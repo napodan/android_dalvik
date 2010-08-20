@@ -220,8 +220,6 @@ static ClassObject* convertSignaturePartToClass(char** pSignature,
 
     if (clazz == NULL) {
         ALOGW("Unable to match class for part: '%s'\n", *pSignature);
-        dvmClearException(dvmThreadSelf());
-        dvmThrowException("Ljava/lang/NoSuchMethodException;", NULL);
     }
     *pSignature = signature;
     return clazz;
