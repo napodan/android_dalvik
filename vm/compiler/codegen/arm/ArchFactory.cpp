@@ -22,6 +22,18 @@
  *
  */
 
+/*
+ * Perform a "reg cmp imm" operation and jump to the PCR region if condition
+ * satisfies.
+ */
+static TGT_LIR *genRegImmCheck(CompilationUnit *cUnit,
+                               ArmConditionCode cond, int reg,
+                               int checkValue, int dOffset,
+                               TGT_LIR *pcrLabel)
+{
+    TGT_LIR *branch = genCmpImmBranch(cUnit, cond, reg, checkValue);
+        return genCheckCommon(cUnit, dOffset, branch, pcrLabel);
+}
 
 /*
  * Perform null-check on a register. sReg is the ssa register being checked,
