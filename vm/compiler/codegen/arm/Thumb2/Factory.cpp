@@ -1089,13 +1089,12 @@ static void loadPair(CompilationUnit *cUnit, int base, int lowReg, int highReg)
 }
 
 /*
- * Perform a "reg cmp imm" operation and jump to the PCR region if condition
- * satisfies.
+ * Generate a register comparison to an immediate and branch.  Caller
+ * is responsible for setting branch target field.
  */
-static ArmLIR *genRegImmCheck(CompilationUnit *cUnit,
+static ArmLIR *genCmpImmBranch(CompilationUnit *cUnit,
                               ArmConditionCode cond, int reg,
-                              int checkValue, int dOffset,
-                              ArmLIR *pcrLabel)
+                              int checkValue)
 {
     ArmLIR *branch;
     int modImm;
@@ -1117,7 +1116,7 @@ static ArmLIR *genRegImmCheck(CompilationUnit *cUnit,
         }
         branch = newLIR2(cUnit, kThumbBCond, 0, cond);
     }
-    return genCheckCommon(cUnit, dOffset, branch, pcrLabel);
+    return branch;
 }
 
 static ArmLIR *fpRegCopy(CompilationUnit *cUnit, int rDest, int rSrc)
