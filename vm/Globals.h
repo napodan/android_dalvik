@@ -327,7 +327,6 @@ struct DvmGlobals {
 
     /* assorted direct buffer helpers */
     Method*     methJavaNioReadWriteDirectByteBuffer_init;
-    Method*     methOrgApacheHarmonyLuniPlatformPlatformAddress_on;
     Method*     methOrgApacheHarmonyNioInternalDirectBuffer_getEffectiveAddress;
     int         offJavaNioBuffer_capacity;
     int         offJavaNioBuffer_effectiveDirectAddress;
