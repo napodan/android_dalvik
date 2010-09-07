@@ -335,7 +335,7 @@ bool dvmJniStartup() {
      * and methods.
      */
     ClassObject* directBufferClass =
-        dvmFindSystemClassNoInit("Lorg/apache/harmony/nio/internal/DirectBuffer;");
+        dvmFindSystemClassNoInit("Ljava/nio/DirectBuffer;");
     ClassObject* readWriteBufferClass =
         dvmFindSystemClassNoInit("Ljava/nio/ReadWriteDirectByteBuffer;");
     ClassObject* bufferClass =
