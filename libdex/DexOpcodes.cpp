@@ -271,7 +271,7 @@ static const char* gOpNames[kNumPackedOpcodes] = {
     "+execute-inline",
     "+execute-inline/range",
     "+invoke-direct-empty",
-    "UNUSED",
+    "+return-void-barrier",
     "+iget-quick",
     "+iget-wide-quick",
     "+iget-object-quick",

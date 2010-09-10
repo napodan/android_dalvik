@@ -5394,6 +5394,7 @@ sput_1nr_common:
     case OP_INVOKE_VIRTUAL_QUICK_RANGE:
     case OP_INVOKE_SUPER_QUICK:
     case OP_INVOKE_SUPER_QUICK_RANGE:
+    case OP_RETURN_VOID_BARRIER:
         failure = VERIFY_ERROR_GENERIC;
         break;
 
@@ -5408,7 +5409,6 @@ sput_1nr_common:
     case OP_UNUSED_79:
     case OP_UNUSED_7A:
     case OP_BREAKPOINT:
-    case OP_UNUSED_F1:
     case OP_UNUSED_FF:
         failure = VERIFY_ERROR_GENERIC;
         break;
