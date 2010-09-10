@@ -311,7 +311,7 @@ typedef enum {
     OP_EXECUTE_INLINE               = 0xee,
     OP_EXECUTE_INLINE_RANGE         = 0xef,
     OP_INVOKE_DIRECT_EMPTY          = 0xf0,
-    OP_UNUSED_F1                    = 0xf1, /* OP_INVOKE_DIRECT_EMPTY_RANGE? */
+    OP_RETURN_VOID_BARRIER          = 0xf1,
     OP_IGET_QUICK                   = 0xf2,
     OP_IGET_WIDE_QUICK              = 0xf3,
     OP_IGET_OBJECT_QUICK            = 0xf4,
@@ -577,7 +577,7 @@ typedef enum {
         H(OP_EXECUTE_INLINE),                                                 \
         H(OP_EXECUTE_INLINE_RANGE),                                           \
         H(OP_INVOKE_DIRECT_EMPTY),                                            \
-        H(OP_UNUSED_F1),                                                      \
+        H(OP_RETURN_VOID_BARRIER),                                                      \
         H(OP_IGET_QUICK),                                                     \
         H(OP_IGET_WIDE_QUICK),                                                \
         H(OP_IGET_OBJECT_QUICK),                                              \
