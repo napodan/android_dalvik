@@ -47,6 +47,8 @@ static bool rewriteExecuteInline(Method* method, u2* insns,
     MethodType methodType);
 static bool rewriteExecuteInlineRange(Method* method, u2* insns,
     MethodType methodType);
+static void rewriteReturnVoid(Method* method, u2* insns);
+static bool needsReturnBarrier(Method* method);
 
 
 /*
@@ -179,6 +181,9 @@ static void optimizeMethod(Method* method, bool essentialOnly)
     if (dvmIsNativeMethod(method) || dvmIsAbstractMethod(method))
         return;
 
+    /* compute this once per method */
+    bool needRetBar = needsReturnBarrier(method);
+
     insns = (u2*) method->insns;
     assert(insns != NULL);
     insnsSize = dvmGetMethodInsnsSize(method);
@@ -274,6 +279,11 @@ rewrite_static_field2:
                 rewriteStaticField(method, insns, volatileOpc);
                 notMatched = false;
                 break;
+            case OP_RETURN_VOID:
+                if (needRetBar)
+                    rewriteReturnVoid(method, insns);
+                notMatched = false;
+                break;
             default:
                 assert(notMatched);
                 break;
@@ -339,7 +349,7 @@ rewrite_static_field2:
  * This will be operating on post-byte-swap DEX data, so values will
  * be in host order.
  */
-static inline void updateCode(const Method* meth, u2* ptr, u2 newVal)
+static inline void dvmUpdateCodeUnit(const Method* meth, u2* ptr, u2 newVal)
 {
     if (gDvm.optimizing) {
         /* dexopt time, alter the output directly */
@@ -348,6 +358,14 @@ static inline void updateCode(const Method* meth, u2* ptr, u2 newVal)
         /* runtime, toggle the page read/write status */
         dvmDexChangeDex2(meth->clazz->pDvmDex, ptr, newVal);
     }
+}
+
+/*
+ * Update the 8-bit opcode portion of a 16-bit code unit in "meth".
+ */
+static inline void updateOpcode(const Method* meth, u2* ptr, Opcode opcode)
+{
+    dvmUpdateCodeUnit(meth, ptr, (ptr[0] & 0xff00) | (u2) opcode);
 }
 
 /*
@@ -660,17 +678,17 @@ static bool rewriteInstField(Method* method, u2* insns, Opcode quickOpc,
     }
 
     if (volatileOpc != OP_NOP && dvmIsVolatileField(&instField->field)) {
-        updateCode(method, insns, (insns[0] & 0xff00) | (u2) volatileOpc);
-        ALOGV("DexOpt: rewrote ifield access %s.%s --> volatile\n",
+        updateOpcode(method, insns, volatileOpc);
+        ALOGV("DexOpt: rewrote ifield access %s.%s --> volatile",
             instField->field.clazz->descriptor, instField->field.name);
     } else if (quickOpc != OP_NOP) {
-        updateCode(method, insns, (insns[0] & 0xff00) | (u2) quickOpc);
-        updateCode(method, insns+1, (u2) instField->byteOffset);
-        ALOGV("DexOpt: rewrote ifield access %s.%s --> %d\n",
+        updateOpcode(method, insns, quickOpc);
+        dvmUpdateCodeUnit(method, insns+1, (u2) instField->byteOffset);
+        ALOGV("DexOpt: rewrote ifield access %s.%s --> %d",
             instField->field.clazz->descriptor, instField->field.name,
             instField->byteOffset);
     } else {
-        ALOGV("DexOpt: no rewrite of ifield access %s.%s\n",
+        ALOGV("DexOpt: no rewrite of ifield access %s.%s",
             instField->field.clazz->descriptor, instField->field.name);
     }
 
@@ -683,10 +701,10 @@ static bool rewriteInstField(Method* method, u2* insns, Opcode quickOpc,
  *
  * "method" is the referring method.
  */
-static bool rewriteStaticField(Method* method, u2* insns, Opcode volatileOpc)
+static bool rewriteStaticField0(Method* method, u2* insns, Opcode volatileOpc,
+    u4 fieldIdx)
 {
     ClassObject* clazz = method->clazz;
-    u2 fieldIdx = insns[1];
     StaticField* staticField;
 
     assert(volatileOpc != OP_NOP);
@@ -701,12 +719,18 @@ static bool rewriteStaticField(Method* method, u2* insns, Opcode volatileOpc)
     }
 
     if (dvmIsVolatileField(&staticField->field)) {
-        updateCode(method, insns, (insns[0] & 0xff00) | (u2) volatileOpc);
-        ALOGV("DexOpt: rewrote sfield access %s.%s --> volatile\n",
+        updateOpcode(method, insns, volatileOpc);
+        ALOGV("DexOpt: rewrote sfield access %s.%s --> volatile",
             staticField->field.clazz->descriptor, staticField->field.name);
     }
 
     return true;
+}
+
+static bool rewriteStaticField(Method* method, u2* insns, Opcode volatileOpc)
+{
+    u2 fieldIdx = insns[1];
+    return rewriteStaticField0(method, insns, volatileOpc, fieldIdx);
 }
 
 /*
@@ -874,10 +898,10 @@ static bool rewriteVirtualInvoke(Method* method, u2* insns, Opcode newOpc)
      * Note: Method->methodIndex is a u2 and is range checked during the
      * initial load.
      */
-    updateCode(method, insns, (insns[0] & 0xff00) | (u2) newOpc);
-    updateCode(method, insns+1, baseMethod->methodIndex);
+    updateOpcode(method, insns, newOpc);
+    dvmUpdateCodeUnit(method, insns+1, baseMethod->methodIndex);
 
-    //ALOGI("DexOpt: rewrote call to %s.%s --> %s.%s\n",
+    //ALOGI("DexOpt: rewrote call to %s.%s --> %s.%s",
     //    method->clazz->descriptor, method->name,
     //    baseMethod->clazz->descriptor, baseMethod->name);
 
@@ -904,9 +928,8 @@ static bool rewriteEmptyDirectInvoke(Method* method, u2* insns)
     calledMethod = dvmOptResolveMethod(clazz, methodIdx, METHOD_DIRECT, NULL);
     if (calledMethod == NULL) {
         ALOGD("DexOpt: unable to opt direct call 0x%04x at 0x%02x in %s.%s",
-            methodIdx,
-            (int) (insns - method->insns), clazz->descriptor,
-            method->name);
+            methodIdx, (int) (insns - method->insns),
+            clazz->descriptor, method->name);
         return false;
     }
 
@@ -919,12 +942,8 @@ static bool rewriteEmptyDirectInvoke(Method* method, u2* insns)
          * OP_INVOKE_DIRECT when debugging is enabled.
          */
         assert((insns[0] & 0xff) == OP_INVOKE_DIRECT);
-        updateCode(method, insns,
-            (insns[0] & 0xff00) | (u2) OP_INVOKE_DIRECT_EMPTY);
+        updateOpcode(method, insns, OP_INVOKE_DIRECT_EMPTY);
 
-        //ALOGI("DexOpt: marked-empty call to %s.%s --> %s.%s\n",
-        //    method->clazz->descriptor, method->name,
-        //    calledMethod->clazz->descriptor, calledMethod->name);
     }
 
     return true;
@@ -1051,9 +1070,8 @@ static bool rewriteExecuteInline(Method* method, u2* insns,
             assert((insns[0] & 0xff) == OP_INVOKE_DIRECT ||
                    (insns[0] & 0xff) == OP_INVOKE_STATIC ||
                    (insns[0] & 0xff) == OP_INVOKE_VIRTUAL);
-            updateCode(method, insns,
-                (insns[0] & 0xff00) | (u2) OP_EXECUTE_INLINE);
-            updateCode(method, insns+1, (u2) inlineSubs->inlineIdx);
+            updateOpcode(method, insns, OP_EXECUTE_INLINE);
+            dvmUpdateCodeUnit(method, insns+1, (u2) inlineSubs->inlineIdx);
 
             //ALOGI("DexOpt: execute-inline %s.%s --> %s.%s",
             //    method->clazz->descriptor, method->name,
@@ -1092,9 +1110,8 @@ static bool rewriteExecuteInlineRange(Method* method, u2* insns,
             assert((insns[0] & 0xff) == OP_INVOKE_DIRECT_RANGE ||
                    (insns[0] & 0xff) == OP_INVOKE_STATIC_RANGE ||
                    (insns[0] & 0xff) == OP_INVOKE_VIRTUAL_RANGE);
-            updateCode(method, insns,
-                (insns[0] & 0xff00) | (u2) OP_EXECUTE_INLINE_RANGE);
-            updateCode(method, insns+1, (u2) inlineSubs->inlineIdx);
+            updateOpcode(method, insns, OP_EXECUTE_INLINE_RANGE);
+            dvmUpdateCodeUnit(method, insns+1, (u2) inlineSubs->inlineIdx);
 
             //ALOGI("DexOpt: execute-inline/range %s.%s --> %s.%s",
             //    method->clazz->descriptor, method->name,
@@ -1106,4 +1123,55 @@ static bool rewriteExecuteInlineRange(Method* method, u2* insns,
     }
 
     return false;
+}
+
+/*
+ * Returns "true" if the return-void instructions in this method should
+ * be converted to return-void-barrier.
+ *
+ * This is needed to satisfy a Java Memory Model requirement regarding
+ * the construction of objects with final fields.  (This does not apply
+ * to <clinit> or static fields, since appropriate barriers are guaranteed
+ * by the class initialization process.)
+ */
+static bool needsReturnBarrier(Method* method)
+{
+    if (!gDvm.dexOptForSmp)
+        return false;
+    if (strcmp(method->name, "<init>") != 0)
+        return false;
+
+    /*
+     * Check to see if the class has any final fields.  If not, we don't
+     * need to generate a barrier instruction.
+     */
+    const ClassObject* clazz = method->clazz;
+    int idx = clazz->ifieldCount;
+    while (--idx >= 0) {
+        if (dvmIsFinalField(&clazz->ifields[idx].field))
+            break;
+    }
+    if (idx < 0)
+        return false;
+
+    /*
+     * In theory, we only need to do this if the method actually modifies
+     * a final field.  In practice, non-constructor methods are allowed
+     * to modify final fields by the VM, and there are tools that rely on
+     * this behavior.  (The compiler does not allow it.)
+     *
+     * If we alter the verifier to restrict final-field updates to
+     * constructors, we can tighten this up as well.
+     */
+
+    return true;
+}
+
+/*
+ * Convert a return-void to a return-void-barrier.
+ */
+static void rewriteReturnVoid(Method* method, u2* insns)
+{
+    assert((insns[0] & 0xff) == OP_RETURN_VOID);
+    updateOpcode(method, insns, OP_RETURN_VOID_BARRIER);
 }
