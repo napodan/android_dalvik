@@ -1323,6 +1323,7 @@ int dvmStartup(int argc, const char* const argv[], bool ignoreUnrecognized,
     if (!dvmDebuggerStartup())
         goto fail;
 
+
     /*
      * Init for either zygote mode or non-zygote mode.  The key difference
      * is that we don't start any additional threads in Zygote mode.
@@ -1382,18 +1383,18 @@ static void loadJniLibrary(const char* name) {
  */
 static bool registerSystemNatives(JNIEnv* pEnv)
 {
-    Thread* self;
+    // Main thread is always first in list.
+    Thread* self = gDvm.threadList;
 
-    /* main thread is always first in list */
-    self = gDvm.threadList;
-
-    /* must set this before allowing JNI-based method registration */
+    // Must set this before allowing JNI-based method registration.
     self->status = THREAD_NATIVE;
 
+    // Most JNI libraries can just use System.loadLibrary, but you can't
+    // if you're the library that implements System.loadLibrary!
     loadJniLibrary("javacore");
     loadJniLibrary("nativehelper");
 
-    /* back to run mode */
+    // Back to run mode.
     self->status = THREAD_RUNNING;
 
     return true;

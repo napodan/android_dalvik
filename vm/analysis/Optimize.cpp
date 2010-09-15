@@ -62,7 +62,6 @@ InlineSub* dvmCreateInlineSubsTable(void)
     const InlineOperation* ops = dvmGetInlineOpsTable();
     const int count = dvmGetInlineOpsTableLength();
     InlineSub* table;
-    ClassObject* clazz;
     int i, tableIndex;
 
     /*
@@ -72,49 +71,16 @@ InlineSub* dvmCreateInlineSubsTable(void)
 
     tableIndex = 0;
     for (i = 0; i < count; i++) {
-        clazz = dvmFindClassNoInit(ops[i].classDescriptor, NULL);
-        if (clazz == NULL) {
-            ALOGV("DexOpt: can't inline for class '%s': not found\n",
-                ops[i].classDescriptor);
-            dvmClearOptException(dvmThreadSelf());
-        } else {
-            /*
-             * Method could be virtual or direct.  Try both.  Don't use
-             * the "hier" versions.
-             */
-            Method* method = dvmFindDirectMethodByDescriptor(clazz, ops[i].methodName,
-                        ops[i].methodSignature);
-            if (method == NULL)
-                method = dvmFindVirtualMethodByDescriptor(clazz, ops[i].methodName,
-                        ops[i].methodSignature);
-            if (method == NULL) {
-                ALOGW("DexOpt: can't inline %s.%s %s: method not found\n",
-                    ops[i].classDescriptor, ops[i].methodName,
-                    ops[i].methodSignature);
-            } else {
-                if (!dvmIsFinalClass(clazz) && !dvmIsFinalMethod(method)) {
-                    ALOGW("DexOpt: WARNING: inline op on non-final class/method "
-                         "%s.%s\n",
-                        clazz->descriptor, method->name);
-                    /* fail? */
-                }
-                if (dvmIsSynchronizedMethod(method) ||
-                    dvmIsDeclaredSynchronizedMethod(method))
-                {
-                    ALOGW("DexOpt: WARNING: inline op on synchronized method "
-                         "%s.%s\n",
-                        clazz->descriptor, method->name);
-                    /* fail? */
-                }
+        Method* method = dvmFindInlinableMethod(ops[i].classDescriptor,
+            ops[i].methodName, ops[i].methodSignature);
+        if (method != NULL) {
+            table[tableIndex].method = method;
+            table[tableIndex].inlineIdx = i;
+            tableIndex++;
 
-                table[tableIndex].method = method;
-                table[tableIndex].inlineIdx = i;
-                tableIndex++;
-
-                ALOGV("DexOpt: will inline %d: %s.%s %s\n", i,
-                    ops[i].classDescriptor, ops[i].methodName,
-                    ops[i].methodSignature);
-            }
+            ALOGV("DexOpt: will inline %d: %s.%s %s\n", i,
+                ops[i].classDescriptor, ops[i].methodName,
+                ops[i].methodSignature);
         }
     }
 
