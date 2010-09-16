@@ -152,15 +152,6 @@ bool dvmExceptionStartup(void)
         return false;
     }
 
-    /* and one for the message field, in case we want to show it */
-    gDvm.offJavaLangThrowable_message =
-        dvmFindFieldOffset(gDvm.classJavaLangThrowable,
-            "detailMessage", "Ljava/lang/String;");
-    if (gDvm.offJavaLangThrowable_message < 0) {
-        ALOGE("Unable to find Throwable.detailMessage\n");
-        return false;
-    }
-
     /* and one for the cause field, just 'cause */
     gDvm.offJavaLangThrowable_cause =
         dvmFindFieldOffset(gDvm.classJavaLangThrowable,
@@ -1242,14 +1233,60 @@ void dvmLogRawStackTrace(const int* intVals, int stackDepth)
 }
 
 /*
+ * Get the message string.  We'd like to just grab the field out of
+ * Throwable, but the getMessage() function can be overridden by the
+ * sub-class.
+ *
+ * Returns the message string object, or NULL if it wasn't set or
+ * we encountered a failure trying to retrieve it.  The string will
+ * be added to the tracked references table.
+ */
+static StringObject* getExceptionMessage(Object* exception)
+{
+    Thread* self = dvmThreadSelf();
+    Method* getMessageMethod;
+    StringObject* messageStr = NULL;
+
+    assert(exception == self->exception);
+    self->exception = NULL;
+
+    getMessageMethod = dvmFindVirtualMethodHierByDescriptor(exception->clazz,
+            "getMessage", "()Ljava/lang/String;");
+    if (getMessageMethod != NULL) {
+        /* could be in NATIVE mode from CheckJNI, so switch state */
+        ThreadStatus oldStatus = dvmChangeStatus(self, THREAD_RUNNING);
+        JValue result;
+
+        dvmCallMethod(self, getMessageMethod, exception, &result);
+        messageStr = (StringObject*) result.l;
+        dvmAddTrackedAlloc((Object*) messageStr, self);
+
+        dvmChangeStatus(self, oldStatus);
+    } else {
+        ALOGW("WARNING: could not find getMessage in %s",
+            exception->clazz->descriptor);
+    }
+
+    if (self->exception != NULL) {
+        ALOGW("NOTE: exception thrown while retrieving exception message: %s",
+            self->exception->clazz->descriptor);
+    }
+
+    self->exception = exception;
+    return messageStr;
+}
+
+/*
  * Print the direct stack trace of the given exception to the log.
  */
 static void logStackTraceOf(Object* exception) {
     char* className = dvmDescriptorToDot(exception->clazz->descriptor);
-    StringObject* messageStr = (StringObject*) dvmGetFieldObject(exception,
-                    gDvm.offJavaLangThrowable_message);
+    StringObject* messageStr = getExceptionMessage(exception);
     if (messageStr != NULL) {
         char* cp = dvmCreateCstrFromString(messageStr);
+        dvmReleaseTrackedAlloc((Object*) messageStr, dvmThreadSelf());
+        messageStr = NULL;
+
         ALOGI("%s: %s", className, cp);
         free(cp);
     } else {
