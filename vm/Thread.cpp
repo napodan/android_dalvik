@@ -3115,6 +3115,8 @@ ThreadStatus dvmChangeStatus(Thread* self, ThreadStatus newStatus)
         self->threadId, self->status, newStatus);
 
     oldStatus = self->status;
+    if (oldStatus == newStatus)
+        return oldStatus;
 
     if (newStatus == THREAD_RUNNING) {
         /*
