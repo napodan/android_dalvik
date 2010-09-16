@@ -1245,16 +1245,17 @@ void dvmLogRawStackTrace(const int* intVals, int stackDepth)
  * Print the direct stack trace of the given exception to the log.
  */
 static void logStackTraceOf(Object* exception) {
-
+    char* className = dvmDescriptorToDot(exception->clazz->descriptor);
     StringObject* messageStr = (StringObject*) dvmGetFieldObject(exception,
                     gDvm.offJavaLangThrowable_message);
     if (messageStr != NULL) {
         char* cp = dvmCreateCstrFromString(messageStr);
-        ALOGI("%s: %s\n", exception->clazz->descriptor, cp);
+        ALOGI("%s: %s", className, cp);
         free(cp);
     } else {
-        ALOGI("%s:\n", exception->clazz->descriptor);
+        ALOGI("%s:", className);
     }
+    free(className);
 
     /*
      * This relies on the stackState field, which contains the "raw"
