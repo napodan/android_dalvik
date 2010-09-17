@@ -515,7 +515,7 @@ void dvmJitStats()
 }
 
 
-void setTraceConstruction(JitEntry *slot, bool value)
+static void setTraceConstruction(JitEntry *slot, bool value)
 {
 
     JitEntryInfoUnion oldValue;
@@ -528,7 +528,7 @@ void setTraceConstruction(JitEntry *slot, bool value)
             &slot->u.infoWord) != 0);
 }
 
-void resetTracehead(InterpState* interpState, JitEntry *slot)
+static void resetTracehead(InterpState* interpState, JitEntry *slot)
 {
     slot->codeAddress = dvmCompilerGetInterpretTemplate();
     setTraceConstruction(slot, false);
