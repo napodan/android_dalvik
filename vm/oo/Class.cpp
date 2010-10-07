@@ -205,7 +205,7 @@ static void logClassLoadWithTime(char type, ClassObject* clazz, u8 time) {
     pid_t pid = getpid();
     unsigned int tid = (unsigned int) pthread_self();
 
-    LOG(LOG_INFO, "PRELOAD", "%c%d:%d:%d:%s:%d:%s:%lld\n", type, ppid, pid, tid,
+    ALOG(LOG_INFO, "PRELOAD", "%c%d:%d:%d:%s:%d:%s:%lld", type, ppid, pid, tid,
         get_process_name(), (int) clazz->classLoader, clazz->descriptor,
         time);
 }
@@ -342,6 +342,7 @@ bool dvmClassStartup()
         classObjectSize(CLASS_SFIELD_SLOTS), ALLOC_DEFAULT);
     DVM_OBJECT_INIT(&gDvm.classJavaLangClass->obj, gDvm.classJavaLangClass);
     gDvm.classJavaLangClass->descriptor = "Ljava/lang/Class;";
+
     /*
      * Process the bootstrap class path.  This means opening the specified
      * DEX or Jar files and possibly running them through the optimizer.
@@ -351,6 +352,19 @@ bool dvmClassStartup()
 
     if (gDvm.bootClassPath == NULL)
         return false;
+
+    /*
+     * We should be able to find classes now.  Get the vtable index for
+     * the class loader loadClass() method.
+     */
+    ClassObject* clClass = dvmFindSystemClassNoInit("Ljava/lang/ClassLoader;");
+    Method* meth = dvmFindVirtualMethodByDescriptor(clClass, "loadClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;");
+    if (meth == NULL) {
+        ALOGE("Unable to find loadClass() in java.lang.ClassLoader\n");
+        return false;
+    }
+    gDvm.voffJavaLangClassLoader_loadClass = meth->methodIndex;
 
     return true;
 }
@@ -480,11 +494,9 @@ static bool prepareCpe(ClassPathEntry* cpe, bool isBootstrap)
     JarFile* pJarFile = NULL;
     RawDexFile* pRawDexFile = NULL;
     struct stat sb;
-    int cc;
 
-    cc = stat(cpe->fileName, &sb);
-    if (cc < 0) {
-        ALOGD("Unable to stat classpath element '%s'\n", cpe->fileName);
+    if (stat(cpe->fileName, &sb) < 0) {
+        ALOGD("Unable to stat classpath element '%s'", cpe->fileName);
         return false;
     }
     if (S_ISDIR(sb.st_mode)) {
@@ -614,7 +626,11 @@ static ClassPathEntry* processClassPath(const char* pathStr, bool isBootstrap)
     }
     assert(idx <= count);
     if (idx == 0 && !gDvm.optimizing) {
-        ALOGE("No valid entries found in bootclasspath '%s'\n", pathStr);
+        /*
+         * There's no way the vm will be doing anything if this is the
+         * case, so just bail out (reasonably) gracefully.
+         */
+        ALOGE("No valid entries found in bootclasspath '%s'", pathStr);
         free(cpe);
         cpe = NULL;
         goto bail;
@@ -1243,15 +1259,7 @@ static ClassObject* findClassFromLoaderNoInit(const char* descriptor,
         goto bail;
     }
 
-    {
-        Method* loadClass = dvmFindVirtualMethodHierByDescriptor(loader->clazz, "loadClass",
-                 "(Ljava/lang/String;)Ljava/lang/Class;");
-        if (loadClass == NULL) {
-            ALOGW("Couldn't find loadClass in ClassLoader\n");
-            goto bail;
-        }
-
-        dvmMethodTraceClassPrepBegin();
+    dvmMethodTraceClassPrepBegin();
 
     /*
      * Invoke loadClass().  This will probably result in a couple of
@@ -1260,6 +1268,9 @@ static ClassObject* findClassFromLoaderNoInit(const char* descriptor,
      * the bootstrap class loader can find it before doing its own load.
      */
     LOGVV("--- Invoking loadClass(%s, %p)", dotName, loader);
+    {
+        const Method* loadClass =
+            loader->clazz->vtable[gDvm.voffJavaLangClassLoader_loadClass];
         JValue result;
         dvmCallMethod(self, loadClass, loader, &result, nameObj);
         clazz = (ClassObject*) result.l;
@@ -3132,8 +3143,9 @@ static bool createIftable(ClassObject* clazz)
                     == 0)
                 {
                     LOGVV("INTF:   matched at %d", j);
-                    if (!dvmIsPublicMethod(clazz->vtable[j])) {
-                        ALOGW("Implementation of %s.%s is not public\n",
+                    if (!dvmIsPublicMethod(clazz->vtable[j]))
+                    {
+                        ALOGW("Implementation of %s.%s is not public",
                             clazz->descriptor, clazz->vtable[j]->name);
                         dvmThrowException("Ljava/lang/IllegalAccessError;",
                             "interface implementation not public");
