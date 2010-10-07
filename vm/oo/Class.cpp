@@ -4122,7 +4122,10 @@ static bool validateSuperDescriptors(const ClassObject* clazz)
  */
 bool dvmIsClassInitializing(const ClassObject* clazz)
 {
-    return (clazz->status == CLASS_INITIALIZING &&
+    const int32_t* addr = (const int32_t*)(const void*)&clazz->status;
+    int32_t value = android_atomic_acquire_load(addr);
+    ClassStatus status = static_cast<ClassStatus>(value);
+    return (status == CLASS_INITIALIZING &&
             clazz->initThreadId == dvmThreadSelf()->threadId);
 }
 
@@ -4390,8 +4393,10 @@ noverify:
     initializedByUs = true;
 #endif
 
-    clazz->status = CLASS_INITIALIZING;
+    /* order matters here, esp. interaction with dvmIsClassInitializing */
     clazz->initThreadId = self->threadId;
+    android_atomic_release_store(CLASS_INITIALIZING,
+                                 (int32_t*)(void*)&clazz->status);
     dvmUnlockObject(self, (Object*) clazz);
 
     /* init our superclass */
