@@ -1677,6 +1677,7 @@ static jclass FindClass(JNIEnv* env, const char* name) {
     ClassObject* clazz;
     jclass jclazz = NULL;
     Object* loader;
+    Object* trackedLoader = NULL;
     char* descriptor = NULL;
 
     thisMethod = dvmGetCurrentJNIMethod();
@@ -1696,7 +1697,7 @@ static jclass FindClass(JNIEnv* env, const char* name) {
     } else if (thisMethod == gDvm.methFakeNativeEntry) {
         /* start point of invocation interface */
         if (!gDvm.initializing)
-            loader = dvmGetSystemClassLoader();
+            loader = trackedLoader = dvmGetSystemClassLoader();
         else
             loader = NULL;
     } else {
@@ -1705,6 +1706,8 @@ static jclass FindClass(JNIEnv* env, const char* name) {
 
     clazz = dvmFindClassNoInit(descriptor, loader);
     jclazz = (jclass) addLocalReference(env, (Object*) clazz);
+
+    dvmReleaseTrackedAlloc(trackedLoader, _self);
 
 bail:
     free(descriptor);

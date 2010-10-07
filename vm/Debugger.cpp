@@ -1329,12 +1329,12 @@ void dvmDbgOutputAllInterfaces(RefTypeId refTypeId, ExpandBuf* pReply)
     }
 }
 
-typedef struct DebugCallbackContext {
+struct DebugCallbackContext {
     int numItems;
     ExpandBuf* pReply;
     // used by locals table
     bool withGeneric;
-} DebugCallbackContext;
+};
 
 static int lineTablePositionsCb(void *cnxt, u4 address, u4 lineNum)
 {
@@ -1407,7 +1407,7 @@ static int tweakSlot(int slot, const char* name)
     else if (slot == 0)                 // always remap slot 0
         newSlot = kSlot0Sub;
 
-    ALOGV("untweak: %d to %d\n", slot, newSlot);
+    ALOGV("untweak: %d to %d", slot, newSlot);
     return newSlot;
 }
 
@@ -1426,7 +1426,7 @@ static int untweakSlot(int slot, const void* framePtr)
         newSlot = method->registersSize - method->insSize;
     }
 
-    ALOGV("untweak: %d to %d\n", slot, newSlot);
+    ALOGV("untweak: %d to %d", slot, newSlot);
     return newSlot;
 }
 
@@ -1438,7 +1438,7 @@ static void variableTableCb (void *cnxt, u2 reg, u4 startAddress,
 
     reg = (u2) tweakSlot(reg, name);
 
-    ALOGV("    %2d: %d(%d) '%s' '%s' slot=%d\n",
+    ALOGV("    %2d: %d(%d) '%s' '%s' slot=%d",
         pContext->numItems, startAddress, endAddress - startAddress,
         name, descriptor, reg);
 
@@ -1602,14 +1602,16 @@ void dvmDbgSetFieldValue(ObjectId objectId, FieldId fieldId, u8 value,
         dvmSetFieldLong(obj, field->byteOffset, value);
         break;
     default:
-        ALOGE("ERROR: unhandled class type '%s'\n", field->field.signature);
+        ALOGE("ERROR: unhandled class type '%s'", field->field.signature);
         assert(false);
         break;
     }
 }
 
 /*
- * Copy the value of a static field into the specified buffer.
+ * Copy the value of a static field into the output buffer, preceded
+ * by an appropriate tag.  The tag is based on the value held by the
+ * field, not the field's type.
  */
 void dvmDbgGetStaticFieldValue(RefTypeId refTypeId, FieldId fieldId, u1* buf,
     int expectedLen)
@@ -1718,7 +1720,7 @@ void dvmDbgSetStaticFieldValue(RefTypeId refTypeId, FieldId fieldId,
         dvmSetStaticFieldDouble(sfield, value.d);
         break;
     default:
-        ALOGE("ERROR: unhandled class type '%s'\n", sfield->field.signature);
+        ALOGE("ERROR: unhandled class type '%s'", sfield->field.signature);
         assert(false);
         break;
     }
@@ -1893,45 +1895,19 @@ bail:
     return result;
 }
 
-#if 0
-/*
- * Wait until a thread suspends.
- *
- * We stray from the usual pattern here, and release the thread list lock
- * before we use the Thread.  This is necessary and should be safe in this
- * circumstance; see comments in dvmWaitForSuspend().
- */
-void dvmDbgWaitForSuspend(ObjectId threadId)
-{
-    Object* threadObj;
-    Thread* thread;
-
-    threadObj = objectIdToObject(threadId);
-    assert(threadObj != NULL);
-
-    dvmLockThreadList(NULL);
-    thread = threadObjToThread(threadObj);
-    dvmUnlockThreadList();
-
-    if (thread != NULL)
-        dvmWaitForSuspend(thread);
-}
-#endif
-
-
 /*
  * Return the ObjectId for the "system" thread group.
  */
-ObjectId dvmDbgGetSystemThreadGroupId(void)
+ObjectId dvmDbgGetSystemThreadGroupId()
 {
     Object* groupObj = dvmGetSystemThreadGroup();
     return objectToObjectId(groupObj);
 }
 
 /*
- * Return the ObjectId for the "system" thread group.
+ * Return the ObjectId for the "main" thread group.
  */
-ObjectId dvmDbgGetMainThreadGroupId(void)
+ObjectId dvmDbgGetMainThreadGroupId()
 {
     Object* groupObj = dvmGetMainThreadGroup();
     return objectToObjectId(groupObj);
@@ -2143,33 +2119,29 @@ void dvmDbgGetAllThreads(ObjectId** ppThreadIds, u4* pThreadCount)
 /*
  * Count up the #of frames on the thread's stack.
  *
- * Returns -1 on failure;
+ * Returns -1 on failure.
  */
 int dvmDbgGetThreadFrameCount(ObjectId threadId)
 {
     Object* threadObj;
     Thread* thread;
-    void* framePtr;
     u4 count = 0;
 
     threadObj = objectIdToObject(threadId);
 
     dvmLockThreadList(NULL);
-
     thread = threadObjToThread(threadObj);
-    if (thread == NULL)
-        goto bail;
+    if (thread != NULL) {
+        void* framePtr = thread->curFrame;
+        while (framePtr != NULL) {
+            if (!dvmIsBreakFrame((const u4*)framePtr))
+                count++;
 
-    framePtr = thread->curFrame;
-    while (framePtr != NULL) {
-        if (!dvmIsBreakFrame((const u4*)framePtr))
-            count++;
-
-        framePtr = SAVEAREA_FROM_FP(framePtr)->prevFrame;
+            framePtr = SAVEAREA_FROM_FP(framePtr)->prevFrame;
+        }
     }
-
-bail:
     dvmUnlockThreadList();
+
     return count;
 }
 
@@ -2885,6 +2857,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
      * to preserve that across the method invocation.
      */
     oldExcept = dvmGetException(self);
+    dvmAddTrackedAlloc(oldExcept, self);
     dvmClearException(self);
 
     oldStatus = dvmChangeStatus(self, THREAD_RUNNING);
@@ -2938,6 +2911,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
 
     if (oldExcept != NULL) {
         dvmSetException(self, oldExcept);
+        dvmReleaseTrackedAlloc(oldExcept, self);
     }
     dvmChangeStatus(self, oldStatus);
 }
