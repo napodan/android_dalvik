@@ -724,6 +724,7 @@ void dvmPrintExceptionStackTrace()
     if (exception == NULL)
         return;
 
+    dvmAddTrackedAlloc(exception, self);
     self->exception = NULL;
     printMethod = dvmFindVirtualMethodHierByDescriptor(exception->clazz,
                     "printStackTrace", "()V");
@@ -741,6 +742,7 @@ void dvmPrintExceptionStackTrace()
     }
 
     self->exception = exception;
+    dvmReleaseTrackedAlloc(exception, self);
 }
 
 /*
@@ -1248,6 +1250,7 @@ static StringObject* getExceptionMessage(Object* exception)
     StringObject* messageStr = NULL;
 
     assert(exception == self->exception);
+    dvmAddTrackedAlloc(exception, self);
     self->exception = NULL;
 
     getMessageMethod = dvmFindVirtualMethodHierByDescriptor(exception->clazz,
@@ -1274,6 +1277,7 @@ static StringObject* getExceptionMessage(Object* exception)
     }
 
     self->exception = exception;
+    dvmReleaseTrackedAlloc(exception, self);
     return messageStr;
 }
 
