@@ -54,6 +54,7 @@ typedef struct ClassPathEntry {
 } ClassPathEntry;
 
 bool dvmClassStartup(void);
+bool dvmBaseClassStartup(void);
 void dvmClassShutdown(void);
 bool dvmPrepBootClassPath(bool isNormalStart);
 

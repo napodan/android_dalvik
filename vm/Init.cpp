@@ -1238,6 +1238,8 @@ int dvmStartup(int argc, const char* const argv[], bool ignoreUnrecognized,
         goto fail;
     if (!dvmClassStartup())
         goto fail;
+    if (!dvmBaseClassStartup())
+        goto fail;
     if (!dvmThreadObjStartup())
         goto fail;
     if (!dvmExceptionStartup())
