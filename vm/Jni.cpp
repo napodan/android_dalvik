@@ -3321,7 +3321,7 @@ static jobject NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity) {
     JNI_ENTER();
 
     Thread* self = _self /*dvmThreadSelf()*/;
-    JValue callResult;
+    JValue unused;
     jobject result = NULL;
     ClassObject* bufferClazz = gDvm.classJavaNioReadWriteDirectByteBuffer;
 
@@ -3336,7 +3336,7 @@ static jobject NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity) {
         /* call the constructor */
         result = addLocalReference(env, newObj);
         dvmCallMethod(self, gDvm.methJavaNioReadWriteDirectByteBuffer_init,
-                newObj, &callResult, (jint) address, (jint) capacity);
+                newObj, &unused, (jint) address, (jint) capacity);
         if (dvmGetException(self) != NULL) {
             deleteLocalReference(env, result);
             result = NULL;
