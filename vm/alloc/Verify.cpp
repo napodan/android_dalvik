@@ -42,7 +42,6 @@ static void dumpReferencesCallback(void *ptr, void *arg)
 {
     Object *obj = (Object *)arg;
     if (ptr == obj) {
-        ALOGD("skipping %p == %p", ptr, obj);
         return;
     }
     dvmVisitObject(dumpReferencesVisitor, (Object *)ptr, &obj);
