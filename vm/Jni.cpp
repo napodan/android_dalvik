@@ -2882,8 +2882,9 @@ static jobjectArray NewObjectArray(JNIEnv* env, jsize length,
 static bool checkArrayElementBounds(ArrayObject* arrayObj, jsize index) {
     assert(arrayObj != NULL);
     if (index < 0 || index >= (int) arrayObj->length) {
-        dvmThrowException("Ljava/lang/ArrayIndexOutOfBoundsException;",
-            arrayObj->obj.clazz->descriptor);
+        dvmThrowExceptionFmt("Ljava/lang/ArrayIndexOutOfBoundsException;",
+            "%s index=%d length=%d", arrayObj->obj.clazz->descriptor, index,
+            arrayObj->length);
         return false;
     }
     return true;
@@ -2996,6 +2997,15 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double, 'D');
         JNI_EXIT();                                                         \
     }
 
+static void throwArrayRegionOutOfBounds(ArrayObject* arrayObj, jsize start,
+    jsize len, const char* arrayIdentifier)
+{
+    dvmThrowExceptionFmt("Ljava/lang/ArrayIndexOutOfBoundsException;",
+        "%s offset=%d length=%d %s.length=%d",
+        arrayObj->obj.clazz->descriptor, start, len, arrayIdentifier,
+        arrayObj->length);
+}
+
 /*
  * Copy a section of a primitive array to a buffer.
  */
@@ -3007,12 +3017,11 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double, 'D');
         ArrayObject* arrayObj = (ArrayObject*) dvmDecodeIndirectRef(env, jarr); \
         _ctype* data = (_ctype*) (void*) arrayObj->contents; \
         if (start < 0 || len < 0 || start + len > (int) arrayObj->length) { \
-            dvmThrowException("Ljava/lang/ArrayIndexOutOfBoundsException;", \
-                arrayObj->obj.clazz->descriptor); \
+            throwArrayRegionOutOfBounds(arrayObj, start, len, "src"); \
         } else { \
             memcpy(buf, data + start, len * sizeof(_ctype)); \
         } \
-        JNI_EXIT(); \
+        JNI_EXIT();                                                         \
     }
 
 /*
@@ -3026,12 +3035,11 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double, 'D');
         ArrayObject* arrayObj = (ArrayObject*) dvmDecodeIndirectRef(env, jarr); \
         _ctype* data = (_ctype*) (void*) arrayObj->contents; \
         if (start < 0 || len < 0 || start + len > (int) arrayObj->length) { \
-            dvmThrowException("Ljava/lang/ArrayIndexOutOfBoundsException;", \
-                arrayObj->obj.clazz->descriptor); \
+            throwArrayRegionOutOfBounds(arrayObj, start, len, "dst"); \
         } else { \
             memcpy(data + start, buf, len * sizeof(_ctype)); \
         } \
-        JNI_EXIT(); \
+        JNI_EXIT();                                                         \
     }
 
 /*
