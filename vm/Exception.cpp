@@ -1344,3 +1344,9 @@ void dvmLogExceptionStackTrace()
         exception = cause;
     }
 }
+
+void dvmThrowAIOOBE(int index, int length)
+{
+    dvmThrowExceptionFmt("Ljava/lang/ArrayIndexOutOfBoundsException;",
+        "index=%d length=%d", index, length);
+}
