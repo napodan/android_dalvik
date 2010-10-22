@@ -23,7 +23,8 @@
     mov     r0, r1                      @ r0<- newFP
     add     r1, rGLUE, #offGlue_retval  @ r1<- &retval
 
-    LDR_PC_LR "[r2, #offMethod_nativeFunc]"
+    mov     lr, pc
+    ldr     pc, [r2, #offMethod_nativeFunc]
 
     @ Refresh Jit's on/off status
     ldr     r3, [rGLUE, #offGlue_ppJitProfTable]
