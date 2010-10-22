@@ -693,9 +693,8 @@ dalvik_mterp:
 .Lskip:
 #endif
 
-    @mov     lr, pc                      @ set return addr
-    @ldr     pc, [r2, #offMethod_nativeFunc] @ pc<- methodToCall->nativeFunc
-    LDR_PC_LR "[r2, #offMethod_nativeFunc]"
+    mov     lr, pc                      @ set return addr
+    ldr     pc, [r2, #offMethod_nativeFunc] @ pc<- methodToCall->nativeFunc
 
 #if defined(WITH_JIT)
     ldr     r3, [rGLUE, #offGlue_ppJitProfTable] @ Refresh Jit's on/off status
