@@ -1195,6 +1195,13 @@ static void dumpFrames(const DebugOutputTarget* target, void* framePtr,
     bool first = true;
 
     /*
+     * We call functions that require us to be holding the thread list lock.
+     * It's probable that the caller has already done so, but it's not
+     * guaranteed.  If it's not locked, lock it now.
+     */
+    bool needThreadUnlock = dvmTryLockThreadList();
+
+    /*
      * The "currentPc" is updated whenever we execute an instruction that
      * might throw an exception.  Show it here.
      */
@@ -1245,9 +1252,19 @@ static void dumpFrames(const DebugOutputTarget* target, void* framePtr,
                     Monitor* mon = thread->waitMonitor;
                     Object* obj = dvmGetMonitorObject(mon);
                     if (obj != NULL) {
+                        Thread* joinThread = NULL;
                         className = dvmDescriptorToDot(obj->clazz->descriptor);
-                        dvmPrintDebugMessage(target,
-                            "  - waiting on <%p> (a %s)\n", obj, className);
+                        if (strcmp(className, "java.lang.VMThread") == 0) {
+                            joinThread = dvmGetThreadFromThreadObject(obj);
+                        }
+                        if (joinThread == NULL) {
+                            dvmPrintDebugMessage(target,
+                                "  - waiting on <%p> (a %s)\n", obj, className);
+                        } else {
+                            dvmPrintDebugMessage(target,
+                                "  - waiting on <%p> (a %s) tid=%d\n",
+                                obj, className, joinThread->threadId);
+                        }
                         free(className);
                     }
                 } else if (thread->status == THREAD_MONITOR) {
@@ -1298,6 +1315,10 @@ static void dumpFrames(const DebugOutputTarget* target, void* framePtr,
         }
     }
     dvmPrintDebugMessage(target, "\n");
+
+    if (needThreadUnlock) {
+        dvmUnlockThreadList();
+    }
 }
 
 
