@@ -51,12 +51,8 @@ static void dumpReferencesCallback(void *ptr, void *arg)
     }
 }
 
-/*
- * Visitor applied to each root to search for things that point to an
- * object.  Logs a message when a match is found.
- */
-static void dumpReferencesRootVisitor(void *ptr,
-                                      void *arg)
+static void dumpReferencesRootVisitor(void *ptr, u4 threadId,
+                                      RootType type, void *arg)
 {
     Object *obj = *(Object **)ptr;
     Object *lookingFor = *(Object **)arg;
@@ -134,9 +130,18 @@ void dvmVerifyBitmap(const HeapBitmap *bitmap)
 }
 
 /*
+ * Helper function to call verifyReference from the root verifier.
+ */
+static void verifyRootReference(void *addr, u4 threadId,
+                                RootType type, void *arg)
+{
+    verifyReference(addr, arg);
+}
+
+/*
  * Verifies references in the roots.
  */
 void dvmVerifyRoots()
 {
-    dvmVisitRoots(verifyReference, NULL);
+    dvmVisitRoots(verifyRootReference, NULL);
 }

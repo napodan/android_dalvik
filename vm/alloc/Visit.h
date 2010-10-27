@@ -34,7 +34,9 @@ typedef enum {
   ROOT_MONITOR_USED,
   ROOT_THREAD_OBJECT,
   ROOT_INTERNED_STRING,
+  ROOT_FINALIZING,
   ROOT_DEBUGGER,
+  ROOT_REFERENCE_CLEANUP,
   ROOT_VM_INTERNAL,
   ROOT_JNI_MONITOR,
 } RootType;
@@ -60,7 +62,7 @@ void dvmVisitObject(Visitor *visitor, Object *obj, void *arg);
 /*
  * Visits references in the root set.
  */
-void dvmVisitRoots(Visitor *visitor, void *arg);
+void dvmVisitRoots(RootVisitor *visitor, void *arg);
 
 #ifdef __cplusplus
 };
