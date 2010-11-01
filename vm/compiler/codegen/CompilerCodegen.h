@@ -66,7 +66,7 @@ bool dvmCompilerArchVariantInit(void);
 int dvmCompilerTargetOptHint(int key);
 
 /* Implemented in codegen/<target>/<target_variant>/ArchVariant.c */
-void dvmCompilerGenMemBarrier(CompilationUnit *cUnit);
+void dvmCompilerGenMemBarrier(CompilationUnit *cUnit, int barrierKind);
 
 #ifdef __cplusplus
 };

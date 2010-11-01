@@ -317,7 +317,7 @@ static void genIGet(CompilationUnit *cUnit, MIR *mir, OpSize size,
                  size, rlObj.sRegLow);
     HEAP_ACCESS_SHADOW(false);
     if (isVolatile) {
-        dvmCompilerGenMemBarrier(cUnit);
+        dvmCompilerGenMemBarrier(cUnit, kSY);
     }
 
     storeValue(cUnit, rlDest, rlResult);
@@ -339,7 +339,7 @@ static void genIPut(CompilationUnit *cUnit, MIR *mir, OpSize size,
                  NULL);/* null object? */
 
     if (isVolatile) {
-        dvmCompilerGenMemBarrier(cUnit);
+        dvmCompilerGenMemBarrier(cUnit, kSY);
     }
     HEAP_ACCESS_SHADOW(true);
     storeBaseDisp(cUnit, rlObj.lowReg, fieldOffset, rlSrc.lowReg, size);
@@ -1325,19 +1325,21 @@ static bool handleFmt10x(CompilationUnit *cUnit, MIR *mir)
 {
     Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     if ((dalvikOpcode >= OP_UNUSED_3E) && (dalvikOpcode <= OP_UNUSED_43)) {
-        ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpcode);
+        ALOGE("Codegen: got unused opcode %#x",dalvikOpcode);
         return true;
     }
     switch (dalvikOpcode) {
-        case OP_RETURN_VOID:
         case OP_RETURN_VOID_BARRIER:
+            dvmCompilerGenMemBarrier(cUnit, kST);
+            // Intentional fallthrough
+        case OP_RETURN_VOID:
             genReturnCommon(cUnit,mir);
             break;
         case OP_UNUSED_73:
         case OP_UNUSED_79:
         case OP_UNUSED_7A:
         case OP_UNUSED_FF:
-            ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpcode);
+            ALOGE("Codegen: got unused opcode %#x",dalvikOpcode);
             return true;
         case OP_NOP:
             break;
@@ -1486,7 +1488,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
             loadConstant(cUnit, tReg,  (int) fieldPtr + valOffset);
 
             if (isVolatile) {
-                dvmCompilerGenMemBarrier(cUnit);
+                dvmCompilerGenMemBarrier(cUnit, kSY);
             }
             HEAP_ACCESS_SHADOW(true);
             loadWordDisp(cUnit, tReg, 0, rlResult.lowReg);
@@ -1561,7 +1563,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
             dvmCompilerFreeTemp(cUnit, tReg);
             HEAP_ACCESS_SHADOW(false);
             if (isVolatile) {
-                dvmCompilerGenMemBarrier(cUnit);
+                dvmCompilerGenMemBarrier(cUnit, kSY);
             }
             if (isSputObject) {
                 /* NOTE: marking card based sfield->clazz */
