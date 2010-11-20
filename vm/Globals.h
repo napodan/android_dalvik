@@ -629,7 +629,7 @@ struct DvmGlobals {
     Method**    inlinedMethods;
 
     /*
-     * Dalvik instruction counts (256 entries).
+     * Dalvik instruction counts (kNumDalvikInstructions entries).
      */
     int*        executedInstrCounts;
     bool        instructionCountEnableCount;
