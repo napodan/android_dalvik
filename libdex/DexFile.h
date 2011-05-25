@@ -55,7 +55,7 @@ extern "C" {
 #define DEX_MAGIC       "dex\n"
 
 /* current version, encoded in 4 bytes of ASCII */
-#define DEX_MAGIC_VERS  "035\0"
+#define DEX_MAGIC_VERS  "036\0"
 
 /*
  * older but still-recognized version (corresponding to Android API
