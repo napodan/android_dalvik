@@ -170,7 +170,7 @@ IndirectRef dvmAddToIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
         if (newTable == NULL) {
             ALOGE("Unable to expand iref table (from %d to %d, max=%d)\n",
                 pRef->allocEntries, newSize, pRef->maxEntries);
-            return false;
+            return NULL;
         }
         ALOGI("Growing ireftab %p from %d to %d (max=%d)\n",
             pRef, pRef->allocEntries, newSize, pRef->maxEntries);
