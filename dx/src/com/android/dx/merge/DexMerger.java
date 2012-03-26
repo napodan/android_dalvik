@@ -33,7 +33,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Combine two dex files into one.
@@ -594,6 +596,8 @@ public final class DexMerger {
         transformAnnotationSets(dexB, bIndexMap);
         transformAnnotationDirectories(dexA, aIndexMap);
         transformAnnotationDirectories(dexB, bIndexMap);
+        transformStaticValues(dexA, aIndexMap);
+        transformStaticValues(dexB, bIndexMap);
     }
 
     private void transformAnnotationSets(DexBuffer in, IndexMap indexMap) {
@@ -612,6 +616,16 @@ public final class DexMerger {
             DexBuffer.Section directoryIn = in.open(section.off);
             for (int i = 0; i < section.size; i++) {
                 transformAnnotationDirectory(in, directoryIn, indexMap);
+            }
+        }
+    }
+
+    private void transformStaticValues(DexBuffer in, IndexMap indexMap) {
+        TableOfContents.Section section = in.getTableOfContents().encodedArrays;
+        if (section.exists()) {
+            DexBuffer.Section staticValuesIn = in.open(section.off);
+            for (int i = 0; i < section.size; i++) {
+                transformStaticValues(staticValuesIn, indexMap);
             }
         }
     }
@@ -643,13 +657,7 @@ public final class DexMerger {
         }
 
         int staticValuesOff = classDef.getStaticValuesOffset();
-        if (staticValuesOff == 0) {
-            idsDefsOut.writeInt(0);
-        } else {
-            DexBuffer.Section staticValuesIn = in.open(staticValuesOff);
-            idsDefsOut.writeInt(encodedArrayOut.getPosition());
-            transformStaticValues(staticValuesIn, indexMap);
-        }
+        idsDefsOut.writeInt(indexMap.adjustStaticValues(staticValuesOff));
     }
 
     /**
@@ -838,6 +846,7 @@ public final class DexMerger {
 
     private void transformStaticValues(DexBuffer.Section in, IndexMap indexMap) {
         contentsOut.encodedArrays.size++;
+        indexMap.putStaticValuesOffset(in.getPosition(), encodedArrayOut.getPosition());
         indexMap.adjustEncodedArray(in.readEncodedArray()).writeTo(encodedArrayOut);
     }
 
@@ -921,6 +930,9 @@ public final class DexMerger {
                 // at most 1/3 of the bytes in an encoding arrays section are uleb/sleb
                 annotation += (int) Math.ceil(contents.annotations.byteCount * 1.34);
             }
+
+            typeList = DexBuffer.fourByteAlign(typeList);
+            code = DexBuffer.fourByteAlign(code);
         }
 
         public int size() {
