@@ -60,7 +60,7 @@ ifeq ($(dvm_make_debug_vm),true)
   # - tracked-reference verification enabled
   # - allocation limits enabled
   # - GDB helpers enabled
-  # - LOGV
+  # - ALOGV
   # - assert()
   #
   LOCAL_CFLAGS += -DWITH_INSTR_CHECKS

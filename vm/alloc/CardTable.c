@@ -255,7 +255,7 @@ static void verifyCardTableCallback(void *ptr, void *arg)
     } else if (isPushedOnMarkStack(obj)) {
         return;
     } else {
-        LOGE("Verify failed, object %p is gray and on an unmarked card", obj);
+        ALOGE("Verify failed, object %p is gray and on an unmarked card", obj);
         dvmDumpObject(obj);
         dvmAbort();
     }

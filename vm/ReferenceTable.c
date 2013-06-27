@@ -64,7 +64,7 @@ bool dvmAddToReferenceTable(ReferenceTable* pRef, Object* obj)
     if (pRef->nextEntry == pRef->table + pRef->allocEntries) {
         /* reached end of allocated space; did we hit buffer max? */
         if (pRef->nextEntry == pRef->table + pRef->maxEntries) {
-            LOGW("ReferenceTable overflow (max=%d)\n", pRef->maxEntries);
+            ALOGW("ReferenceTable overflow (max=%d)\n", pRef->maxEntries);
             return false;
         }
 
@@ -78,7 +78,7 @@ bool dvmAddToReferenceTable(ReferenceTable* pRef, Object* obj)
 
         newTable = (Object**) realloc(pRef->table, newSize * sizeof(Object*));
         if (newTable == NULL) {
-            LOGE("Unable to expand ref table (from %d to %d %d-byte entries)\n",
+            ALOGE("Unable to expand ref table (from %d to %d %d-byte entries)\n",
                 pRef->allocEntries, newSize, sizeof(Object*));
             return false;
         }
@@ -141,10 +141,10 @@ bool dvmRemoveFromReferenceTable(ReferenceTable* pRef, Object** bottom,
     if (moveCount != 0) {
         /* remove from middle, slide the rest down */
         memmove(ptr, ptr+1, moveCount * sizeof(Object*));
-        //LOGV("LREF delete %p, shift %d down\n", obj, moveCount);
+        //ALOGV("LREF delete %p, shift %d down\n", obj, moveCount);
     } else {
         /* last entry, falls off the end */
-        //LOGV("LREF delete %p from end\n", obj);
+        //ALOGV("LREF delete %p from end\n", obj);
     }
 
     return true;
@@ -184,7 +184,7 @@ static int compareObject(const void* vobj1, const void* vobj2)
 static void logObject(Object* obj, int size, int identical, int equiv)
 {
     if (obj == NULL) {
-        LOGW("  NULL reference (count=%d)\n", equiv);
+        ALOGW("  NULL reference (count=%d)\n", equiv);
         return;
     }
 
@@ -193,10 +193,10 @@ static void logObject(Object* obj, int size, int identical, int equiv)
         (obj->clazz != NULL) ? obj->clazz->descriptor : "(raw)";
 
     if (identical + equiv != 0) {
-        LOGW("%5d of %s %dB (%d unique)\n", identical + equiv +1,
+        ALOGW("%5d of %s %dB (%d unique)\n", identical + equiv +1,
             descriptor, size, equiv +1);
     } else {
-        LOGW("%5d of %s %dB\n", identical + equiv +1, descriptor, size);
+        ALOGW("%5d of %s %dB\n", identical + equiv +1, descriptor, size);
     }
 }
 
@@ -216,7 +216,7 @@ void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr)
     int i;
 
     if (count == 0) {
-        LOGW("%s reference table has no entries\n", descr);
+        ALOGW("%s reference table has no entries\n", descr);
         return;
     }
     assert(count > 0);
@@ -224,7 +224,7 @@ void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr)
     /*
      * Dump the most recent N entries.
      */
-    LOGW("Last %d entries in %s reference table:\n", kLast, descr);
+    ALOGW("Last %d entries in %s reference table:\n", kLast, descr);
     refs = pRef->table;         // use unsorted list
     int size;
     int start = count - kLast;
@@ -236,14 +236,14 @@ void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr)
         Object* ref = refs[i];
         if (ref->clazz == gDvm.classJavaLangClass) {
             ClassObject* clazz = (ClassObject*) ref;
-            LOGW("%5d: %p cls=%s '%s' (%d bytes)\n", i, ref,
+            ALOGW("%5d: %p cls=%s '%s' (%d bytes)\n", i, ref,
                 (refs[i] == NULL) ? "-" : ref->clazz->descriptor,
                 clazz->descriptor, size);
         } else if (ref->clazz == NULL) {
             /* should only be possible right after a plain dvmMalloc() */
-            LOGW("%5d: %p cls=(raw) (%d bytes)\n", i, ref, size);
+            ALOGW("%5d: %p cls=(raw) (%d bytes)\n", i, ref, size);
         } else {
-            LOGW("%5d: %p cls=%s (%d bytes)\n", i, ref,
+            ALOGW("%5d: %p cls=%s (%d bytes)\n", i, ref,
                 (refs[i] == NULL) ? "-" : ref->clazz->descriptor, size);
         }
     }
@@ -260,7 +260,7 @@ void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr)
      * Dump uniquified table summary.  While we're at it, generate a
      * cumulative total amount of pinned memory based on the unique entries.
      */
-    LOGW("%s reference table summary (%d entries):\n", descr, count);
+    ALOGW("%s reference table summary (%d entries):\n", descr, count);
     int equiv, identical, total;
     total = equiv = identical = 0;
     for (i = 1; i < count; i++) {
@@ -288,6 +288,6 @@ void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr)
     total += size;
     logObject(refs[count-1], size, identical, equiv);
 
-    LOGW("Memory held directly by tracked refs is %d bytes\n", total);
+    ALOGW("Memory held directly by tracked refs is %d bytes\n", total);
     free(tableCopy);
 }

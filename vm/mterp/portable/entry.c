@@ -38,7 +38,7 @@ bool INTERP_FUNC_NAME(Thread* self, InterpState* interpState)
 
 #if defined(WITH_JIT)
 #if 0
-    LOGD("*DebugInterp - entrypoint is %d, tgt is 0x%x, %s\n",
+    ALOGD("*DebugInterp - entrypoint is %d, tgt is 0x%x, %s\n",
          interpState->entryPoint,
          interpState->pc,
          interpState->method->name);
@@ -66,7 +66,7 @@ bool INTERP_FUNC_NAME(Thread* self, InterpState* interpState)
           interpState->jitState == kJitTSelectRequestHot) &&
          dvmJitCheckTraceRequest(self, interpState)) {
         interpState->nextMode = INTERP_STD;
-        //LOGD("Invalid trace request, exiting\n");
+        //ALOGD("Invalid trace request, exiting\n");
         return true;
     }
 #endif /* INTERP_TYPE == INTERP_DBG */

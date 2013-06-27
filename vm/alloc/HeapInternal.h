@@ -136,12 +136,12 @@ void dvmLogMadviseStats(size_t madvisedSizes[], size_t arrayLen);
 #define LOGV_HEAP(...)    ((void)0)
 #define LOGD_HEAP(...)    ((void)0)
 #else
-#define LOGV_HEAP(...)    LOG(LOG_VERBOSE, HEAP_LOG_TAG, __VA_ARGS__)
-#define LOGD_HEAP(...)    LOG(LOG_DEBUG, HEAP_LOG_TAG, __VA_ARGS__)
+#define LOGV_HEAP(...)    ALOG(LOG_VERBOSE, HEAP_LOG_TAG, __VA_ARGS__)
+#define LOGD_HEAP(...)    ALOG(LOG_DEBUG, HEAP_LOG_TAG, __VA_ARGS__)
 #endif
-#define LOGI_HEAP(...)    LOG(LOG_INFO, HEAP_LOG_TAG, __VA_ARGS__)
-#define LOGW_HEAP(...)    LOG(LOG_WARN, HEAP_LOG_TAG, __VA_ARGS__)
-#define LOGE_HEAP(...)    LOG(LOG_ERROR, HEAP_LOG_TAG, __VA_ARGS__)
+#define LOGI_HEAP(...)    ALOG(LOG_INFO, HEAP_LOG_TAG, __VA_ARGS__)
+#define LOGW_HEAP(...)    ALOG(LOG_WARN, HEAP_LOG_TAG, __VA_ARGS__)
+#define LOGE_HEAP(...)    ALOG(LOG_ERROR, HEAP_LOG_TAG, __VA_ARGS__)
 
 #define QUIET_ZYGOTE_GC 1
 #if QUIET_ZYGOTE_GC
@@ -149,7 +149,7 @@ void dvmLogMadviseStats(size_t madvisedSizes[], size_t arrayLen);
 #define LOGI_HEAP(...) \
     do { \
         if (!gDvm.zygote) { \
-            LOG(LOG_INFO, HEAP_LOG_TAG, __VA_ARGS__); \
+            ALOG(LOG_INFO, HEAP_LOG_TAG, __VA_ARGS__); \
         } \
     } while (false)
 #endif

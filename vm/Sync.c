@@ -41,7 +41,7 @@
 #include <sys/time.h>
 #include <errno.h>
 
-#define LOG_THIN    LOGV
+#define LOG_THIN    ALOGV
 
 #ifdef WITH_DEADLOCK_PREDICTION     /* fwd */
 static const char* kStartBanner =
@@ -166,11 +166,11 @@ Monitor* dvmCreateMonitor(Object* obj)
 
     mon = (Monitor*) calloc(1, sizeof(Monitor));
     if (mon == NULL) {
-        LOGE("Unable to allocate monitor\n");
+        ALOGE("Unable to allocate monitor\n");
         dvmAbort();
     }
     if (((u4)mon & 7) != 0) {
-        LOGE("Misaligned monitor: %p\n", mon);
+        ALOGE("Misaligned monitor: %p\n", mon);
         dvmAbort();
     }
     mon->obj = obj;
@@ -230,7 +230,7 @@ void dvmDumpMonitorInfo(const char* msg)
         mon = mon->next;
     }
 
-    LOGD("%s: monitor list has %d entries (%d live)\n",
+    ALOGD("%s: monitor list has %d entries (%d live)\n",
         msg, totalCount, liveCount);
 }
 
@@ -676,7 +676,7 @@ void absoluteTime(s8 msec, s4 nsec, struct timespec *ts)
 #endif
     endSec = ts->tv_sec + msec / 1000;
     if (endSec >= 0x7fffffff) {
-        LOGV("NOTE: end time exceeds epoch\n");
+        ALOGV("NOTE: end time exceeds epoch\n");
         endSec = 0x7ffffffe;
     }
     ts->tv_sec = endSec;
@@ -1116,7 +1116,7 @@ retry:
      */
     if (gDvm.deadlockPredictMode != kDPOff) {
         if (self->status != THREAD_RUNNING) {
-            LOGE("Bad thread status (%d) in DP\n", self->status);
+            ALOGE("Bad thread status (%d) in DP\n", self->status);
             dvmDumpThread(self, false);
             dvmAbort();
         }
@@ -1130,7 +1130,7 @@ retry:
              */
             dvmAddToMonitorList(self, obj, false);
             dvmUnlockObject(self, obj);
-            LOGV("--- unlocked, pending is '%s'\n",
+            ALOGV("--- unlocked, pending is '%s'\n",
                 dvmGetException(self)->clazz->descriptor);
         }
     }
@@ -1531,7 +1531,7 @@ retry:
         dvmUnlockThreadList();
         goto retry;
     }
-    LOGE("object %p has an unknown hash state %#x", obj, hashState);
+    ALOGE("object %p has an unknown hash state %#x", obj, hashState);
     dvmDumpThread(dvmThreadSelf(), false);
     dvmAbort();
     return 0;  /* Quiet the compiler. */
@@ -1656,7 +1656,7 @@ static void expandObjAddEntry(ExpandingObjectList* pList, Object* obj)
         LOGVV("expanding %p to %d\n", pList, pList->alloc);
         newList = realloc(pList->list, pList->alloc * sizeof(Object*));
         if (newList == NULL) {
-            LOGE("Failed expanding DP object list (alloc=%d)\n", pList->alloc);
+            ALOGE("Failed expanding DP object list (alloc=%d)\n", pList->alloc);
             dvmAbort();
         }
         pList->list = newList;
@@ -1746,7 +1746,7 @@ static bool objectInChildList(const Object* parent, Object* child)
 {
     u4 lock = parent->lock;
     if (!IS_LOCK_FAT(&lock)) {
-        //LOGI("on thin\n");
+        //ALOGI("on thin\n");
         return false;
     }
 
@@ -1800,14 +1800,14 @@ static void unlinkParentFromChild(Object* parent, Object* child)
 
     mon = LW_MONITOR(parent->lock);
     if (!expandObjRemoveEntry(&mon->historyChildren, child)) {
-        LOGW("WARNING: child %p not found in parent %p\n", child, parent);
+        ALOGW("WARNING: child %p not found in parent %p\n", child, parent);
     }
     assert(!expandObjHas(&mon->historyChildren, child));
     assert(expandObjCheckForDuplicates(&mon->historyChildren) < 0);
 
     mon = LW_MONITOR(child->lock);
     if (!expandObjRemoveEntry(&mon->historyParents, parent)) {
-        LOGW("WARNING: parent %p not found in child %p\n", parent, child);
+        ALOGW("WARNING: parent %p not found in child %p\n", parent, child);
     }
     assert(!expandObjHas(&mon->historyParents, parent));
     assert(expandObjCheckForDuplicates(&mon->historyParents) < 0);
@@ -1823,14 +1823,14 @@ static void logHeldMonitors(Thread* self)
     char* name = NULL;
 
     name = dvmGetThreadName(self);
-    LOGW("Monitors currently held by thread (threadid=%d '%s')\n",
+    ALOGW("Monitors currently held by thread (threadid=%d '%s')\n",
         self->threadId, name);
-    LOGW("(most-recently-acquired on top):\n");
+    ALOGW("(most-recently-acquired on top):\n");
     free(name);
 
     LockedObjectData* lod = self->pLockedObjects;
     while (lod != NULL) {
-        LOGW("--- object %p[%d] (%s)\n",
+        ALOGW("--- object %p[%d] (%s)\n",
             lod->obj, lod->recursionCount, lod->obj->clazz->descriptor);
         dvmLogRawStackTrace(lod->rawStackTrace, lod->stackDepth);
 
@@ -1857,20 +1857,20 @@ static bool traverseTree(Thread* self, const Object* obj)
         int* rawStackTrace;
         int stackDepth;
 
-        LOGW("%s\n", kStartBanner);
-        LOGW("Illegal lock attempt:\n");
-        LOGW("--- object %p (%s)\n", obj, obj->clazz->descriptor);
+        ALOGW("%s\n", kStartBanner);
+        ALOGW("Illegal lock attempt:\n");
+        ALOGW("--- object %p (%s)\n", obj, obj->clazz->descriptor);
 
         rawStackTrace = dvmFillInStackTraceRaw(self, &stackDepth);
         dvmLogRawStackTrace(rawStackTrace, stackDepth);
         free(rawStackTrace);
 
-        LOGW(" ");
+        ALOGW(" ");
         logHeldMonitors(self);
 
-        LOGW(" ");
-        LOGW("Earlier, the following lock order (from last to first) was\n");
-        LOGW("established -- stack trace is from first successful lock):\n");
+        ALOGW(" ");
+        ALOGW("Earlier, the following lock order (from last to first) was\n");
+        ALOGW("established -- stack trace is from first successful lock):\n");
         return false;
     }
     mon->historyMark = true;
@@ -1896,7 +1896,7 @@ static bool traverseTree(Thread* self, const Object* obj)
         if (!IS_LOCK_FAT(&lock))
             continue;
         if (!traverseTree(self, child)) {
-            LOGW("--- object %p (%s)\n", obj, obj->clazz->descriptor);
+            ALOGW("--- object %p (%s)\n", obj, obj->clazz->descriptor);
             dvmLogRawStackTrace(mon->historyRawStackTrace,
                 mon->historyStackDepth);
             mon->historyMark = false;
@@ -1932,7 +1932,7 @@ static void updateDeadlockPrediction(Thread* self, Object* acqObj)
      */
     lod = dvmFindInMonitorList(self, acqObj);
     if (lod != NULL) {
-        LOGV("+++ DP: recursive %p\n", acqObj);
+        ALOGV("+++ DP: recursive %p\n", acqObj);
         return;
     }
 
@@ -2020,7 +2020,7 @@ static void updateDeadlockPrediction(Thread* self, Object* acqObj)
     dvmLockMutex(&gDvm.deadlockHistoryLock);
     linkParentToChild(mrl->obj, acqObj);
     if (!traverseTree(self, acqObj)) {
-        LOGW("%s\n", kEndBanner);
+        ALOGW("%s\n", kEndBanner);
         failed = true;
 
         /* remove the entry so we're still okay when in "warning" mode */
@@ -2034,7 +2034,7 @@ static void updateDeadlockPrediction(Thread* self, Object* acqObj)
             dvmThrowException("Ldalvik/system/PotentialDeadlockError;", NULL);
             break;
         case kDPAbort:
-            LOGE("Aborting due to potential deadlock\n");
+            ALOGE("Aborting due to potential deadlock\n");
             dvmAbort();
             break;
         default:
@@ -2103,7 +2103,7 @@ static void removeCollectedObject(Object* obj)
         Monitor* parentMon = LW_MONITOR(parent->lock);
 
         if (!expandObjRemoveEntry(&parentMon->historyChildren, obj)) {
-            LOGW("WARNING: child %p not found in parent %p\n", obj, parent);
+            ALOGW("WARNING: child %p not found in parent %p\n", obj, parent);
         }
         assert(!expandObjHas(&parentMon->historyChildren, obj));
 
@@ -2120,7 +2120,7 @@ static void removeCollectedObject(Object* obj)
         Monitor* childMon = LW_MONITOR(child->lock);
 
         if (!expandObjRemoveEntry(&childMon->historyParents, obj)) {
-            LOGW("WARNING: parent %p not found in child %p\n", obj, child);
+            ALOGW("WARNING: parent %p not found in child %p\n", obj, child);
         }
         assert(!expandObjHas(&childMon->historyParents, obj));
     }

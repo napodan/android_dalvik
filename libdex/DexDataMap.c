@@ -77,7 +77,7 @@ void dexDataMapAdd(DexDataMap* map, u4 offset, u2 type) {
 
     if ((map->count != 0) &&
             (map->offsets[map->count - 1] >= offset)) {
-        LOGE("Out-of-order data map offset: 0x%x then 0x%x\n",
+        ALOGE("Out-of-order data map offset: 0x%x then 0x%x\n",
                 map->offsets[map->count - 1], offset);
         return;
     }
@@ -130,10 +130,10 @@ bool dexDataMapVerify(DexDataMap* map, u4 offset, u2 type) {
     }
 
     if (found < 0) {
-        LOGE("No data map entry found @ 0x%x; expected %x\n",
+        ALOGE("No data map entry found @ 0x%x; expected %x\n",
                 offset, type);
     } else {
-        LOGE("Unexpected data map entry @ 0x%x: expected %x, found %x\n",
+        ALOGE("Unexpected data map entry @ 0x%x: expected %x, found %x\n",
                 offset, type, found);
     }
 

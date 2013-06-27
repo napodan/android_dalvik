@@ -141,7 +141,7 @@ bool dvmCompilerSetupCodeCache(void)
     /* Allocate the code cache */
     fd = ashmem_create_region("dalvik-jit-code-cache", gDvmJit.codeCacheSize);
     if (fd < 0) {
-        LOGE("Could not create %u-byte ashmem region for the JIT code cache",
+        ALOGE("Could not create %u-byte ashmem region for the JIT code cache",
              gDvmJit.codeCacheSize);
         return false;
     }
@@ -150,14 +150,14 @@ bool dvmCompilerSetupCodeCache(void)
                              MAP_PRIVATE , fd, 0);
     close(fd);
     if (gDvmJit.codeCache == MAP_FAILED) {
-        LOGE("Failed to mmap the JIT code cache: %s\n", strerror(errno));
+        ALOGE("Failed to mmap the JIT code cache: %s\n", strerror(errno));
         return false;
     }
 
     gDvmJit.pageSizeMask = getpagesize() - 1;
 
     /* This can be found through "dalvik-jit-code-cache" in /proc/<pid>/maps */
-    // LOGD("Code cache starts at %p", gDvmJit.codeCache);
+    // ALOGD("Code cache starts at %p", gDvmJit.codeCache);
 
     /* Copy the template code into the beginning of the code cache */
     int templateSize = (intptr_t) dmvCompilerTemplateEnd -
@@ -185,7 +185,7 @@ bool dvmCompilerSetupCodeCache(void)
                           PROTECT_CODE_CACHE_ATTRS);
 
     if (result == -1) {
-        LOGE("Failed to remove the write permission for the code cache");
+        ALOGE("Failed to remove the write permission for the code cache");
         dvmAbort();
     }
 
@@ -199,7 +199,7 @@ static void crawlDalvikStack(Thread *thread, bool print)
     int stackLevel = 0;
 
     if (print) {
-        LOGD("Crawling tid %d (%s / %p %s)", thread->systemTid,
+        ALOGD("Crawling tid %d (%s / %p %s)", thread->systemTid,
              dvmGetThreadStatusStr(thread->status),
              thread->inJitCodeCache,
              thread->inJitCodeCache ? "jit" : "interp");
@@ -210,11 +210,11 @@ static void crawlDalvikStack(Thread *thread, bool print)
 
         if (print) {
             if (dvmIsBreakFrame(fp)) {
-                LOGD("  #%d: break frame (%p)",
+                ALOGD("  #%d: break frame (%p)",
                      stackLevel, saveArea->returnAddr);
             }
             else {
-                LOGD("  #%d: %s.%s%s (%p)",
+                ALOGD("  #%d: %s.%s%s (%p)",
                      stackLevel,
                      saveArea->method->clazz->descriptor,
                      saveArea->method->name,
@@ -255,7 +255,7 @@ static void resetCodeCache(void)
     }
 
     if (inJit) {
-        LOGD("JIT code cache reset delayed (%d bytes %d/%d)",
+        ALOGD("JIT code cache reset delayed (%d bytes %d/%d)",
              gDvmJit.codeCacheByteUsed, gDvmJit.numCodeCacheReset,
              ++gDvmJit.numCodeCacheResetDelayed);
         return;
@@ -306,7 +306,7 @@ static void resetCodeCache(void)
 
     dvmUnlockMutex(&gDvmJit.compilerLock);
 
-    LOGD("JIT code cache reset in %lld ms (%d bytes %d/%d)",
+    ALOGD("JIT code cache reset in %lld ms (%d bytes %d/%d)",
          (dvmGetRelativeTimeUsec() - startTime) / 1000,
          byteUsed, ++gDvmJit.numCodeCacheReset,
          gDvmJit.numCodeCacheResetDelayed);
@@ -372,7 +372,7 @@ bool compilerThreadStartup(void)
     pJitTable = (JitEntry*)
                 calloc(gDvmJit.jitTableSize, sizeof(*pJitTable));
     if (!pJitTable) {
-        LOGE("jit table allocation failed\n");
+        ALOGE("jit table allocation failed\n");
         dvmUnlockMutex(&gDvmJit.tableLock);
         goto fail;
     }
@@ -386,7 +386,7 @@ bool compilerThreadStartup(void)
      */
     pJitProfTable = (unsigned char *)malloc(JIT_PROF_SIZE);
     if (!pJitProfTable) {
-        LOGE("jit prof table allocation failed\n");
+        ALOGE("jit prof table allocation failed\n");
         dvmUnlockMutex(&gDvmJit.tableLock);
         goto fail;
     }
@@ -554,7 +554,7 @@ static void *compilerThreadStart(void *arg)
             pthread_cond_wait(&gDvmJit.compilerQueueActivity,
                               &gDvmJit.compilerLock);
             dvmUnlockMutex(&gDvmJit.compilerLock);
-            LOGD("JIT started for system_server");
+            ALOGD("JIT started for system_server");
         } else {
             dvmLockMutex(&gDvmJit.compilerLock);
             /*
@@ -617,7 +617,7 @@ static void *compilerThreadStart(void *arg)
                     gDvmJit.codeCacheFull |= resizeFail;
                 }
                 if (gDvmJit.haltCompilerThread) {
-                    LOGD("Compiler shutdown in progress - discarding request");
+                    ALOGD("Compiler shutdown in progress - discarding request");
                 } else if (!gDvmJit.codeCacheFull) {
                     bool compileOK = false;
                     jmp_buf jmpBuf;
@@ -655,7 +655,7 @@ static void *compilerThreadStart(void *arg)
     dvmChangeStatus(NULL, THREAD_RUNNING);
 
     if (gDvm.verboseShutdown)
-        LOGD("Compiler thread shutting down\n");
+        ALOGD("Compiler thread shutting down\n");
     return NULL;
 }
 
@@ -706,9 +706,9 @@ void dvmCompilerShutdown(void)
         dvmUnlockMutex(&gDvmJit.compilerLock);
 
         if (pthread_join(gDvmJit.compilerHandle, &threadReturn) != 0)
-            LOGW("Compiler thread join failed\n");
+            ALOGW("Compiler thread join failed\n");
         else if (gDvm.verboseShutdown)
-            LOGD("Compiler thread has shut down\n");
+            ALOGD("Compiler thread has shut down\n");
     }
 
     /* Break loops within the translation cache */

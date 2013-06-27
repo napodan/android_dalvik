@@ -65,7 +65,7 @@ void dvmSignalCatcherShutdown(void)
     pthread_kill(gDvm.signalCatcherHandle, SIGQUIT);
 
     pthread_join(gDvm.signalCatcherHandle, NULL);
-    LOGV("signal catcher has shut down\n");
+    ALOGV("signal catcher has shut down\n");
 }
 
 
@@ -156,7 +156,7 @@ static void handleSigQuit(void)
         /* write to memory buffer */
         FILE* memfp = open_memstream(&traceBuf, &traceLen);
         if (memfp == NULL) {
-            LOGE("Unable to create memstream for stack traces\n");
+            ALOGE("Unable to create memstream for stack traces\n");
             traceBuf = NULL;        /* make sure it didn't touch this */
             /* continue on */
         } else {
@@ -191,16 +191,16 @@ static void handleSigQuit(void)
          */
         int fd = open(gDvm.stackTraceFile, O_WRONLY | O_APPEND | O_CREAT, 0666);
         if (fd < 0) {
-            LOGE("Unable to open stack trace file '%s': %s\n",
+            ALOGE("Unable to open stack trace file '%s': %s\n",
                 gDvm.stackTraceFile, strerror(errno));
         } else {
             ssize_t actual = write(fd, traceBuf, traceLen);
             if (actual != (ssize_t) traceLen) {
-                LOGE("Failed to write stack traces to %s (%d of %zd): %s\n",
+                ALOGE("Failed to write stack traces to %s (%d of %zd): %s\n",
                     gDvm.stackTraceFile, (int) actual, traceLen,
                     strerror(errno));
             } else {
-                LOGI("Wrote stack traces to '%s'\n", gDvm.stackTraceFile);
+                ALOGI("Wrote stack traces to '%s'\n", gDvm.stackTraceFile);
             }
             close(fd);
         }
@@ -215,7 +215,7 @@ static void handleSigQuit(void)
  */
 static void handleSigUsr1(void)
 {
-    LOGI("SIGUSR1 forcing GC (no HPROF)\n");
+    ALOGI("SIGUSR1 forcing GC (no HPROF)\n");
     dvmCollectGarbage(false);
 }
 
@@ -233,7 +233,7 @@ static void handleSigUsr2(void)
         dvmCompilerDumpStats();
         /* Stress-test unchain all */
         dvmJitUnchainAll();
-        LOGD("Send %d more signals to rest the code cache",
+        ALOGD("Send %d more signals to rest the code cache",
              codeCacheResetCount & 7);
     }
 }
@@ -250,7 +250,7 @@ static void* signalCatcherThreadStart(void* arg)
 
     UNUSED_PARAMETER(arg);
 
-    LOGV("Signal catcher thread started (threadid=%d)\n", self->threadId);
+    ALOGV("Signal catcher thread started (threadid=%d)\n", self->threadId);
 
     /* set up mask with signals we want to handle */
     sigemptyset(&mask);
@@ -278,14 +278,14 @@ loop:
         cc = sigwait(&mask, &rcvd);
         if (cc != 0) {
             if (cc == EINTR) {
-                //LOGV("sigwait: EINTR\n");
+                //ALOGV("sigwait: EINTR\n");
                 goto loop;
             }
             assert(!"bad result from sigwait");
         }
 
         if (!gDvm.haltSignalCatcher) {
-            LOGI("threadid=%d: reacting to signal %d\n",
+            ALOGI("threadid=%d: reacting to signal %d\n",
                 dvmThreadSelf()->threadId, rcvd);
         }
 
@@ -308,7 +308,7 @@ loop:
             break;
 #endif
         default:
-            LOGE("unexpected signal %d\n", rcvd);
+            ALOGE("unexpected signal %d\n", rcvd);
             break;
         }
     }

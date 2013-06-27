@@ -124,7 +124,7 @@ bool dvmExceptionStartup(void)
         gDvm.classJavaLangStackTraceElement == NULL ||
         gDvm.classJavaLangStackTraceElementArray == NULL)
     {
-        LOGE("Could not find one or more essential exception classes\n");
+        ALOGE("Could not find one or more essential exception classes\n");
         return false;
     }
 
@@ -138,7 +138,7 @@ bool dvmExceptionStartup(void)
     meth = dvmFindDirectMethodByDescriptor(gDvm.classJavaLangStackTraceElement,
         "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
     if (meth == NULL) {
-        LOGE("Unable to find constructor for StackTraceElement\n");
+        ALOGE("Unable to find constructor for StackTraceElement\n");
         return false;
     }
     gDvm.methJavaLangStackTraceElement_init = meth;
@@ -148,7 +148,7 @@ bool dvmExceptionStartup(void)
         dvmFindFieldOffset(gDvm.classJavaLangThrowable,
             "stackState", "Ljava/lang/Object;");
     if (gDvm.offJavaLangThrowable_stackState < 0) {
-        LOGE("Unable to find Throwable.stackState\n");
+        ALOGE("Unable to find Throwable.stackState\n");
         return false;
     }
 
@@ -157,7 +157,7 @@ bool dvmExceptionStartup(void)
         dvmFindFieldOffset(gDvm.classJavaLangThrowable,
             "detailMessage", "Ljava/lang/String;");
     if (gDvm.offJavaLangThrowable_message < 0) {
-        LOGE("Unable to find Throwable.detailMessage\n");
+        ALOGE("Unable to find Throwable.detailMessage\n");
         return false;
     }
 
@@ -166,7 +166,7 @@ bool dvmExceptionStartup(void)
         dvmFindFieldOffset(gDvm.classJavaLangThrowable,
             "cause", "Ljava/lang/Throwable;");
     if (gDvm.offJavaLangThrowable_cause < 0) {
-        LOGE("Unable to find Throwable.cause\n");
+        ALOGE("Unable to find Throwable.cause\n");
         return false;
     }
 
@@ -219,13 +219,13 @@ void dvmThrowChainedException(const char* exceptionDescriptor, const char* msg,
 {
     ClassObject* excepClass;
 
-    LOGV("THROW '%s' msg='%s' cause=%s\n",
+    ALOGV("THROW '%s' msg='%s' cause=%s\n",
         exceptionDescriptor, msg,
         (cause != NULL) ? cause->clazz->descriptor : "(none)");
 
     if (gDvm.initializing) {
         if (++gDvm.initExceptionCount >= 2) {
-            LOGE("Too many exceptions during init (failed on '%s' '%s')\n",
+            ALOGE("Too many exceptions during init (failed on '%s' '%s')\n",
                 exceptionDescriptor, msg);
             dvmAbort();
         }
@@ -246,7 +246,7 @@ void dvmThrowChainedException(const char* exceptionDescriptor, const char* msg,
          * field.
          */
         if (!dvmCheckException(dvmThreadSelf())) {
-            LOGE("FATAL: unable to throw exception (failed on '%s' '%s')\n",
+            ALOGE("FATAL: unable to throw exception (failed on '%s' '%s')\n",
                 exceptionDescriptor, msg);
             dvmAbort();
         }
@@ -267,7 +267,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
 
     /* make sure the exception is initialized */
     if (!dvmIsClassInitialized(excepClass) && !dvmInitClass(excepClass)) {
-        LOGE("ERROR: unable to initialize exception class '%s'\n",
+        ALOGE("ERROR: unable to initialize exception class '%s'\n",
             excepClass->descriptor);
         if (strcmp(excepClass->descriptor, "Ljava/lang/InternalError;") == 0)
             dvmAbort();
@@ -288,7 +288,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
          */
         if (dvmCheckException(self))
             goto bail;
-        LOGE("FATAL: unable to allocate exception '%s' '%s'\n",
+        ALOGE("FATAL: unable to allocate exception '%s' '%s'\n",
             excepClass->descriptor, msg != NULL ? msg : "(no msg)");
         dvmAbort();
     }
@@ -298,7 +298,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
      */
     if (gDvm.optimizing) {
         /* need the exception object, but can't invoke interpreted code */
-        LOGV("Skipping init of exception %s '%s'\n",
+        ALOGV("Skipping init of exception %s '%s'\n",
             excepClass->descriptor, msg);
     } else {
         assert(excepClass == exception->clazz);
@@ -426,7 +426,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
     else {
         msgStr = dvmCreateStringFromCstr(msg);
         if (msgStr == NULL) {
-            LOGW("Could not allocate message string \"%s\" while "
+            ALOGW("Could not allocate message string \"%s\" while "
                     "throwing internal exception (%s)\n",
                     msg, excepClass->descriptor);
             goto bail;
@@ -435,7 +435,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
 
     if (cause != NULL) {
         if (!dvmInstanceof(cause->clazz, gDvm.classJavaLangThrowable)) {
-            LOGE("Tried to init exception with cause '%s'\n",
+            ALOGE("Tried to init exception with cause '%s'\n",
                 cause->clazz->descriptor);
             dvmAbort();
         }
@@ -523,7 +523,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
          * constructor, e.g. it doesn't provide one that takes a string
          * when a message has been provided.
          */
-        LOGW("WARNING: exception class '%s' missing constructor "
+        ALOGW("WARNING: exception class '%s' missing constructor "
             "(msg='%s' kind=%d)\n",
             excepClass->descriptor, msg, initKind);
         assert(strcmp(excepClass->descriptor,
@@ -566,7 +566,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
      * return an error and let our caller deal with it.
      */
     if (self->exception != NULL) {
-        LOGW("Exception thrown (%s) while throwing internal exception (%s)\n",
+        ALOGW("Exception thrown (%s) while throwing internal exception (%s)\n",
             self->exception->clazz->descriptor, exception->clazz->descriptor);
         goto bail;
     }
@@ -586,14 +586,14 @@ static bool initException(Object* exception, const char* msg, Object* cause,
                 /* initCause() threw an exception; return an error and
                  * let the caller deal with it.
                  */
-                LOGW("Exception thrown (%s) during initCause() "
+                ALOGW("Exception thrown (%s) during initCause() "
                         "of internal exception (%s)\n",
                         self->exception->clazz->descriptor,
                         exception->clazz->descriptor);
                 goto bail;
             }
         } else {
-            LOGW("WARNING: couldn't find initCause in '%s'\n",
+            ALOGW("WARNING: couldn't find initCause in '%s'\n",
                 excepClass->descriptor);
         }
     }
@@ -700,7 +700,7 @@ void dvmWrapException(const char* newExcepStr)
 Object* dvmGetExceptionCause(const Object* exception)
 {
     if (!dvmInstanceof(exception->clazz, gDvm.classJavaLangThrowable)) {
-        LOGE("Tried to get cause from object of type '%s'\n",
+        ALOGE("Tried to get cause from object of type '%s'\n",
             exception->clazz->descriptor);
         dvmAbort();
     }
@@ -739,12 +739,12 @@ void dvmPrintExceptionStackTrace(void)
         JValue unused;
         dvmCallMethod(self, printMethod, exception, &unused);
     } else {
-        LOGW("WARNING: could not find printStackTrace in %s\n",
+        ALOGW("WARNING: could not find printStackTrace in %s\n",
             exception->clazz->descriptor);
     }
 
     if (self->exception != NULL) {
-        LOGW("NOTE: exception thrown while printing stack trace: %s\n",
+        ALOGW("NOTE: exception thrown while printing stack trace: %s\n",
             self->exception->clazz->descriptor);
     }
 
@@ -784,7 +784,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
 
             if (handler->typeIdx == kDexNoIndex) {
                 /* catch-all */
-                LOGV("Match on catch-all block at 0x%02x in %s.%s for %s\n",
+                ALOGV("Match on catch-all block at 0x%02x in %s.%s for %s\n",
                         relPc, method->clazz->descriptor,
                         method->name, excepClass->descriptor);
                 return handler->address;
@@ -830,7 +830,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
                      * up a warning, then move on to the next entry.
                      * Keep the exception status clear.
                      */
-                    LOGW("Could not resolve class ref'ed in exception "
+                    ALOGW("Could not resolve class ref'ed in exception "
                             "catch list (class index %d, exception %s)\n",
                             handler->typeIdx,
                             (self->exception != NULL) ?
@@ -840,11 +840,11 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
                 }
             }
 
-            //LOGD("ADDR MATCH, check %s instanceof %s\n",
+            //ALOGD("ADDR MATCH, check %s instanceof %s\n",
             //    excepClass->descriptor, pEntry->excepClass->descriptor);
 
             if (dvmInstanceof(excepClass, throwable)) {
-                LOGV("Match on catch block at 0x%02x in %s.%s for %s\n",
+                ALOGV("Match on catch block at 0x%02x in %s.%s for %s\n",
                         relPc, method->clazz->descriptor,
                         method->name, excepClass->descriptor);
                 return handler->address;
@@ -852,7 +852,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
         }
     }
 
-    LOGV("No matching catch block at 0x%02x in %s for %s\n",
+    ALOGV("No matching catch block at 0x%02x in %s for %s\n",
         relPc, method->name, excepClass->descriptor);
     return -1;
 }
@@ -1012,7 +1012,7 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
             break;
         if (!dvmInstanceof(method->clazz, gDvm.classJavaLangThrowable))
             break;
-        //LOGD("EXCEP: ignoring %s.%s\n",
+        //ALOGD("EXCEP: ignoring %s.%s\n",
         //         method->clazz->descriptor, method->name);
         fp = saveArea->prevFrame;
     }
@@ -1031,7 +1031,7 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
         assert(fp != saveArea->prevFrame);
         fp = saveArea->prevFrame;
     }
-    //LOGD("EXCEP: stack depth is %d\n", stackDepth);
+    //ALOGD("EXCEP: stack depth is %d\n", stackDepth);
 
     if (!stackDepth)
         goto bail;
@@ -1067,7 +1067,7 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
         const Method* method = saveArea->method;
 
         if (!dvmIsBreakFrame(fp)) {
-            //LOGD("EXCEP keeping %s.%s\n", method->clazz->descriptor,
+            //ALOGD("EXCEP keeping %s.%s\n", method->clazz->descriptor,
             //         method->name);
 
             *intPtr++ = (int) method;
@@ -1230,9 +1230,9 @@ void dvmLogRawStackTrace(const int* intVals, int stackDepth)
         dotName = dvmDescriptorToDot(meth->clazz->descriptor);
 
         if (dvmIsNativeMethod(meth)) {
-            LOGI("\tat %s.%s(Native Method)\n", dotName, meth->name);
+            ALOGI("\tat %s.%s(Native Method)\n", dotName, meth->name);
         } else {
-            LOGI("\tat %s.%s(%s:%d)\n",
+            ALOGI("\tat %s.%s(%s:%d)\n",
                 dotName, meth->name, dvmGetMethodSourceFile(meth),
                 dvmLineNumFromPC(meth, pc));
         }
@@ -1257,16 +1257,16 @@ static void logStackTraceOf(Object* exception)
                     gDvm.offJavaLangThrowable_message);
     if (messageStr != NULL) {
         char* cp = dvmCreateCstrFromString(messageStr);
-        LOGI("%s: %s\n", exception->clazz->descriptor, cp);
+        ALOGI("%s: %s\n", exception->clazz->descriptor, cp);
         free(cp);
     } else {
-        LOGI("%s:\n", exception->clazz->descriptor);
+        ALOGI("%s:\n", exception->clazz->descriptor);
     }
 
     stackData = (const ArrayObject*) dvmGetFieldObject(exception,
                     gDvm.offJavaLangThrowable_stackState);
     if (stackData == NULL) {
-        LOGI("  (no stack trace data found)\n");
+        ALOGI("  (no stack trace data found)\n");
         return;
     }
 
@@ -1288,7 +1288,7 @@ void dvmLogExceptionStackTrace(void)
     Object* cause;
 
     if (exception == NULL) {
-        LOGW("tried to log a null exception?\n");
+        ALOGW("tried to log a null exception?\n");
         return;
     }
 
@@ -1298,7 +1298,7 @@ void dvmLogExceptionStackTrace(void)
         if (cause == NULL) {
             break;
         }
-        LOGI("Caused by:\n");
+        ALOGI("Caused by:\n");
         exception = cause;
     }
 }

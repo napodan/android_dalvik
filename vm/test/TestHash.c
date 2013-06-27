@@ -44,7 +44,7 @@ static void dumpForeach(HashTable* pTab)
     //printf("Print from foreach:\n");
     dvmHashForeach(pTab, printFunc, &count);
     if (count != kNumTestEntries) {
-        LOGE("TestHash foreach test failed\n");
+        ALOGE("TestHash foreach test failed\n");
         assert(false);
     }
 }
@@ -67,7 +67,7 @@ static void dumpIterator(HashTable* pTab)
         count++;
     }
     if (count != kNumTestEntries) {
-        LOGE("TestHash iterator test failed\n");
+        ALOGE("TestHash iterator test failed\n");
         assert(false);
     }
 }
@@ -83,7 +83,7 @@ bool dvmTestHash(void)
     u4 hash;
     int i;
 
-    LOGV("TestHash BEGIN\n");
+    ALOGV("TestHash BEGIN\n");
 
     pTab = dvmHashTableCreate(dvmHashSize(12), free);
     if (pTab == NULL)
@@ -108,7 +108,7 @@ bool dvmTestHash(void)
         str = (const char*) dvmHashTableLookup(pTab, hash, tmpStr,
                 (HashCompareFunc) strcmp, false);
         if (str == NULL) {
-            LOGE("TestHash: failure: could not find '%s'\n", tmpStr);
+            ALOGE("TestHash: failure: could not find '%s'\n", tmpStr);
             /* return false */
         }
     }
@@ -121,7 +121,7 @@ bool dvmTestHash(void)
     if (str == NULL) {
         /* good */
     } else {
-        LOGE("TestHash found nonexistent string (improper add?)\n");
+        ALOGE("TestHash found nonexistent string (improper add?)\n");
     }
 
     dumpForeach(pTab);
@@ -150,7 +150,7 @@ bool dvmTestHash(void)
 
     /* remove the first one */
     if (!dvmHashTableRemove(pTab, hash, str1))
-        LOGE("TestHash failed to delete item\n");
+        ALOGE("TestHash failed to delete item\n");
     else
         free(str1);     // "Remove" doesn't call the free func
 
@@ -163,16 +163,16 @@ bool dvmTestHash(void)
         count++;
     }
     if (count != 1) {
-        LOGE("TestHash wrong number of entries (%d)\n", count);
+        ALOGE("TestHash wrong number of entries (%d)\n", count);
     }
 
     /* see if we can find them */
     str = dvmHashTableLookup(pTab, hash, "one", (HashCompareFunc) strcmp,false);
     if (str != NULL)
-        LOGE("TestHash deleted entry has returned!");
+        ALOGE("TestHash deleted entry has returned!");
     str = dvmHashTableLookup(pTab, hash, "two", (HashCompareFunc) strcmp,false);
     if (str == NULL)
-        LOGE("TestHash entry vanished\n");
+        ALOGE("TestHash entry vanished\n");
 
     /* force a table realloc to exercise tombstone removal */
     for (i = 0; i < 20; i++) {
@@ -183,7 +183,7 @@ bool dvmTestHash(void)
     }
 
     dvmHashTableFree(pTab);
-    LOGV("TestHash END\n");
+    ALOGV("TestHash END\n");
 
     return true;
 }

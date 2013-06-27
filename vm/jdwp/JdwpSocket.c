@@ -89,7 +89,7 @@ static bool prepareSocket(JdwpState* state, const JdwpStartupParams* pParams)
             }
         }
         if (state->netState == NULL) {
-            LOGE("JDWP net startup failed (req port=%d)\n", pParams->port);
+            ALOGE("JDWP net startup failed (req port=%d)\n", pParams->port);
             return false;
         }
     } else {
@@ -98,9 +98,9 @@ static bool prepareSocket(JdwpState* state, const JdwpStartupParams* pParams)
     }
 
     if (pParams->suspend)
-        LOGI("JDWP will wait for debugger on port %d\n", port);
+        ALOGI("JDWP will wait for debugger on port %d\n", port);
     else
-        LOGD("JDWP will %s on port %d\n",
+        ALOGD("JDWP will %s on port %d\n",
             pParams->server ? "listen" : "connect", port);
 
     return true;
@@ -146,7 +146,7 @@ static JdwpNetState* netStartup(short port)
 
     netState->listenSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (netState->listenSock < 0) {
-        LOGE("Socket create failed: %s\n", strerror(errno));
+        ALOGE("Socket create failed: %s\n", strerror(errno));
         goto fail;
     }
 
@@ -154,7 +154,7 @@ static JdwpNetState* netStartup(short port)
     if (setsockopt(netState->listenSock, SOL_SOCKET, SO_REUSEADDR, &one,
             sizeof(one)) < 0)
     {
-        LOGE("setsockopt(SO_REUSEADDR) failed: %s\n", strerror(errno));
+        ALOGE("setsockopt(SO_REUSEADDR) failed: %s\n", strerror(errno));
         goto fail;
     }
 
@@ -167,7 +167,7 @@ static JdwpNetState* netStartup(short port)
     inet_aton("127.0.0.1", &addr.addrInet.sin_addr);
 
     if (bind(netState->listenSock, &addr.addrPlain, sizeof(addr)) != 0) {
-        LOGV("attempt to bind to port %u failed: %s\n", port, strerror(errno));
+        ALOGV("attempt to bind to port %u failed: %s\n", port, strerror(errno));
         goto fail;
     }
 
@@ -175,7 +175,7 @@ static JdwpNetState* netStartup(short port)
     LOGVV("+++ bound to port %d\n", netState->listenPort);
 
     if (listen(netState->listenSock, 5) != 0) {
-        LOGE("Listen failed: %s\n", strerror(errno));
+        ALOGE("Listen failed: %s\n", strerror(errno));
         goto fail;
     }
 
@@ -221,7 +221,7 @@ static void netShutdown(JdwpNetState* netState)
 
     /* if we might be sitting in select, kick us loose */
     if (netState->wakePipe[1] >= 0) {
-        LOGV("+++ writing to wakePipe\n");
+        ALOGV("+++ writing to wakePipe\n");
         (void) write(netState->wakePipe[1], "", 1);
     }
 }
@@ -289,7 +289,7 @@ static bool isFdReadable(int sock)
     if (FD_ISSET(sock, &readfds))   /* make sure it's our fd */
         return true;
 
-    LOGE("WEIRD: odd behavior in select (count=%d)\n", count);
+    ALOGE("WEIRD: odd behavior in select (count=%d)\n", count);
     return false;
 }
 #endif
@@ -357,25 +357,25 @@ static bool acceptConnection(JdwpState* state)
             if (errno == EINVAL)
                 LOGVV("accept failed: %s\n", strerror(errno));
             else
-                LOGE("accept failed: %s\n", strerror(errno));
+                ALOGE("accept failed: %s\n", strerror(errno));
             return false;
         }
     } while (sock < 0);
 
     netState->remoteAddr = addr.addrInet.sin_addr;
     netState->remotePort = ntohs(addr.addrInet.sin_port);
-    LOGV("+++ accepted connection from %s:%u\n",
+    ALOGV("+++ accepted connection from %s:%u\n",
         inet_ntoa(netState->remoteAddr), netState->remotePort);
 
     netState->clientSock = sock;
     netState->awaitingHandshake = true;
     netState->inputCount = 0;
 
-    LOGV("Setting TCP_NODELAY on accepted socket\n");
+    ALOGV("Setting TCP_NODELAY on accepted socket\n");
     setNoDelay(netState->clientSock);
 
     if (pipe(netState->wakePipe) < 0) {
-        LOGE("pipe failed");
+        ALOGE("pipe failed");
         return false;
     }
 
@@ -410,7 +410,7 @@ static bool establishConnection(JdwpState* state)
     int cc = gethostbyname_r(state->params.host, &he, auxBuf, sizeof(auxBuf),
             &pEntry, &h_errno);
     if (cc != 0) {
-        LOGW("gethostbyname_r('%s') failed: %s\n",
+        ALOGW("gethostbyname_r('%s') failed: %s\n",
             state->params.host, strerror(errno));
         return false;
     }
@@ -419,7 +419,7 @@ static bool establishConnection(JdwpState* state)
     h_errno = 0;
     pEntry = gethostbyname(state->params.host);
     if (pEntry == NULL) {
-        LOGW("gethostbyname('%s') failed: %s\n",
+        ALOGW("gethostbyname('%s') failed: %s\n",
             state->params.host, strerror(h_errno));
         return false;
     }
@@ -431,7 +431,7 @@ static bool establishConnection(JdwpState* state)
 
     addr.addrInet.sin_port = htons(state->params.port);
 
-    LOGI("Connecting out to '%s' %d\n",
+    ALOGI("Connecting out to '%s' %d\n",
         inet_ntoa(addr.addrInet.sin_addr), ntohs(addr.addrInet.sin_port));
 
     /*
@@ -441,7 +441,7 @@ static bool establishConnection(JdwpState* state)
     netState = state->netState;
     netState->clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (netState->clientSock < 0) {
-        LOGE("Unable to create socket: %s\n", strerror(errno));
+        ALOGE("Unable to create socket: %s\n", strerror(errno));
         return false;
     }
 
@@ -449,7 +449,7 @@ static bool establishConnection(JdwpState* state)
      * Try to connect.
      */
     if (connect(netState->clientSock, &addr.addrPlain, sizeof(addr)) != 0) {
-        LOGE("Unable to connect to %s:%d: %s\n",
+        ALOGE("Unable to connect to %s:%d: %s\n",
             inet_ntoa(addr.addrInet.sin_addr), ntohs(addr.addrInet.sin_port),
             strerror(errno));
         close(netState->clientSock);
@@ -457,7 +457,7 @@ static bool establishConnection(JdwpState* state)
         return false;
     }
 
-    LOGI("Connection established to %s (%s:%d)\n",
+    ALOGI("Connection established to %s (%s:%d)\n",
         state->params.host, inet_ntoa(addr.addrInet.sin_addr),
         ntohs(addr.addrInet.sin_port));
     netState->awaitingHandshake = true;
@@ -466,7 +466,7 @@ static bool establishConnection(JdwpState* state)
     setNoDelay(netState->clientSock);
 
     if (pipe(netState->wakePipe) < 0) {
-        LOGE("pipe failed");
+        ALOGE("pipe failed");
         return false;
     }
 
@@ -488,7 +488,7 @@ static void closeConnection(JdwpState* state)
     if (netState->clientSock < 0)
         return;
 
-    LOGV("+++ closed connection to %s:%u\n",
+    ALOGV("+++ closed connection to %s:%u\n",
         inet_ntoa(netState->remoteAddr), netState->remotePort);
 
     close(netState->clientSock);
@@ -564,7 +564,7 @@ static void dumpPacket(const unsigned char* packetBuf)
 
     dataLen = length - (buf - packetBuf);
 
-    LOGV("--- %s: dataLen=%u id=0x%08x flags=0x%02x cmd=%d/%d\n",
+    ALOGV("--- %s: dataLen=%u id=0x%08x flags=0x%02x cmd=%d/%d\n",
         reply ? "reply" : "req",
         dataLen, id, flags, cmdSet, cmd);
     if (dataLen > 0)
@@ -624,20 +624,20 @@ static bool handlePacket(JdwpState* state)
             cc = write(netState->clientSock, expandBufGetBuffer(pReply),
                     expandBufGetLength(pReply));
             if (cc != (int) expandBufGetLength(pReply)) {
-                LOGE("Failed sending reply to debugger: %s\n", strerror(errno));
+                ALOGE("Failed sending reply to debugger: %s\n", strerror(errno));
                 expandBufFree(pReply);
                 return false;
             }
         } else {
-            LOGW("No reply created for set=%d cmd=%d\n", cmdSet, cmd);
+            ALOGW("No reply created for set=%d cmd=%d\n", cmdSet, cmd);
         }
         expandBufFree(pReply);
     } else {
-        LOGV("reply?!\n");
+        ALOGV("reply?!\n");
         assert(false);
     }
 
-    LOGV("----------\n");
+    ALOGV("----------\n");
 
     consumeBytes(netState, length);
     return true;
@@ -681,7 +681,7 @@ static bool processIncoming(JdwpState* state)
                 maxfd = netState->wakePipe[0];
 
             if (maxfd < 0) {
-                LOGV("+++ all fds are closed\n");
+                ALOGV("+++ all fds are closed\n");
                 return false;
             }
 
@@ -698,7 +698,7 @@ static bool processIncoming(JdwpState* state)
             if (fd >= 0) {
                 FD_SET(fd, &readfds);
             } else {
-                LOGI("NOTE: entering select w/o wakepipe\n");
+                ALOGI("NOTE: entering select w/o wakepipe\n");
             }
 
             /*
@@ -717,7 +717,7 @@ static bool processIncoming(JdwpState* state)
             if (selCount < 0) {
                 if (errno == EINTR)
                     continue;
-                LOGE("select failed: %s\n", strerror(errno));
+                ALOGE("select failed: %s\n", strerror(errno));
                 goto fail;
             }
 
@@ -725,15 +725,15 @@ static bool processIncoming(JdwpState* state)
                 FD_ISSET(netState->wakePipe[0], &readfds))
             {
                 if (netState->listenSock >= 0)
-                    LOGE("Exit wake set, but not exiting?\n");
+                    ALOGE("Exit wake set, but not exiting?\n");
                 else
-                    LOGD("Got wake-up signal, bailing out of select\n");
+                    ALOGD("Got wake-up signal, bailing out of select\n");
                 goto fail;
             }
             if (netState->listenSock >= 0 &&
                 FD_ISSET(netState->listenSock, &readfds))
             {
-                LOGI("Ignoring second debugger -- accepting and dropping\n");
+                ALOGI("Ignoring second debugger -- accepting and dropping\n");
                 union {
                     struct sockaddr_in   addrInet;
                     struct sockaddr      addrPlain;
@@ -743,7 +743,7 @@ static bool processIncoming(JdwpState* state)
                 tmpSock = accept(netState->listenSock, &addr.addrPlain,
                                 &addrlen);
                 if (tmpSock < 0)
-                    LOGI("Weird -- accept failed\n");
+                    ALOGI("Weird -- accept failed\n");
                 else
                     close(tmpSock);
             }
@@ -757,11 +757,11 @@ static bool processIncoming(JdwpState* state)
                     /* read failed */
                     if (errno != EINTR)
                         goto fail;
-                    LOGD("+++ EINTR hit\n");
+                    ALOGD("+++ EINTR hit\n");
                     return true;
                 } else if (readCount == 0) {
                     /* EOF hit -- far end went away */
-                    LOGD("+++ peer disconnected\n");
+                    ALOGD("+++ peer disconnected\n");
                     goto fail;
                 } else
                     break;
@@ -787,7 +787,7 @@ static bool processIncoming(JdwpState* state)
         if (memcmp(netState->inputBuffer,
                 kMagicHandshake, kMagicHandshakeLen) != 0)
         {
-            LOGE("ERROR: bad handshake '%.14s'\n", netState->inputBuffer);
+            ALOGE("ERROR: bad handshake '%.14s'\n", netState->inputBuffer);
             goto fail;
         }
 
@@ -795,14 +795,14 @@ static bool processIncoming(JdwpState* state)
         cc = write(netState->clientSock, netState->inputBuffer,
                 kMagicHandshakeLen);
         if (cc != kMagicHandshakeLen) {
-            LOGE("Failed writing handshake bytes: %s (%d of %d)\n",
+            ALOGE("Failed writing handshake bytes: %s (%d of %d)\n",
                 strerror(errno), cc, (int) kMagicHandshakeLen);
             goto fail;
         }
 
         consumeBytes(netState, kMagicHandshakeLen);
         netState->awaitingHandshake = false;
-        LOGV("+++ handshake complete\n");
+        ALOGV("+++ handshake complete\n");
         return true;
     }
 
@@ -832,7 +832,7 @@ static bool sendRequest(JdwpState* state, ExpandBuf* pReq)
     /*dumpPacket(expandBufGetBuffer(pReq));*/
     if (netState->clientSock < 0) {
         /* can happen with some DDMS events */
-        LOGV("NOT sending request -- no debugger is attached\n");
+        ALOGV("NOT sending request -- no debugger is attached\n");
         return false;
     }
 
@@ -845,7 +845,7 @@ static bool sendRequest(JdwpState* state, ExpandBuf* pReq)
     cc = write(netState->clientSock, expandBufGetBuffer(pReq),
             expandBufGetLength(pReq));
     if (cc != (int) expandBufGetLength(pReq)) {
-        LOGE("Failed sending req to debugger: %s (%d of %d)\n",
+        ALOGE("Failed sending req to debugger: %s (%d of %d)\n",
             strerror(errno), cc, (int) expandBufGetLength(pReq));
         return false;
     }
@@ -868,7 +868,7 @@ static bool sendBufferedRequest(JdwpState* state, const struct iovec* iov,
 
     if (netState->clientSock < 0) {
         /* can happen with some DDMS events */
-        LOGV("NOT sending request -- no debugger is attached\n");
+        ALOGV("NOT sending request -- no debugger is attached\n");
         return false;
     }
 
@@ -885,7 +885,7 @@ static bool sendBufferedRequest(JdwpState* state, const struct iovec* iov,
     ssize_t actual;
     actual = writev(netState->clientSock, iov, iovcnt);
     if ((size_t)actual != expected) {
-        LOGE("Failed sending b-req to debugger: %s (%d of %zu)\n",
+        ALOGE("Failed sending b-req to debugger: %s (%d of %zu)\n",
             strerror(errno), (int) actual, expected);
         return false;
     }

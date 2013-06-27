@@ -140,7 +140,7 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
             width = 8;
             break;
         default:        /* 'V' or something weird */
-            LOGE("Weird array type '%s'\n", srcClass->descriptor);
+            ALOGE("Weird array type '%s'\n", srcClass->descriptor);
             assert(false);
             width = 0;
             break;

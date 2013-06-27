@@ -48,7 +48,7 @@ static void updateDebugger(const Method* method, const u2* pc, const u4* fp,
      * we may or may not actually send a message to the debugger.
      */
     if (INST_INST(*pc) == OP_BREAKPOINT) {
-        LOGV("+++ breakpoint hit at %p\n", pc);
+        ALOGV("+++ breakpoint hit at %p\n", pc);
         eventFlags |= DBG_BREAKPOINT;
     }
 
@@ -123,7 +123,7 @@ static void updateDebugger(const Method* method, const u2* pc, const u4* fp,
         }
 
         if (doStop) {
-            LOGV("#####S %s\n", msg);
+            ALOGV("#####S %s\n", msg);
             eventFlags |= DBG_SINGLE_STEP;
         }
     }
@@ -159,7 +159,7 @@ static void updateDebugger(const Method* method, const u2* pc, const u4* fp,
              * during single-step.
              */
             char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-            LOGE("HEY: invalid 'this' ptr %p (%s.%s %s)\n", thisPtr,
+            ALOGE("HEY: invalid 'this' ptr %p (%s.%s %s)\n", thisPtr,
                 method->clazz->descriptor, method->name, desc);
             free(desc);
             dvmAbort();
@@ -199,7 +199,7 @@ static void checkDebugAndProf(const u2* pc, const u4* fp, Thread* self,
             strcmp(method->name, mn) == 0 &&
             strcmp(method->shorty, sg) == 0)
         {
-            LOGW("Reached %s.%s, enabling verbose mode\n",
+            ALOGW("Reached %s.%s, enabling verbose mode\n",
                 method->clazz->descriptor, method->name);
             android_setMinPriority(LOG_TAG"i", ANDROID_LOG_VERBOSE);
             dumpRegs(method, fp, true);

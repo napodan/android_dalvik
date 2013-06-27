@@ -22,7 +22,7 @@ HANDLE_OPCODE(OP_APUT_OBJECT /*vAA, vBB, vCC*/)
             if (!checkForNull(obj))
                 GOTO_exceptionThrown();
             if (!dvmCanPutArrayElement(obj->clazz, arrayObj->obj.clazz)) {
-                LOGV("Can't put a '%s'(%p) into array type='%s'(%p)\n",
+                ALOGV("Can't put a '%s'(%p) into array type='%s'(%p)\n",
                     obj->clazz->descriptor, obj,
                     arrayObj->obj.clazz->descriptor, arrayObj);
                 //dvmDumpClass(obj->clazz);

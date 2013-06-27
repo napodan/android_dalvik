@@ -120,7 +120,7 @@
         {                                                                   \
             char* desc;                                                     \
             desc = dexProtoCopyMethodDescriptor(&curMethod->prototype);     \
-            LOGE("Invalid branch %d at 0x%04x in %s.%s %s\n",               \
+            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s\n",               \
                 myoff, (int) (pc - curMethod->insns),                       \
                 curMethod->clazz->descriptor, curMethod->name, desc);       \
             free(desc);                                                     \
@@ -365,14 +365,14 @@ static inline bool checkForNull(Object* obj)
     }
 #ifdef WITH_EXTRA_OBJECT_VALIDATION
     if (!dvmIsValidObject(obj)) {
-        LOGE("Invalid object %p\n", obj);
+        ALOGE("Invalid object %p\n", obj);
         dvmAbort();
     }
 #endif
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        LOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
         dvmAbort();
     }
 #endif
@@ -397,14 +397,14 @@ static inline bool checkForNullExportPC(Object* obj, u4* fp, const u2* pc)
     }
 #ifdef WITH_EXTRA_OBJECT_VALIDATION
     if (!dvmIsValidObject(obj)) {
-        LOGE("Invalid object %p\n", obj);
+        ALOGE("Invalid object %p\n", obj);
         dvmAbort();
     }
 #endif
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        LOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
         dvmAbort();
     }
 #endif
@@ -998,7 +998,7 @@ GOTO_TARGET_DECL(exceptionThrown);
         if (!checkForNull((Object*) arrayObj))                              \
             GOTO_exceptionThrown();                                         \
         if (GET_REGISTER(vsrc2) >= arrayObj->length) {                      \
-            LOGV("Invalid array access: %p %d (len=%d)\n",                  \
+            ALOGV("Invalid array access: %p %d (len=%d)\n",                  \
                 arrayObj, vsrc2, arrayObj->length);                         \
             dvmThrowException("Ljava/lang/ArrayIndexOutOfBoundsException;", \
                 NULL);                                                      \

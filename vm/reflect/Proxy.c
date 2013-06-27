@@ -71,7 +71,7 @@ bool dvmReflectProxyStartup()
     methF = dvmFindVirtualMethodByDescriptor(gDvm.classJavaLangObject,
                 "finalize", "()V");
     if (methE == NULL || methH == NULL || methT == NULL || methF == NULL) {
-        LOGE("Could not find equals/hashCode/toString/finalize in Object\n");
+        ALOGE("Could not find equals/hashCode/toString/finalize in Object\n");
         return false;
     }
     gDvm.voffJavaLangObject_equals = methE->methodIndex;
@@ -88,13 +88,13 @@ bool dvmReflectProxyStartup()
     Method* meth;
     proxyClass = dvmFindSystemClassNoInit("Ljava/lang/reflect/Proxy;");
     if (proxyClass == NULL) {
-        LOGE("No java.lang.reflect.Proxy\n");
+        ALOGE("No java.lang.reflect.Proxy\n");
         return false;
     }
     meth = dvmFindDirectMethodByDescriptor(proxyClass, "constructorPrototype",
                 "(Ljava/lang/reflect/InvocationHandler;)V");
     if (meth == NULL) {
-        LOGE("Could not find java.lang.Proxy.constructorPrototype()\n");
+        ALOGE("Could not find java.lang.Proxy.constructorPrototype()\n");
         return false;
     }
     gDvm.methJavaLangReflectProxy_constructorPrototype = meth;
@@ -105,7 +105,7 @@ bool dvmReflectProxyStartup()
     gDvm.offJavaLangReflectProxy_h = dvmFindFieldOffset(proxyClass, "h",
         "Ljava/lang/reflect/InvocationHandler;");
     if (gDvm.offJavaLangReflectProxy_h < 0) {
-        LOGE("Unable to find 'h' field in java.lang.Proxy\n");
+        ALOGE("Unable to find 'h' field in java.lang.Proxy\n");
         return false;
     }
 
@@ -144,7 +144,7 @@ ClassObject* dvmGenerateProxyClass(StringObject* str, ArrayObject* interfaces,
         goto bail;
     }
 
-    LOGV("+++ Generate proxy class '%s' %p from %d interface classes\n",
+    ALOGV("+++ Generate proxy class '%s' %p from %d interface classes\n",
         nameStr, loader, interfaces->length);
 
 
@@ -251,7 +251,7 @@ ClassObject* dvmGenerateProxyClass(StringObject* str, ArrayObject* interfaces,
      */
     newClass->status = CLASS_LOADED;
     if (!dvmLinkClass(newClass)) {
-        LOGD("Proxy class link failed\n");
+        ALOGD("Proxy class link failed\n");
         goto bail;
     }
 
@@ -261,7 +261,7 @@ ClassObject* dvmGenerateProxyClass(StringObject* str, ArrayObject* interfaces,
      * with a duplicate name.
      */
     if (!dvmAddClassToHash(newClass)) {
-        LOGE("ERROR: attempted to generate %s more than once\n",
+        ALOGE("ERROR: attempted to generate %s more than once\n",
             newClass->descriptor);
         goto bail;
     }
@@ -389,9 +389,9 @@ static bool gatherMethods(ArrayObject* interfaces, Method*** pMethods,
     if (actualCount < 0)
         goto bail;
 
-    //LOGI("gathered methods:\n");
+    //ALOGI("gathered methods:\n");
     //for (i = 0; i < actualCount; i++) {
-    //    LOGI(" %d: %s.%s\n",
+    //    ALOGI(" %d: %s.%s\n",
     //        i, methods[i]->clazz->descriptor, methods[i]->name);
     //}
 
@@ -479,7 +479,7 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
                  * type or void, the types must match exactly, or we throw
                  * an exception now.
                  */
-                LOGV("MATCH on %s.%s and %s.%s\n",
+                ALOGV("MATCH on %s.%s and %s.%s\n",
                     allMethods[i]->clazz->descriptor, allMethods[i]->name,
                     allMethods[j]->clazz->descriptor, allMethods[j]->name);
                 dupe = true;
@@ -497,7 +497,7 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
          */
         if (dupe) {
             if (best) {
-                LOGV("BEST %d %s.%s -> %d\n", i,
+                ALOGV("BEST %d %s.%s -> %d\n", i,
                     allMethods[i]->clazz->descriptor, allMethods[i]->name,
                     outCount);
 
@@ -518,7 +518,7 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
                     if (dvmCompareMethodNamesAndParameterProtos(allMethods[i],
                             allMethods[j]) == 0)
                     {
-                        LOGV("DEL %d %s.%s\n", j,
+                        ALOGV("DEL %d %s.%s\n", j,
                             allMethods[j]->clazz->descriptor,
                             allMethods[j]->name);
 
@@ -552,7 +552,7 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
                             gDvm.classJavaLangClassArray, commonCount,
                             ALLOC_DEFAULT);
                     if (throwArray == NULL) {
-                        LOGE("common-throw array alloc failed\n");
+                        ALOGE("common-throw array alloc failed\n");
                         return -1;
                     }
 
@@ -574,13 +574,13 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
 
                 dvmPointerSetFree(commonThrows);
             } else {
-                LOGV("BEST not %d\n", i);
+                ALOGV("BEST not %d\n", i);
             }
         } else {
             /*
              * Singleton.  Copy the entry and NULL it out.
              */
-            LOGV("COPY singleton %d %s.%s -> %d\n", i,
+            ALOGV("COPY singleton %d %s.%s -> %d\n", i,
                 allMethods[i]->clazz->descriptor, allMethods[i]->name,
                 outCount);
 
@@ -604,7 +604,7 @@ static int copyWithoutDuplicates(Method** allMethods, int allCount,
      */
     for (i = 0; i < allCount; i++) {
         if (allMethods[i] != NULL) {
-            LOGV("BAD DUPE: %d %s.%s\n", i,
+            ALOGV("BAD DUPE: %d %s.%s\n", i,
                 allMethods[i]->clazz->descriptor, allMethods[i]->name);
             dvmThrowException("Ljava/lang/IllegalArgumentException;",
                 "incompatible return types in proxied interfaces");
@@ -960,11 +960,11 @@ static void proxyInvoker(const u4* args, JValue* pResult,
     invoke = dvmFindVirtualMethodHierByDescriptor(handler->clazz, "invoke",
             "(Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;");
     if (invoke == NULL) {
-        LOGE("Unable to find invoke()\n");
+        ALOGE("Unable to find invoke()\n");
         dvmAbort();
     }
 
-    LOGV("invoke: %s.%s, this=%p, handler=%s\n",
+    ALOGV("invoke: %s.%s, this=%p, handler=%s\n",
         method->clazz->descriptor, method->name,
         thisObj, handler->clazz->descriptor);
 
@@ -992,12 +992,12 @@ static void proxyInvoker(const u4* args, JValue* pResult,
     returnType = dvmGetBoxedReturnType(method);
     if (returnType == NULL) {
         char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-        LOGE("Could not determine return type for '%s'\n", desc);
+        ALOGE("Could not determine return type for '%s'\n", desc);
         free(desc);
         assert(dvmCheckException(self));
         goto bail;
     }
-    LOGV("  return type will be %s\n", returnType->descriptor);
+    ALOGV("  return type will be %s\n", returnType->descriptor);
 
     /*
      * Convert "args" array into Object[] array, using the method

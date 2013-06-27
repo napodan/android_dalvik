@@ -94,15 +94,15 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
     if (!dvmCreateStackTraceArray(dvmThreadSelf()->curFrame, &methods,
             &methodCount))
     {
-        LOGE("Failed to create stack trace array\n");
+        ALOGE("Failed to create stack trace array\n");
         dvmThrowException("Ljava/lang/InternalError;", NULL);
         RETURN_VOID();
     }
 
     //int i;
-    //LOGI("dvmCreateStackTraceArray results:\n");
+    //ALOGI("dvmCreateStackTraceArray results:\n");
     //for (i = 0; i < methodCount; i++) {
-    //    LOGI(" %2d: %s.%s\n",
+    //    ALOGI(" %2d: %s.%s\n",
     //        i, methods[i]->clazz->descriptor, methods[i]->name);
     //}
 
@@ -137,13 +137,13 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
     ArrayObject* classes = NULL;
     classArrayClass = dvmFindArrayClass("[Ljava/lang/Class;", NULL);
     if (classArrayClass == NULL) {
-        LOGW("Unable to find java.lang.Class array class\n");
+        ALOGW("Unable to find java.lang.Class array class\n");
         goto bail;
     }
     classes = dvmAllocArray(classArrayClass, size, kObjectArrayRefWidth,
                 ALLOC_DEFAULT);
     if (classes == NULL) {
-        LOGW("Unable to allocate class array (%d elems)\n", size);
+        ALOGW("Unable to allocate class array (%d elems)\n", size);
         goto bail;
     }
 
@@ -193,7 +193,7 @@ static void Dalvik_dalvik_system_VMStack_getThreadStackTrace(const u4* args,
             break;
     }
     if (thread == NULL) {
-        LOGI("VMStack.getThreadStackTrace: threadObj %p not active\n",
+        ALOGI("VMStack.getThreadStackTrace: threadObj %p not active\n",
             targetThreadObj);
         dvmUnlockThreadList();
         RETURN_PTR(NULL);

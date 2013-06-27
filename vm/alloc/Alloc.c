@@ -91,14 +91,14 @@ static Object* createStockException(const char* descriptor, const char* msg)
     /* find class, initialize if necessary */
     clazz = dvmFindSystemClass(descriptor);
     if (clazz == NULL) {
-        LOGE("Unable to find %s\n", descriptor);
+        ALOGE("Unable to find %s\n", descriptor);
         return NULL;
     }
 
     init = dvmFindDirectMethodByDescriptor(clazz, "<init>",
             "(Ljava/lang/String;)V");
     if (init == NULL) {
-        LOGE("Unable to find String-arg constructor for %s\n", descriptor);
+        ALOGE("Unable to find String-arg constructor for %s\n", descriptor);
         return NULL;
     }
 
@@ -111,7 +111,7 @@ static Object* createStockException(const char* descriptor, const char* msg)
     } else {
         msgStr = dvmCreateStringFromCstr(msg);
         if (msgStr == NULL) {
-            LOGW("Could not allocate message string \"%s\"\n", msg);
+            ALOGW("Could not allocate message string \"%s\"\n", msg);
             dvmReleaseTrackedAlloc(obj, self);
             return NULL;
         }
@@ -157,7 +157,7 @@ bool dvmCreateStockExceptions(void)
     if (gDvm.outOfMemoryObj == NULL || gDvm.internalErrorObj == NULL ||
         gDvm.noClassDefFoundErrorObj == NULL)
     {
-        LOGW("Unable to create stock exceptions\n");
+        ALOGW("Unable to create stock exceptions\n");
         return false;
     }
 
@@ -257,7 +257,7 @@ void dvmAddTrackedAlloc(Object* obj, Thread* self)
 
     assert(self != NULL);
     if (!dvmAddToReferenceTable(&self->internalLocalRefTable, obj)) {
-        LOGE("threadid=%d: unable to add %p to internal ref table\n",
+        ALOGE("threadid=%d: unable to add %p to internal ref table\n",
             self->threadId, obj);
         dvmDumpThread(self, false);
         dvmAbort();
@@ -282,7 +282,7 @@ void dvmReleaseTrackedAlloc(Object* obj, Thread* self)
     if (!dvmRemoveFromReferenceTable(&self->internalLocalRefTable,
             self->internalLocalRefTable.table, obj))
     {
-        LOGE("threadid=%d: failed to remove %p from internal ref table\n",
+        ALOGE("threadid=%d: failed to remove %p from internal ref table\n",
             self->threadId, obj);
         dvmAbort();
     }

@@ -96,7 +96,7 @@ void dvmPlatformInvoke(void* pEnv, ClassObject* clazz, int argInfo, int argc,
      * Prep the CIF (Call InterFace object).
      */
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, dstArg, retType, types) != FFI_OK) {
-        LOGE("ffi_prep_cif failed\n");
+        ALOGE("ffi_prep_cif failed\n");
         dvmAbort();
     }
 

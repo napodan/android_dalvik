@@ -134,7 +134,7 @@ static bool javaLangString_charAt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     if (!dvmValidateObject((Object*) arg0))
         return false;
 
-    //LOGI("String.charAt this=0x%08x index=%d\n", arg0, arg1);
+    //ALOGI("String.charAt this=0x%08x index=%d\n", arg0, arg1);
     count = dvmGetFieldInt((Object*) arg0, STRING_FIELDOFF_COUNT);
     if ((s4) arg1 < 0 || (s4) arg1 >= count) {
         dvmThrowException("Ljava/lang/StringIndexOutOfBoundsException;", NULL);
@@ -178,9 +178,9 @@ static void badMatch(StringObject* thisStrObj, StringObject* compStrObj,
     thisStr = dvmCreateCstrFromString(thisStrObj);
     compStr = dvmCreateCstrFromString(compStrObj);
 
-    LOGE("%s expected %d got %d\n", compareType, expectResult, newResult);
-    LOGE(" this (o=%d l=%d) '%s'\n", thisOffset, thisCount, thisStr);
-    LOGE(" comp (o=%d l=%d) '%s'\n", compOffset, compCount, compStr);
+    ALOGE("%s expected %d got %d\n", compareType, expectResult, newResult);
+    ALOGE(" this (o=%d l=%d) '%s'\n", thisOffset, thisCount, thisStr);
+    ALOGE(" comp (o=%d l=%d) '%s'\n", compOffset, compCount, compStr);
     dvmPrintHexDumpEx(ANDROID_LOG_INFO, LOG_TAG,
         ((const u2*) thisArray->contents) + thisOffset, thisCount*2,
         kHexDumpLocal);
@@ -385,7 +385,7 @@ static bool javaLangString_equals(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 static bool javaLangString_length(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
-    //LOGI("String.length this=0x%08x pResult=%p\n", arg0, pResult);
+    //ALOGI("String.length this=0x%08x pResult=%p\n", arg0, pResult);
 
     /* null reference check on "this" */
     if (!dvmValidateObject((Object*) arg0))
@@ -401,7 +401,7 @@ static bool javaLangString_length(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 static bool javaLangString_isEmpty(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
-    //LOGI("String.isEmpty this=0x%08x pResult=%p\n", arg0, pResult);
+    //ALOGI("String.isEmpty this=0x%08x pResult=%p\n", arg0, pResult);
 
     /* null reference check on "this" */
     if (!dvmValidateObject((Object*) arg0))
@@ -433,7 +433,7 @@ static inline int indexOfCommon(Object* strObj, int ch, int start)
     const u2* chars = (const u2*) charArray->contents;
     int offset = dvmGetFieldInt(strObj, STRING_FIELDOFF_OFFSET);
     int count = dvmGetFieldInt(strObj, STRING_FIELDOFF_COUNT);
-    //LOGI("String.indexOf(0x%08x, 0x%04x, %d) off=%d count=%d\n",
+    //ALOGI("String.indexOf(0x%08x, 0x%04x, %d) off=%d count=%d\n",
     //    (u4) strObj, ch, start, offset, count);
 
     /* factor out the offset */
@@ -819,7 +819,7 @@ bool dvmPerformInlineOp4Dbg(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
         clazz = dvmFindClassNoInit(
                 gDvmInlineOpsTable[opIndex].classDescriptor, NULL);
         if (clazz == NULL) {
-            LOGW("Warning: can't find class '%s'\n", clazz->descriptor);
+            ALOGW("Warning: can't find class '%s'\n", clazz->descriptor);
             goto skip_prof;
         }
         method = dvmFindDirectMethodByDescriptor(clazz,
@@ -830,7 +830,7 @@ bool dvmPerformInlineOp4Dbg(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
                         gDvmInlineOpsTable[opIndex].methodName,
                         gDvmInlineOpsTable[opIndex].methodSignature);
         if (method == NULL) {
-            LOGW("Warning: can't find method %s.%s %s\n",
+            ALOGW("Warning: can't find method %s.%s %s\n",
                 clazz->descriptor,
                 gDvmInlineOpsTable[opIndex].methodName,
                 gDvmInlineOpsTable[opIndex].methodSignature);
@@ -838,9 +838,9 @@ bool dvmPerformInlineOp4Dbg(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
         }
 
         gDvm.inlinedMethods[opIndex] = method;
-        IF_LOGV() {
+        IF_ALOGV() {
             char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-            LOGV("Registered for profile: %s.%s %s\n",
+            ALOGV("Registered for profile: %s.%s %s\n",
                 method->clazz->descriptor, method->name, desc);
             free(desc);
         }
