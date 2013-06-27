@@ -95,7 +95,7 @@ static void ensureSpace(ExpandBuf* pBuf, int newCount)
 
     newPtr = realloc(pBuf->storage, pBuf->maxLen);
     if (newPtr == NULL) {
-        LOGE("realloc(%d) failed\n", pBuf->maxLen);
+        ALOGE("realloc(%d) failed\n", pBuf->maxLen);
         abort();
     }
 

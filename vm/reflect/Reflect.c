@@ -50,7 +50,7 @@ bool dvmReflectStartup(void)
         gDvm.classJavaLangReflectMethodArray == NULL ||
         gDvm.classJavaLangReflectProxy == NULL)
     {
-        LOGE("Could not find one or more reflection classes\n");
+        ALOGE("Could not find one or more reflection classes\n");
         return false;
     }
 
@@ -67,7 +67,7 @@ bool dvmReflectStartup(void)
         gDvm.methJavaLangReflectField_init == NULL ||
         gDvm.methJavaLangReflectMethod_init == NULL)
     {
-        LOGE("Could not find reflection constructors\n");
+        ALOGE("Could not find reflection constructors\n");
         return false;
     }
 
@@ -78,7 +78,7 @@ bool dvmReflectStartup(void)
     if (gDvm.classJavaLangClassArray == NULL ||
         gDvm.classJavaLangObjectArray == NULL)
     {
-        LOGE("Could not find class-array or object-array class\n");
+        ALOGE("Could not find class-array or object-array class\n");
         return false;
     }
 
@@ -112,7 +112,7 @@ bool dvmReflectStartup(void)
         gDvm.offJavaLangReflectMethod_slot < 0 ||
         gDvm.offJavaLangReflectMethod_declClass < 0)
     {
-        LOGE("Could not find reflection fields\n");
+        ALOGE("Could not find reflection fields\n");
         return false;
     }
 
@@ -161,12 +161,12 @@ bool dvmValidateBoxClasses()
 
         clazz = dvmFindClassNoInit(*ccp, NULL);
         if (clazz == NULL) {
-            LOGE("Couldn't find '%s'\n", *ccp);
+            ALOGE("Couldn't find '%s'\n", *ccp);
             return false;
         }
 
         if (clazz->ifieldCount != 1) {
-            LOGE("Found %d instance fields in '%s'\n",
+            ALOGE("Found %d instance fields in '%s'\n",
                 clazz->ifieldCount, *ccp);
             return false;
         }
@@ -219,7 +219,7 @@ static ClassObject* convertSignaturePartToClass(char** pSignature,
     }
 
     if (clazz == NULL) {
-        LOGW("Unable to match class for part: '%s'\n", *pSignature);
+        ALOGW("Unable to match class for part: '%s'\n", *pSignature);
     }
     *pSignature = signature;
     return clazz;
@@ -367,7 +367,7 @@ static Object* createFieldObject(Field* field, const ClassObject* clazz)
     dvmCallMethod(dvmThreadSelf(), gDvm.methJavaLangReflectField_init,
         fieldObj, &unused, clazz, type, nameObj, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        LOGD("Field class init threw exception\n");
+        ALOGD("Field class init threw exception\n");
         goto bail;
     }
 
@@ -549,7 +549,7 @@ static Object* createConstructorObject(Method* meth)
     dvmCallMethod(dvmThreadSelf(), gDvm.methJavaLangReflectConstructor_init,
         consObj, &unused, meth->clazz, params, exceptions, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        LOGD("Constructor class init threw exception\n");
+        ALOGD("Constructor class init threw exception\n");
         goto bail;
     }
 
@@ -660,7 +660,7 @@ Object* dvmCreateReflectMethodObject(const Method* meth)
     int slot;
 
     if (dvmCheckException(dvmThreadSelf())) {
-        LOGW("WARNING: dvmCreateReflectMethodObject called with "
+        ALOGW("WARNING: dvmCreateReflectMethodObject called with "
              "exception pending\n");
         return NULL;
     }
@@ -708,7 +708,7 @@ Object* dvmCreateReflectMethodObject(const Method* meth)
         methObj, &unused, meth->clazz, params, exceptions, returnType,
         nameObj, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        LOGD("Method class init threw exception\n");
+        ALOGD("Method class init threw exception\n");
         goto bail;
     }
 
@@ -933,7 +933,7 @@ int dvmConvertPrimitiveValue(PrimitiveType srcType,
            srcType != PRIM_VOID && dstType != PRIM_VOID);
     result = kConvMode[srcType][dstType];
 
-    //LOGV("+++ convprim: src=%d dst=%d result=%d\n", srcType, dstType, result);
+    //ALOGV("+++ convprim: src=%d dst=%d result=%d\n", srcType, dstType, result);
 
     switch (result) {
     case OK4:
@@ -961,7 +961,7 @@ int dvmConvertPrimitiveValue(PrimitiveType srcType,
         *(float*)dstPtr = (float) (*(long long*) srcPtr);
         return 1;
     case bad:
-        LOGV("convert primitive: prim %d to %d not allowed\n",
+        ALOGV("convert primitive: prim %d to %d not allowed\n",
             srcType, dstType);
         return -1;
     default:
@@ -1055,7 +1055,7 @@ DataObject* dvmWrapPrimitive(JValue value, ClassObject* returnType)
 
     wrapperClass = dvmFindSystemClass(classDescriptor);
     if (wrapperClass == NULL) {
-        LOGW("Unable to find '%s'\n", classDescriptor);
+        ALOGW("Unable to find '%s'\n", classDescriptor);
         assert(dvmCheckException(dvmThreadSelf()));
         return NULL;
     }
@@ -1094,7 +1094,7 @@ bool dvmUnwrapPrimitive(Object* value, ClassObject* returnType,
 
     if (typeIndex == PRIM_NOT) {
         if (value != NULL && !dvmInstanceof(value->clazz, returnType)) {
-            LOGD("wrong object type: %s %s\n",
+            ALOGD("wrong object type: %s %s\n",
                 value->clazz->descriptor, returnType->descriptor);
             return false;
         }
@@ -1114,7 +1114,7 @@ bool dvmUnwrapPrimitive(Object* value, ClassObject* returnType,
     if (dvmConvertPrimitiveValue(valueIndex, typeIndex,
             (s4*) ((DataObject*)value)->instanceData, (s4*)pResult) < 0)
     {
-        LOGV("Prim conversion failed\n");
+        ALOGV("Prim conversion failed\n");
         return false;
     }
 
@@ -1150,7 +1150,7 @@ ClassObject* dvmGetBoxedReturnType(const Method* meth)
     default: {
         /* should not have passed verification */
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        LOGE("Bad return type in signature '%s'\n", desc);
+        ALOGE("Bad return type in signature '%s'\n", desc);
         free(desc);
         dvmThrowException("Ljava/lang/InternalError;", NULL);
         return NULL;

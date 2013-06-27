@@ -117,7 +117,7 @@ DalvikNativeFunc dvmLookupInternalNativeMethod(const Method* method)
                     pMeth->signature, method) == 0)
                 {
                     /* match */
-                    //LOGV("+++  match on %s.%s %s at %p\n",
+                    //ALOGV("+++  match on %s.%s %s at %p\n",
                     //    className, methodName, methodSignature, pMeth->fnPtr);
                     return pMeth->fnPtr;
                 }
@@ -140,7 +140,7 @@ DalvikNativeFunc dvmLookupInternalNativeMethod(const Method* method)
  */
 void dvmAbstractMethodStub(const u4* args, JValue* pResult)
 {
-    LOGD("--- called into dvmAbstractMethodStub\n");
+    ALOGD("--- called into dvmAbstractMethodStub\n");
     dvmThrowException("Ljava/lang/AbstractMethodError;",
         "abstract method not implemented");
 }
@@ -222,7 +222,7 @@ ClassObject* dvmFindClassByName(StringObject* nameObj, Object* loader,
      * auto-generating bogus array classes.
      */
     if (!validateClassName(name)) {
-        LOGW("dvmFindClassByName rejecting '%s'\n", name);
+        ALOGW("dvmFindClassByName rejecting '%s'\n", name);
         dvmThrowException("Ljava/lang/ClassNotFoundException;", name);
         goto bail;
     }
@@ -314,7 +314,7 @@ bool dvmIsPrivilegedMethod(const Method* method)
 
         clazz = dvmFindClassNoInit("Ljava/security/AccessController;", NULL);
         if (clazz == NULL) {
-            LOGW("Couldn't find java/security/AccessController\n");
+            ALOGW("Couldn't find java/security/AccessController\n");
             return false;
         }
 
@@ -326,7 +326,7 @@ bool dvmIsPrivilegedMethod(const Method* method)
             gDvm.methJavaSecurityAccessController_doPrivileged[i] =
                 dvmFindDirectMethodByDescriptor(clazz, "doPrivileged", kSignatures[i]);
             if (gDvm.methJavaSecurityAccessController_doPrivileged[i] == NULL) {
-                LOGW("Warning: couldn't find java/security/AccessController"
+                ALOGW("Warning: couldn't find java/security/AccessController"
                     ".doPrivileged %s\n", kSignatures[i]);
                 return false;
             }
@@ -339,7 +339,7 @@ bool dvmIsPrivilegedMethod(const Method* method)
 
     for (i = 0; i < NUM_DOPRIV_FUNCS; i++) {
         if (gDvm.methJavaSecurityAccessController_doPrivileged[i] == method) {
-            //LOGI("+++ doPriv match\n");
+            //ALOGI("+++ doPriv match\n");
             return true;
         }
     }

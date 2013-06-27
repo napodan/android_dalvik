@@ -39,7 +39,7 @@ void dvmFreeDexOrJar(void* vptr)
 {
     DexOrJar* pDexOrJar = (DexOrJar*) vptr;
 
-    LOGV("Freeing DexOrJar '%s'\n", pDexOrJar->fileName);
+    ALOGV("Freeing DexOrJar '%s'\n", pDexOrJar->fileName);
 
     if (pDexOrJar->isDex)
         dvmRawDexFileFree(pDexOrJar->pRawDexFile);
@@ -150,7 +150,7 @@ static void Dalvik_dalvik_system_DexFile_openDexFile(const u4* args,
      * if the caller specifies their own output file.
      */
     if (dvmClassPathContains(gDvm.bootClassPath, sourceName)) {
-        LOGW("Refusing to reopen boot DEX '%s'\n", sourceName);
+        ALOGW("Refusing to reopen boot DEX '%s'\n", sourceName);
         dvmThrowException("Ljava/io/IOException;",
             "Re-opening BOOTCLASSPATH DEX files is not allowed");
         free(sourceName);
@@ -162,19 +162,19 @@ static void Dalvik_dalvik_system_DexFile_openDexFile(const u4* args,
      * with a "classes.dex" inside.
      */
     if (dvmRawDexFileOpen(sourceName, outputName, &pRawDexFile, false) == 0) {
-        LOGV("Opening DEX file '%s' (DEX)\n", sourceName);
+        ALOGV("Opening DEX file '%s' (DEX)\n", sourceName);
 
         pDexOrJar = (DexOrJar*) malloc(sizeof(DexOrJar));
         pDexOrJar->isDex = true;
         pDexOrJar->pRawDexFile = pRawDexFile;
     } else if (dvmJarFileOpen(sourceName, outputName, &pJarFile, false) == 0) {
-        LOGV("Opening DEX file '%s' (Jar)\n", sourceName);
+        ALOGV("Opening DEX file '%s' (Jar)\n", sourceName);
 
         pDexOrJar = (DexOrJar*) malloc(sizeof(DexOrJar));
         pDexOrJar->isDex = false;
         pDexOrJar->pJarFile = pJarFile;
     } else {
-        LOGV("Unable to open DEX file '%s'\n", sourceName);
+        ALOGV("Unable to open DEX file '%s'\n", sourceName);
         dvmThrowException("Ljava/io/IOException;", "unable to open DEX file");
     }
 
@@ -189,7 +189,7 @@ static void Dalvik_dalvik_system_DexFile_openDexFile(const u4* args,
                     hashcmpDexOrJar, true);
         dvmHashTableUnlock(gDvm.userDexFiles);
         if (result != pDexOrJar) {
-            LOGE("Pointer has already been added?\n");
+            ALOGE("Pointer has already been added?\n");
             dvmAbort();
         }
 
@@ -214,7 +214,7 @@ static void Dalvik_dalvik_system_DexFile_closeDexFile(const u4* args,
     if (pDexOrJar == NULL)
         RETURN_VOID();
 
-    LOGV("Closing DEX file %p (%s)\n", pDexOrJar, pDexOrJar->fileName);
+    ALOGV("Closing DEX file %p (%s)\n", pDexOrJar, pDexOrJar->fileName);
 
     if (!validateCookie(cookie))
         RETURN_VOID();
@@ -231,14 +231,14 @@ static void Dalvik_dalvik_system_DexFile_closeDexFile(const u4* args,
         u4 hash = dvmComputeUtf8Hash(pDexOrJar->fileName);
         dvmHashTableLock(gDvm.userDexFiles);
         if (!dvmHashTableRemove(gDvm.userDexFiles, hash, pDexOrJar)) {
-            LOGW("WARNING: could not remove '%s' from DEX hash table\n",
+            ALOGW("WARNING: could not remove '%s' from DEX hash table\n",
                 pDexOrJar->fileName);
         }
         dvmHashTableUnlock(gDvm.userDexFiles);
-        LOGV("+++ freeing DexFile '%s' resources\n", pDexOrJar->fileName);
+        ALOGV("+++ freeing DexFile '%s' resources\n", pDexOrJar->fileName);
         dvmFreeDexOrJar(pDexOrJar);
     } else {
-        LOGV("+++ NOT freeing DexFile '%s' resources\n", pDexOrJar->fileName);
+        ALOGV("+++ NOT freeing DexFile '%s' resources\n", pDexOrJar->fileName);
     }
 
     RETURN_VOID();
@@ -273,7 +273,7 @@ static void Dalvik_dalvik_system_DexFile_defineClass(const u4* args,
 
     name = dvmCreateCstrFromString(nameObj);
     descriptor = dvmDotToDescriptor(name);
-    LOGV("--- Explicit class load '%s' 0x%08x\n", descriptor, cookie);
+    ALOGV("--- Explicit class load '%s' 0x%08x\n", descriptor, cookie);
     free(name);
 
     if (!validateCookie(cookie))
@@ -313,7 +313,7 @@ static void Dalvik_dalvik_system_DexFile_defineClass(const u4* args,
      * stuff, like where it comes from for bootstrap classes).
      */
     if (clazz != NULL) {
-        //LOGI("SETTING pd '%s' to %p\n", clazz->descriptor, pd);
+        //ALOGI("SETTING pd '%s' to %p\n", clazz->descriptor, pd);
         dvmSetFieldObject((Object*) clazz, gDvm.offJavaLangClass_pd, pd);
     }
 
@@ -352,7 +352,7 @@ static void Dalvik_dalvik_system_DexFile_getClassNameList(const u4* args,
                     ALLOC_DEFAULT);
     if (stringArray == NULL) {
         /* probably OOM */
-        LOGD("Failed allocating array of %d strings\n", count);
+        ALOGD("Failed allocating array of %d strings\n", count);
         assert(dvmCheckException(self));
         RETURN_VOID();
     }
@@ -410,7 +410,7 @@ static void Dalvik_dalvik_system_DexFile_isDexOptNeeded(const u4* args,
         RETURN_VOID();
     }
     status = dvmDexCacheStatus(name);
-    LOGV("dvmDexCacheStatus(%s) returned %d\n", name, status);
+    ALOGV("dvmDexCacheStatus(%s) returned %d\n", name, status);
 
     result = true;
     switch (status) {

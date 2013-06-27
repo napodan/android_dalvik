@@ -17,13 +17,13 @@ HANDLE_OPCODE(OP_BREAKPOINT)
          * the thread resumed.
          */
         u1 originalOpCode = dvmGetOriginalOpCode(pc);
-        LOGV("+++ break 0x%02x (0x%04x -> 0x%04x)\n", originalOpCode, inst,
+        ALOGV("+++ break 0x%02x (0x%04x -> 0x%04x)\n", originalOpCode, inst,
             INST_REPLACE_OP(inst, originalOpCode));
         inst = INST_REPLACE_OP(inst, originalOpCode);
         FINISH_BKPT(originalOpCode);
     }
 #else
-    LOGE("Breakpoint hit in non-debug interpreter\n");
+    ALOGE("Breakpoint hit in non-debug interpreter\n");
     dvmAbort();
 #endif
 OP_END

@@ -114,7 +114,7 @@ static void setProperty(Object* propObj, Method* put, const char* key,
     keyStr = dvmCreateStringFromCstr(key);
     valueStr = dvmCreateStringFromCstr(value);
     if (keyStr == NULL || valueStr == NULL) {
-        LOGW("setProperty string creation failed\n");
+        ALOGW("setProperty string creation failed\n");
         goto bail;
     }
 
@@ -261,7 +261,7 @@ char* dvmGetProperty(const char* key)
     getProp = dvmFindDirectMethodByDescriptor(system, "getProperty",
         "(Ljava/lang/String;)Ljava/lang/String;");
     if (getProp == NULL) {
-        LOGW("Could not find getProperty(String) in java.lang.System\n");
+        ALOGW("Could not find getProperty(String) in java.lang.System\n");
         goto bail;
     }
 

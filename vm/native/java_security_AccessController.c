@@ -41,15 +41,15 @@ static void Dalvik_java_security_AccessController_getStackDomains(
      */
     if (!dvmCreateStackTraceArray(dvmThreadSelf()->curFrame, &methods, &length))
     {
-        LOGE("Failed to create stack trace array\n");
+        ALOGE("Failed to create stack trace array\n");
         dvmThrowException("Ljava/lang/InternalError;", NULL);
         RETURN_VOID();
     }
 
     //int i;
-    //LOGI("dvmCreateStackTraceArray results:\n");
+    //ALOGI("dvmCreateStackTraceArray results:\n");
     //for (i = 0; i < length; i++)
-    //    LOGI(" %2d: %s.%s\n", i, methods[i]->clazz->name, methods[i]->name);
+    //    ALOGI(" %2d: %s.%s\n", i, methods[i]->clazz->name, methods[i]->name);
 
     /*
      * Generate a list of ProtectionDomain objects from the frames that
@@ -68,7 +68,7 @@ static void Dalvik_java_security_AccessController_getStackDomains(
      */
     Object** subSet = (Object**) malloc((length-2) * sizeof(Object*));
     if (subSet == NULL) {
-        LOGE("Failed to allocate subSet (length=%d)\n", length);
+        ALOGE("Failed to allocate subSet (length=%d)\n", length);
         free(methods);
         dvmThrowException("Ljava/lang/InternalError;", NULL);
         RETURN_VOID();
@@ -83,7 +83,7 @@ static void Dalvik_java_security_AccessController_getStackDomains(
 
         if (dvmIsPrivilegedMethod(meth)) {
             /* find nearest non-reflection frame; note we skip priv frame */
-            //LOGI("GSD priv frame at %s.%s\n", meth->clazz->name, meth->name);
+            //ALOGI("GSD priv frame at %s.%s\n", meth->clazz->name, meth->name);
             while (++idx < length && dvmIsReflectionMethod(methods[idx]))
                 ;
             length = idx;       // stomp length to end loop
@@ -94,14 +94,14 @@ static void Dalvik_java_security_AccessController_getStackDomains(
         assert(gDvm.offJavaLangClass_pd != 0);
         pd = dvmGetFieldObject((Object*) meth->clazz,
                 gDvm.offJavaLangClass_pd);
-        //LOGI("FOUND '%s' pd=%p\n", meth->clazz->name, pd);
+        //ALOGI("FOUND '%s' pd=%p\n", meth->clazz->name, pd);
         if (pd != NULL)
             subSet[subIdx++] = pd;
     }
 
-    //LOGI("subSet:\n");
+    //ALOGI("subSet:\n");
     //for (i = 0; i < subIdx; i++)
-    //    LOGI("  %2d: %s\n", i, subSet[i]->clazz->name);
+    //    ALOGI("  %2d: %s\n", i, subSet[i]->clazz->name);
 
     /*
      * Create an array object to contain "subSet".
@@ -110,13 +110,13 @@ static void Dalvik_java_security_AccessController_getStackDomains(
     ArrayObject* domains = NULL;
     pdArrayClass = dvmFindArrayClass("[Ljava/security/ProtectionDomain;", NULL);
     if (pdArrayClass == NULL) {
-        LOGW("Unable to find ProtectionDomain class for array\n");
+        ALOGW("Unable to find ProtectionDomain class for array\n");
         goto bail;
     }
     domains = dvmAllocArray(pdArrayClass, subIdx, kObjectArrayRefWidth,
                 ALLOC_DEFAULT);
     if (domains == NULL) {
-        LOGW("Unable to allocate pd array (%d elems)\n", subIdx);
+        ALOGW("Unable to allocate pd array (%d elems)\n", subIdx);
         goto bail;
     }
 

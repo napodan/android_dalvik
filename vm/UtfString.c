@@ -44,13 +44,13 @@
 static bool stringStartup()
 {
     if (gDvm.javaLangStringReady < 0) {
-        LOGE("ERROR: reentrant string initialization\n");
+        ALOGE("ERROR: reentrant string initialization\n");
         assert(false);
         return false;
     }
 
     if (android_atomic_acquire_cas(0, -1, &gDvm.javaLangStringReady) != 0) {
-        LOGE("ERROR: initial string-ready state not 0 (%d)\n",
+        ALOGE("ERROR: initial string-ready state not 0 (%d)\n",
             gDvm.javaLangStringReady);
         return false;
     }
@@ -73,28 +73,28 @@ static bool stringStartup()
         gDvm.offJavaLangString_offset < 0 ||
         gDvm.offJavaLangString_hashCode < 0)
     {
-        LOGE("VM-required field missing from java/lang/String\n");
+        ALOGE("VM-required field missing from java/lang/String\n");
         return false;
     }
 
     bool badValue = false;
     if (gDvm.offJavaLangString_value != STRING_FIELDOFF_VALUE) {
-        LOGE("InlineNative: String.value offset = %d, expected %d\n",
+        ALOGE("InlineNative: String.value offset = %d, expected %d\n",
             gDvm.offJavaLangString_value, STRING_FIELDOFF_VALUE);
         badValue = true;
     }
     if (gDvm.offJavaLangString_count != STRING_FIELDOFF_COUNT) {
-        LOGE("InlineNative: String.count offset = %d, expected %d\n",
+        ALOGE("InlineNative: String.count offset = %d, expected %d\n",
             gDvm.offJavaLangString_count, STRING_FIELDOFF_COUNT);
         badValue = true;
     }
     if (gDvm.offJavaLangString_offset != STRING_FIELDOFF_OFFSET) {
-        LOGE("InlineNative: String.offset offset = %d, expected %d\n",
+        ALOGE("InlineNative: String.offset offset = %d, expected %d\n",
             gDvm.offJavaLangString_offset, STRING_FIELDOFF_OFFSET);
         badValue = true;
     }
     if (gDvm.offJavaLangString_hashCode != STRING_FIELDOFF_HASHCODE) {
-        LOGE("InlineNative: String.hashCode offset = %d, expected %d\n",
+        ALOGE("InlineNative: String.hashCode offset = %d, expected %d\n",
             gDvm.offJavaLangString_hashCode, STRING_FIELDOFF_HASHCODE);
         badValue = true;
     }
@@ -282,7 +282,7 @@ StringObject* dvmCreateStringFromCstrAndLength(const char* utf8Str,
     ArrayObject* chars;
     u4 hashCode = 0;
 
-    //LOGV("Creating String from '%s'\n", utf8Str);
+    //ALOGV("Creating String from '%s'\n", utf8Str);
     assert(utf8Str != NULL);
 
     if (gDvm.javaLangStringReady <= 0) {

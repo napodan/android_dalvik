@@ -33,12 +33,12 @@ static void dumpReferencesCallback(void *ptr, void *arg)
 {
     Object *obj = arg;
     if (ptr == obj) {
-        LOGD("skipping %p == %p", ptr, obj);
+        ALOGD("skipping %p == %p", ptr, obj);
         return;
     }
     dvmVisitObject(dumpReferencesVisitor, ptr, &obj);
     if (obj == NULL) {
-        LOGD("Found %p in the heap @ %p", arg, ptr);
+        ALOGD("Found %p in the heap @ %p", arg, ptr);
         dvmDumpObject(ptr);
     }
 }
@@ -48,7 +48,7 @@ static void dumpReferencesRootVisitor(void *ptr, void *arg)
     Object *obj = *(Object **)ptr;
     Object *lookingFor = *(Object **)arg;
     if (obj == lookingFor) {
-        LOGD("Found %p in a root @ %p", arg, ptr);
+        ALOGD("Found %p in a root @ %p", arg, ptr);
     }
 }
 
@@ -81,11 +81,11 @@ static void verifyReference(void *addr, void *arg)
     if (!isValid) {
         Object **parent = arg;
         if (*parent != NULL) {
-            LOGE("Verify of object %p failed", *parent);
+            ALOGE("Verify of object %p failed", *parent);
             dvmDumpObject(*parent);
             *parent = NULL;
         }
-        LOGE("Verify of reference %p @ %p failed", obj, addr);
+        ALOGE("Verify of reference %p @ %p failed", obj, addr);
         dvmDumpObject(obj);
     }
 }

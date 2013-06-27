@@ -75,17 +75,17 @@ bool dvmPopIndirectRefTableSegmentCheck(IndirectRefTable* pRef, u4 cookie)
      */
     sst.all = cookie;
     if (sst.parts.topIndex > pRef->segmentState.parts.topIndex) {
-        LOGE("Attempt to expand table with segment pop (%d to %d)\n",
+        ALOGE("Attempt to expand table with segment pop (%d to %d)\n",
             pRef->segmentState.parts.topIndex, sst.parts.topIndex);
         return false;
     }
     if (sst.parts.numHoles >= sst.parts.topIndex) {
-        LOGE("Absurd numHoles in cookie (%d bi=%d)\n",
+        ALOGE("Absurd numHoles in cookie (%d bi=%d)\n",
             sst.parts.numHoles, sst.parts.topIndex);
         return false;
     }
 
-    LOGV("IRT %p[%d]: pop, top=%d holes=%d\n",
+    ALOGV("IRT %p[%d]: pop, top=%d holes=%d\n",
         pRef, pRef->kind, sst.parts.topIndex, sst.parts.numHoles);
 
     return true;
@@ -99,7 +99,7 @@ static bool checkEntry(IndirectRefTable* pRef, IndirectRef iref, int idx)
     Object* obj = pRef->table[idx];
     IndirectRef checkRef = dvmObjectToIndirectRef(pRef, obj, idx, pRef->kind);
     if (checkRef != iref) {
-        LOGW("IRT %p[%d]: iref mismatch (req=%p vs cur=%p)\n",
+        ALOGW("IRT %p[%d]: iref mismatch (req=%p vs cur=%p)\n",
             pRef, pRef->kind, iref, checkRef);
         return false;
     }
@@ -117,7 +117,7 @@ static inline void updateSlotAdd(IndirectRefTable* pRef, Object* obj, int slot)
     if (pRef->slotData != NULL) {
         IndirectRefSlot* pSlot = &pRef->slotData[slot];
         pSlot->serial++;
-        //LOGI("+++ add [%d] slot %d (%p->%p), serial=%d\n",
+        //ALOGI("+++ add [%d] slot %d (%p->%p), serial=%d\n",
         //    pRef->kind, slot, obj, iref, pSlot->serial);
         pSlot->previous[pSlot->serial % kIRTPrevCount] = obj;
     }
@@ -130,7 +130,7 @@ static inline void updateSlotRemove(IndirectRefTable* pRef, int slot)
 {
     if (pRef->slotData != NULL) {
         //IndirectRefSlot* pSlot = &pRef->slotData[slot];
-        //LOGI("+++ remove [%d] slot %d, serial now %d\n",
+        //ALOGI("+++ remove [%d] slot %d, serial now %d\n",
         //    pRef->kind, slot, pSlot->serial);
     }
 }
@@ -154,7 +154,7 @@ IndirectRef dvmAddToIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
     if (topIndex == pRef->allocEntries) {
         /* reached end of allocated space; did we hit buffer max? */
         if (topIndex == pRef->maxEntries) {
-            LOGW("IndirectRefTable overflow (max=%d)\n", pRef->maxEntries);
+            ALOGW("IndirectRefTable overflow (max=%d)\n", pRef->maxEntries);
             return NULL;
         }
 
@@ -168,11 +168,11 @@ IndirectRef dvmAddToIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
 
         newTable = (Object**) realloc(pRef->table, newSize * sizeof(Object*));
         if (newTable == NULL) {
-            LOGE("Unable to expand iref table (from %d to %d, max=%d)\n",
+            ALOGE("Unable to expand iref table (from %d to %d, max=%d)\n",
                 pRef->allocEntries, newSize, pRef->maxEntries);
             return false;
         }
-        LOGI("Growing ireftab %p from %d to %d (max=%d)\n",
+        ALOGI("Growing ireftab %p from %d to %d (max=%d)\n",
             pRef, pRef->allocEntries, newSize, pRef->maxEntries);
 
         /* update entries; adjust "nextEntry" in case memory moved */
@@ -221,7 +221,7 @@ IndirectRef dvmAddToIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
 bool dvmGetFromIndirectRefTableCheck(IndirectRefTable* pRef, IndirectRef iref)
 {
     if (dvmGetIndirectRefType(iref) == kIndirectKindInvalid) {
-        LOGW("Invalid indirect reference 0x%08x\n", (u4) iref);
+        ALOGW("Invalid indirect reference 0x%08x\n", (u4) iref);
         return false;
     }
 
@@ -229,19 +229,19 @@ bool dvmGetFromIndirectRefTableCheck(IndirectRefTable* pRef, IndirectRef iref)
     int idx = dvmIndirectRefToIndex(iref);
 
     if (iref == NULL) {
-        LOGI("--- lookup on NULL iref\n");
+        ALOGI("--- lookup on NULL iref\n");
         return false;
     }
     if (idx >= topIndex) {
         /* bad -- stale reference? */
-        LOGI("Attempt to access invalid index %d (top=%d)\n",
+        ALOGI("Attempt to access invalid index %d (top=%d)\n",
             idx, topIndex);
         return false;
     }
 
     Object* obj = pRef->table[idx];
     if (obj == NULL) {
-        LOGI("Attempt to read from hole, iref=%p\n", iref);
+        ALOGI("Attempt to read from hole, iref=%p\n", iref);
         return false;
     }
     if (!checkEntry(pRef, iref, idx))
@@ -278,13 +278,13 @@ bool dvmRemoveFromIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
     int idx = dvmIndirectRefToIndex(iref);
     if (idx < bottomIndex) {
         /* wrong segment */
-        LOGV("Attempt to remove index outside index area (%d vs %d-%d)\n",
+        ALOGV("Attempt to remove index outside index area (%d vs %d-%d)\n",
             idx, bottomIndex, topIndex);
         return false;
     }
     if (idx >= topIndex) {
         /* bad -- stale reference? */
-        LOGI("Attempt to remove invalid index %d (bottom=%d top=%d)\n",
+        ALOGI("Attempt to remove invalid index %d (bottom=%d top=%d)\n",
             idx, bottomIndex, topIndex);
         return false;
     }
@@ -306,11 +306,11 @@ bool dvmRemoveFromIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
             pRef->segmentState.parts.numHoles - prevState.parts.numHoles;
         if (numHoles != 0) {
             while (--topIndex > bottomIndex && numHoles != 0) {
-                LOGV("+++ checking for hole at %d (cookie=0x%08x) val=%p\n",
+                ALOGV("+++ checking for hole at %d (cookie=0x%08x) val=%p\n",
                     topIndex-1, cookie, pRef->table[topIndex-1]);
                 if (pRef->table[topIndex-1] != NULL)
                     break;
-                LOGV("+++ ate hole at %d\n", topIndex-1);
+                ALOGV("+++ ate hole at %d\n", topIndex-1);
                 numHoles--;
             }
             pRef->segmentState.parts.numHoles =
@@ -318,7 +318,7 @@ bool dvmRemoveFromIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
             pRef->segmentState.parts.topIndex = topIndex;
         } else {
             pRef->segmentState.parts.topIndex = topIndex-1;
-            LOGV("+++ ate last entry %d\n", topIndex-1);
+            ALOGV("+++ ate last entry %d\n", topIndex-1);
         }
     } else {
         /*
@@ -327,7 +327,7 @@ bool dvmRemoveFromIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
          * the hole count.
          */
         if (pRef->table[idx] == NULL) {
-            LOGV("--- WEIRD: removing null entry %d\n", idx);
+            ALOGV("--- WEIRD: removing null entry %d\n", idx);
             return false;
         }
         if (!checkEntry(pRef, iref, idx))
@@ -336,7 +336,7 @@ bool dvmRemoveFromIndirectRefTable(IndirectRefTable* pRef, u4 cookie,
 
         pRef->table[idx] = NULL;
         pRef->segmentState.parts.numHoles++;
-        LOGV("+++ left hole at %d, holes=%d\n",
+        ALOGV("+++ left hole at %d, holes=%d\n",
             idx, pRef->segmentState.parts.numHoles);
     }
 
@@ -385,15 +385,15 @@ static int compareObject(const void* vobj1, const void* vobj2)
 static void logObject(Object* obj, int size, int identical, int equiv)
 {
     if (obj == NULL) {
-        LOGW("  NULL reference (count=%d)\n", equiv);
+        ALOGW("  NULL reference (count=%d)\n", equiv);
         return;
     }
 
     if (identical + equiv != 0) {
-        LOGW("%5d of %s %dB (%d unique)\n", identical + equiv +1,
+        ALOGW("%5d of %s %dB (%d unique)\n", identical + equiv +1,
             obj->clazz->descriptor, size, equiv +1);
     } else {
-        LOGW("%5d of %s %dB\n", identical + equiv +1,
+        ALOGW("%5d of %s %dB\n", identical + equiv +1,
             obj->clazz->descriptor, size);
     }
 }
@@ -409,7 +409,7 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
     int i;
 
     if (count == 0) {
-        LOGW("Reference table has no entries\n");
+        ALOGW("Reference table has no entries\n");
         return;
     }
     assert(count > 0);
@@ -418,7 +418,7 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
      * Dump the most recent N entries.  If there are holes, we will show
      * fewer than N.
      */
-    LOGW("Last %d entries in %s reference table:\n", kLast, descr);
+    ALOGW("Last %d entries in %s reference table:\n", kLast, descr);
     refs = pRef->table;         // use unsorted list
     int size;
     int start = count - kLast;
@@ -432,11 +432,11 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
         Object* ref = refs[i];
         if (ref->clazz == gDvm.classJavaLangClass) {
             ClassObject* clazz = (ClassObject*) ref;
-            LOGW("%5d: %p cls=%s '%s' (%d bytes)\n", i, ref,
+            ALOGW("%5d: %p cls=%s '%s' (%d bytes)\n", i, ref,
                 (refs[i] == NULL) ? "-" : ref->clazz->descriptor,
                 clazz->descriptor, size);
         } else {
-            LOGW("%5d: %p cls=%s (%d bytes)\n", i, ref,
+            ALOGW("%5d: %p cls=%s (%d bytes)\n", i, ref,
                 (refs[i] == NULL) ? "-" : ref->clazz->descriptor, size);
         }
     }
@@ -454,7 +454,7 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
     if (false) {
         int q;
         for (q = 0; q < count; q++)
-            LOGI("%d %p\n", q, refs[q]);
+            ALOGI("%d %p\n", q, refs[q]);
     }
 
     int holes = 0;
@@ -467,7 +467,7 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
      * Dump uniquified table summary.  While we're at it, generate a
      * cumulative total amount of pinned memory based on the unique entries.
      */
-    LOGW("%s reference table summary (%d entries / %d holes):\n",
+    ALOGW("%s reference table summary (%d entries / %d holes):\n",
         descr, count, holes);
     int equiv, identical, total;
     total = equiv = identical = 0;
@@ -496,6 +496,6 @@ void dvmDumpIndirectRefTable(const IndirectRefTable* pRef, const char* descr)
     total += size;
     logObject(refs[count-1], size, identical, equiv);
 
-    LOGW("Memory held directly by native code is %d bytes\n", total);
+    ALOGW("Memory held directly by native code is %d bytes\n", total);
     free(tableCopy);
 }

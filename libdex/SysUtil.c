@@ -46,14 +46,14 @@ static void* sysCreateAnonShmem(size_t length)
     ptr = mmap(NULL, length, PROT_READ | PROT_WRITE,
             MAP_SHARED | MAP_ANON, -1, 0);
     if (ptr == MAP_FAILED) {
-        LOGW("mmap(%d, RW, SHARED|ANON) failed: %s\n", (int) length,
+        ALOGW("mmap(%d, RW, SHARED|ANON) failed: %s\n", (int) length,
             strerror(errno));
         return NULL;
     }
 
     return ptr;
 #else
-    LOGE("sysCreateAnonShmem not implemented.\n");
+    ALOGE("sysCreateAnonShmem not implemented.\n");
     return NULL;
 #endif
 }
@@ -90,13 +90,13 @@ static int getFileStartAndLength(int fd, off_t *start_, size_t *length_)
     (void) lseek(fd, start, SEEK_SET);
 
     if (start == (off_t) -1 || end == (off_t) -1) {
-        LOGE("could not determine length of file\n");
+        ALOGE("could not determine length of file\n");
         return -1;
     }
 
     length = end - start;
     if (length == 0) {
-        LOGE("file is empty\n");
+        ALOGE("file is empty\n");
         return -1;
     }
 
@@ -131,7 +131,7 @@ int sysLoadFileInShmem(int fd, MemMapping* pMap)
 
     actual = read(fd, memPtr, length);
     if (actual != length) {
-        LOGE("only read %d of %d bytes\n", (int) actual, (int) length);
+        ALOGE("only read %d of %d bytes\n", (int) actual, (int) length);
         sysReleaseShmem(pMap);
         return -1;
     }
@@ -141,7 +141,7 @@ int sysLoadFileInShmem(int fd, MemMapping* pMap)
 
     return 0;
 #else
-    LOGE("sysLoadFileInShmem not implemented.\n");
+    ALOGE("sysLoadFileInShmem not implemented.\n");
     return -1;
 #endif
 }
@@ -164,7 +164,7 @@ int sysFakeMapFile(int fd, MemMapping* pMap)
 
     memPtr = malloc(length);
     if (read(fd, memPtr, length) < 0) {
-        LOGW("read(fd=%d, start=%d, length=%d) failed: %s\n", (int) length,
+        ALOGW("read(fd=%d, start=%d, length=%d) failed: %s\n", (int) length,
             fd, (int) start, strerror(errno));
         return -1;
     }
@@ -197,7 +197,7 @@ int sysMapFileInShmemReadOnly(int fd, MemMapping* pMap)
 
     memPtr = mmap(NULL, length, PROT_READ, MAP_FILE | MAP_SHARED, fd, start);
     if (memPtr == MAP_FAILED) {
-        LOGW("mmap(%d, RO, FILE|SHARED, %d, %d) failed: %s\n", (int) length,
+        ALOGW("mmap(%d, RO, FILE|SHARED, %d, %d) failed: %s\n", (int) length,
             fd, (int) start, strerror(errno));
         return -1;
     }
@@ -237,16 +237,16 @@ int sysMapFileInShmemWritableReadOnly(int fd, MemMapping* pMap)
     memPtr = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_FILE | MAP_PRIVATE,
             fd, start);
     if (memPtr == MAP_FAILED) {
-        LOGW("mmap(%d, R/W, FILE|PRIVATE, %d, %d) failed: %s\n", (int) length,
+        ALOGW("mmap(%d, R/W, FILE|PRIVATE, %d, %d) failed: %s\n", (int) length,
             fd, (int) start, strerror(errno));
         return -1;
     }
     if (mprotect(memPtr, length, PROT_READ) < 0) {
         /* this fails with EACCESS on FAT filesystems, e.g. /sdcard */
         int err = errno;
-        LOGV("mprotect(%p, %d, PROT_READ) failed: %s\n",
+        ALOGV("mprotect(%p, %d, PROT_READ) failed: %s\n",
             memPtr, length, strerror(err));
-        LOGD("mprotect(RO) failed (%d), file will remain read-write\n", err);
+        ALOGD("mprotect(RO) failed (%d), file will remain read-write\n", err);
     }
 
     pMap->baseAddr = pMap->addr = memPtr;
@@ -284,7 +284,7 @@ int sysMapFileSegmentInShmem(int fd, off_t start, size_t length,
     memPtr = mmap(NULL, actualLength, PROT_READ, MAP_FILE | MAP_SHARED,
                 fd, actualStart);
     if (memPtr == MAP_FAILED) {
-        LOGW("mmap(%d, R, FILE|SHARED, %d, %d) failed: %s\n",
+        ALOGW("mmap(%d, R, FILE|SHARED, %d, %d) failed: %s\n",
             (int) actualLength, fd, (int) actualStart, strerror(errno));
         return -1;
     }
@@ -301,7 +301,7 @@ int sysMapFileSegmentInShmem(int fd, off_t start, size_t length,
 
     return 0;
 #else
-    LOGE("sysMapFileSegmentInShmem not implemented.\n");
+    ALOGE("sysMapFileSegmentInShmem not implemented.\n");
     return -1;
 #endif
 }
@@ -321,7 +321,7 @@ int sysChangeMapAccess(void* addr, size_t length, int wantReadWrite,
     if (addr < pMap->baseAddr ||
         (u1*)addr >= (u1*)pMap->baseAddr + pMap->baseLength)
     {
-        LOGE("Attempted to change %p; map is %p - %p\n",
+        ALOGE("Attempted to change %p; map is %p - %p\n",
             addr, pMap->baseAddr, (u1*)pMap->baseAddr + pMap->baseLength);
         return -1;
     }
@@ -334,11 +334,11 @@ int sysChangeMapAccess(void* addr, size_t length, int wantReadWrite,
     u1* alignAddr = (u1*) ((int) addr & ~(SYSTEM_PAGE_SIZE-1));
     size_t alignLength = length + ((u1*) addr - alignAddr);
 
-    //LOGI("%p/%zd --> %p/%zd\n", addr, length, alignAddr, alignLength);
+    //ALOGI("%p/%zd --> %p/%zd\n", addr, length, alignAddr, alignLength);
     int prot = wantReadWrite ? (PROT_READ|PROT_WRITE) : (PROT_READ);
     if (mprotect(alignAddr, alignLength, prot) != 0) {
         int err = errno;
-        LOGV("mprotect (%p,%zd,%d) failed: %s\n",
+        ALOGV("mprotect (%p,%zd,%d) failed: %s\n",
             alignAddr, alignLength, prot, strerror(errno));
         return (errno != 0) ? errno : -1;
     }
@@ -358,10 +358,10 @@ void sysReleaseShmem(MemMapping* pMap)
         return;
 
     if (munmap(pMap->baseAddr, pMap->baseLength) < 0) {
-        LOGW("munmap(%p, %d) failed: %s\n",
+        ALOGW("munmap(%p, %d) failed: %s\n",
             pMap->baseAddr, (int)pMap->baseLength, strerror(errno));
     } else {
-        LOGV("munmap(%p, %d) succeeded\n", pMap->baseAddr, pMap->baseLength);
+        ALOGV("munmap(%p, %d) succeeded\n", pMap->baseAddr, pMap->baseLength);
         pMap->baseAddr = NULL;
         pMap->baseLength = 0;
     }
@@ -394,10 +394,10 @@ int sysWriteFully(int fd, const void* buf, size_t count, const char* logMsg)
         ssize_t actual = TEMP_FAILURE_RETRY(write(fd, buf, count));
         if (actual < 0) {
             int err = errno;
-            LOGE("%s: write failed: %s\n", logMsg, strerror(err));
+            ALOGE("%s: write failed: %s\n", logMsg, strerror(err));
             return err;
         } else if (actual != (ssize_t) count) {
-            LOGD("%s: partial write (will retry): (%d of %zd)\n",
+            ALOGD("%s: partial write (will retry): (%d of %zd)\n",
                 logMsg, (int) actual, count);
             buf = (const void*) (((const u1*) buf) + actual);
         }

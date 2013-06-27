@@ -127,7 +127,7 @@ static ArmLIR *opNone(CompilationUnit *cUnit, OpKind op)
             opCode = kThumbBUncond;
             break;
         default:
-            LOGE("Jit: bad case in opNone");
+            ALOGE("Jit: bad case in opNone");
             dvmCompilerAbort(cUnit);
     }
     return newLIR0(cUnit, opCode);
@@ -149,7 +149,7 @@ static ArmLIR *opImm(CompilationUnit *cUnit, OpKind op, int value)
             opCode = kThumbPop;
             break;
         default:
-            LOGE("Jit: bad case in opCondBranch");
+            ALOGE("Jit: bad case in opCondBranch");
             dvmCompilerAbort(cUnit);
     }
     return newLIR1(cUnit, opCode, value);
@@ -163,7 +163,7 @@ static ArmLIR *opReg(CompilationUnit *cUnit, OpKind op, int rDestSrc)
             opCode = kThumbBlxR;
             break;
         default:
-            LOGE("Jit: bad case in opReg");
+            ALOGE("Jit: bad case in opReg");
             dvmCompilerAbort(cUnit);
     }
     return newLIR1(cUnit, opCode, rDestSrc);
@@ -209,7 +209,7 @@ static ArmLIR *opRegImm(CompilationUnit *cUnit, OpKind op, int rDestSrc1,
             }
             break;
         default:
-            LOGE("Jit: bad case in opRegImm");
+            ALOGE("Jit: bad case in opRegImm");
             dvmCompilerAbort(cUnit);
             break;
     }
@@ -330,7 +330,7 @@ static ArmLIR *opRegRegImm(CompilationUnit *cUnit, OpKind op, int rDest,
                 }
                 return res;
         default:
-            LOGE("Jit: bad case in opRegRegImm");
+            ALOGE("Jit: bad case in opRegRegImm");
             dvmCompilerAbort(cUnit);
             break;
     }
@@ -428,7 +428,7 @@ static ArmLIR *opRegReg(CompilationUnit *cUnit, OpKind op, int rDestSrc1,
              opRegRegImm(cUnit, kOpLsr, rDestSrc1, rDestSrc1, 16);
              return res;
         default:
-            LOGE("Jit: bad case in opRegReg");
+            ALOGE("Jit: bad case in opRegReg");
             dvmCompilerAbort(cUnit);
             break;
     }
@@ -474,7 +474,7 @@ static ArmLIR *loadBaseIndexed(CompilationUnit *cUnit, int rBase,
             opCode = kThumbLdrsbRRR;
             break;
         default:
-            LOGE("Jit: bad case in loadBaseIndexed");
+            ALOGE("Jit: bad case in loadBaseIndexed");
             dvmCompilerAbort(cUnit);
     }
     res = newLIR3(cUnit, opCode, rDest, rBase, rNewIndex);
@@ -512,7 +512,7 @@ static ArmLIR *storeBaseIndexed(CompilationUnit *cUnit, int rBase,
             opCode = kThumbStrbRRR;
             break;
         default:
-            LOGE("Jit: bad case in storeBaseIndexed");
+            ALOGE("Jit: bad case in storeBaseIndexed");
             dvmCompilerAbort(cUnit);
     }
     res = newLIR3(cUnit, opCode, rSrc, rBase, rNewIndex);
@@ -629,7 +629,7 @@ static ArmLIR *loadBaseDispBody(CompilationUnit *cUnit, MIR *mir, int rBase,
             opCode = kThumbLdrsbRRR;
             break;
         default:
-            LOGE("Jit: bad case in loadBaseIndexedBody");
+            ALOGE("Jit: bad case in loadBaseIndexedBody");
             dvmCompilerAbort(cUnit);
     }
     if (shortForm) {
@@ -746,7 +746,7 @@ static ArmLIR *storeBaseDispBody(CompilationUnit *cUnit, int rBase,
             }
             break;
         default:
-            LOGE("Jit: bad case in storeBaseIndexedBody");
+            ALOGE("Jit: bad case in storeBaseIndexedBody");
             dvmCompilerAbort(cUnit);
     }
     if (shortForm) {

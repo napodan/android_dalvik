@@ -45,7 +45,7 @@ hprofStartup(const char *outputFileName, int fd, bool directToDdms)
 
     hprof_context_t *ctx = malloc(sizeof(*ctx));
     if (ctx == NULL) {
-        LOGE("hprof: can't allocate context.\n");
+        ALOGE("hprof: can't allocate context.\n");
         return NULL;
     }
 
@@ -72,14 +72,14 @@ hprofShutdown(hprof_context_t *tailCtx)
      */
     hprof_context_t *headCtx = malloc(sizeof(*headCtx));
     if (headCtx == NULL) {
-        LOGE("hprof: can't allocate context.\n");
+        ALOGE("hprof: can't allocate context.\n");
         hprofFreeContext(tailCtx);
         return false;
     }
     hprofContextInit(headCtx, strdup(tailCtx->fileName), tailCtx->fd, true,
         tailCtx->directToDdms);
 
-    LOGI("hprof: dumping heap strings to \"%s\".\n", tailCtx->fileName);
+    ALOGI("hprof: dumping heap strings to \"%s\".\n", tailCtx->fileName);
     hprofDumpStrings(headCtx);
     hprofDumpClasses(headCtx);
 
@@ -127,13 +127,13 @@ hprofShutdown(hprof_context_t *tailCtx)
         if (headCtx->fd >= 0) {
             outFd = dup(headCtx->fd);
             if (outFd < 0) {
-                LOGE("dup(%d) failed: %s\n", headCtx->fd, strerror(errno));
+                ALOGE("dup(%d) failed: %s\n", headCtx->fd, strerror(errno));
                 /* continue to fail-handler below */
             }
         } else {
             outFd = open(tailCtx->fileName, O_WRONLY|O_CREAT, 0644);
             if (outFd < 0) {
-                LOGE("can't open %s: %s\n", headCtx->fileName, strerror(errno));
+                ALOGE("can't open %s: %s\n", headCtx->fileName, strerror(errno));
                 /* continue to fail-handler below */
             }
         }
@@ -157,7 +157,7 @@ hprofShutdown(hprof_context_t *tailCtx)
     }
 
     /* throw out a log message for the benefit of "runhat" */
-    LOGI("hprof: heap dump completed (%dKB)\n",
+    ALOGI("hprof: heap dump completed (%dKB)\n",
         (headCtx->fileDataSize + tailCtx->fileDataSize + 1023) / 1024);
 
     hprofFreeContext(headCtx);

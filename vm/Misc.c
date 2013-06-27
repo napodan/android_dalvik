@@ -186,7 +186,7 @@ void dvmPrintDebugMessage(const DebugOutputTarget* target, const char* format,
         vfprintf(target->data.file.fp, format, args);
         break;
     default:
-        LOGE("unexpected 'which' %d\n", target->which);
+        ALOGE("unexpected 'which' %d\n", target->which);
         break;
     }
 
@@ -662,11 +662,11 @@ bool dvmSetCloseOnExec(int fd)
      */
     flags = fcntl(fd, F_GETFD);
     if (flags < 0) {
-        LOGW("Unable to get fd flags for fd %d\n", fd);
+        ALOGW("Unable to get fd flags for fd %d\n", fd);
         return false;
     }
     if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) {
-        LOGW("Unable to set close-on-exec for fd %d\n", fd);
+        ALOGW("Unable to set close-on-exec for fd %d\n", fd);
         return false;
     }
     return true;

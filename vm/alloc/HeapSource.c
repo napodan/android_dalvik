@@ -379,7 +379,7 @@ addNewHeap(HeapSource *hs, mspace msp, size_t mspAbsoluteMaxSize)
     Heap heap;
 
     if (hs->numHeaps >= HEAP_SOURCE_MAX_HEAP_COUNT) {
-        LOGE("Attempt to create too many heaps (%zd >= %zd)\n",
+        ALOGE("Attempt to create too many heaps (%zd >= %zd)\n",
                 hs->numHeaps, HEAP_SOURCE_MAX_HEAP_COUNT);
         dvmAbort();
         return false;
@@ -492,7 +492,7 @@ dvmHeapSourceStartup(size_t startSize, size_t absoluteMaxSize)
     assert(gHs == NULL);
 
     if (startSize > absoluteMaxSize) {
-        LOGE("Bad heap parameters (start=%d, max=%d)\n",
+        ALOGE("Bad heap parameters (start=%d, max=%d)\n",
            startSize, absoluteMaxSize);
         return NULL;
     }
@@ -595,7 +595,7 @@ dvmHeapSourceStartupBeforeFork()
         /* Create a new heap for post-fork zygote allocations.  We only
          * try once, even if it fails.
          */
-        LOGV("Splitting out new zygote heap\n");
+        ALOGV("Splitting out new zygote heap\n");
         gDvm.newZygoteHeapAllocated = true;
         return addNewHeap(hs, NULL, 0);
     }
@@ -1271,7 +1271,7 @@ void dvmSetTargetHeapUtilization(float newTarget)
 
     hs->targetUtilization =
             (size_t)(newTarget * (float)HEAP_UTILIZATION_MAX);
-    LOGV("Set heap target utilization to %zd/%d (%f)\n",
+    ALOGV("Set heap target utilization to %zd/%d (%f)\n",
             hs->targetUtilization, HEAP_UTILIZATION_MAX, newTarget);
 }
 

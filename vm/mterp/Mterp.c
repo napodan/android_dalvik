@@ -38,7 +38,7 @@ bool dvmCheckAsmConstants(void)
 #include "mterp/common/asm-constants.h"
 
     if (failed) {
-        LOGE("Please correct the values in mterp/common/asm-constants.h\n");
+        ALOGE("Please correct the values in mterp/common/asm-constants.h\n");
         dvmAbort();
     }
 
@@ -49,8 +49,8 @@ bool dvmCheckAsmConstants(void)
     const int width = 64;
     int interpSize = dvmAsmInstructionEnd - dvmAsmInstructionStart;
     if (interpSize != 0 && interpSize != 256*width) {
-        LOGE("ERROR: unexpected asm interp size %d\n", interpSize);
-        LOGE("(did an instruction handler exceed %d bytes?)\n", width);
+        ALOGE("ERROR: unexpected asm interp size %d\n", interpSize);
+        ALOGE("(did an instruction handler exceed %d bytes?)\n", width);
         dvmAbort();
     }
 
@@ -99,8 +99,8 @@ bool dvmMterpStd(Thread* self, InterpState* glue)
             desc);
         free(desc);
     }
-    //LOGI("glue is %p, pc=%p, fp=%p\n", glue, glue->pc, glue->fp);
-    //LOGI("first instruction is 0x%04x\n", glue->pc[0]);
+    //ALOGI("glue is %p, pc=%p, fp=%p\n", glue, glue->pc, glue->fp);
+    //ALOGI("first instruction is 0x%04x\n", glue->pc[0]);
 
     changeInterp = dvmMterpStdRun(glue);
 
@@ -113,7 +113,7 @@ bool dvmMterpStd(Thread* self, InterpState* glue)
     if (!changeInterp) {
         /* this is a "normal" exit; we're not coming back */
 #ifdef LOG_INSTR
-        LOGD("|-- Leaving interpreter loop");
+        ALOGD("|-- Leaving interpreter loop");
 #endif
         return false;
     } else {

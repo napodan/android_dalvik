@@ -36,7 +36,7 @@ dvmHeapBitmapInit(HeapBitmap *hb, const void *base, size_t maxSize,
     bitsLen = HB_OFFSET_TO_INDEX(maxSize) * sizeof(*hb->bits);
     bits = dvmAllocRegion(bitsLen, PROT_READ | PROT_WRITE, name);
     if (bits == NULL) {
-        LOGE("Could not mmap %zd-byte ashmem region '%s'", bitsLen, name);
+        ALOGE("Could not mmap %zd-byte ashmem region '%s'", bitsLen, name);
         return false;
     }
     hb->bits = bits;
@@ -134,12 +134,12 @@ void dvmHeapBitmapSweepWalk(const HeapBitmap *liveHb, const HeapBitmap *markHb,
     assert(callback != NULL);
 
     if (liveHb->base != markHb->base) {
-        LOGW("dvmHeapBitmapSweepWalk: bitmaps cover different heaps (%zd != %zd)",
+        ALOGW("dvmHeapBitmapSweepWalk: bitmaps cover different heaps (%zd != %zd)",
              liveHb->base, markHb->base);
         return;
     }
     if (liveHb->bitsLen != markHb->bitsLen) {
-        LOGW("dvmHeapBitmapSweepWalk: size of bitmaps differ (%zd != %zd)",
+        ALOGW("dvmHeapBitmapSweepWalk: size of bitmaps differ (%zd != %zd)",
              liveHb->bitsLen, markHb->bitsLen);
         return;
     }

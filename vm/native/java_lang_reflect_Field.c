@@ -128,7 +128,7 @@ static JValue* getFieldDataAddr(Object* obj, ClassObject* declaringClass,
         if (!dvmVerifyObjectInClass(obj, declaringClass)) {
             assert(dvmCheckException(dvmThreadSelf()));
             if (obj != NULL) {
-                LOGD("Wrong type of object for field lookup: %s %s\n",
+                ALOGD("Wrong type of object for field lookup: %s %s\n",
                     obj->clazz->descriptor, declaringClass->descriptor);
             }
             return NULL;

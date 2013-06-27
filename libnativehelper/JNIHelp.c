@@ -34,16 +34,16 @@ int jniRegisterNativeMethods(JNIEnv* env, const char* className,
 {
     jclass clazz;
 
-    LOGV("Registering %s natives\n", className);
+    ALOGV("Registering %s natives\n", className);
     clazz = (*env)->FindClass(env, className);
     if (clazz == NULL) {
-        LOGE("Native registration unable to find class '%s'\n", className);
+        ALOGE("Native registration unable to find class '%s'\n", className);
         return -1;
     }
 
     int result = 0;
     if ((*env)->RegisterNatives(env, clazz, gMethods, numMethods) < 0) {
-        LOGE("RegisterNatives failed for '%s'\n", className);
+        ALOGE("RegisterNatives failed for '%s'\n", className);
         result = -1;
     }
 
@@ -187,21 +187,21 @@ int jniThrowException(JNIEnv* env, const char* className, const char* msg)
 
         if (exception != NULL) {
             getExceptionSummary(env, exception, buf, sizeof(buf));
-            LOGW("Discarding pending exception (%s) to throw %s\n", buf, className);
+            ALOGW("Discarding pending exception (%s) to throw %s\n", buf, className);
             (*env)->DeleteLocalRef(env, exception);
         }
     }
 
     exceptionClass = (*env)->FindClass(env, className);
     if (exceptionClass == NULL) {
-        LOGE("Unable to find exception class %s\n", className);
+        ALOGE("Unable to find exception class %s\n", className);
         /* ClassNotFoundException now pending */
         return -1;
     }
 
     int result = 0;
     if ((*env)->ThrowNew(env, exceptionClass, msg) != JNI_OK) {
-        LOGE("Failed throwing '%s' '%s'\n", className, msg);
+        ALOGE("Failed throwing '%s' '%s'\n", className, msg);
         /* an exception, most likely OOM, will now be pending */
         result = -1;
     }

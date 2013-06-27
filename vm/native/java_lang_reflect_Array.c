@@ -73,7 +73,7 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
     int numDim, i;
     int* dimensions;
 
-    LOGV("createMultiArray: '%s' [%d]\n",
+    ALOGV("createMultiArray: '%s' [%d]\n",
         elementClass->descriptor, dimArray->length);
 
     assert(elementClass != NULL);       // verified by caller
@@ -119,7 +119,7 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
      */
     arrayClass = dvmFindArrayClass(acDescriptor, elementClass->classLoader);
     if (arrayClass == NULL) {
-        LOGW("Unable to find or generate array class '%s'\n", acDescriptor);
+        ALOGW("Unable to find or generate array class '%s'\n", acDescriptor);
         assert(dvmCheckException(dvmThreadSelf()));
         free(acDescriptor);
         RETURN_VOID();

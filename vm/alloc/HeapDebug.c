@@ -243,7 +243,7 @@ void dvmLogGcStats(size_t numFreed, size_t sizeFreed, size_t gcTimeMs)
     uordblks = mi.uordblks;
     footprint = dlmalloc_footprint();
     //end = dvmGetRelativeTimeNsec();
-    //LOGD("mallinfo+footprint took %dusec; used=%zd footprint=%zd\n",
+    //ALOGD("mallinfo+footprint took %dusec; used=%zd footprint=%zd\n",
     //    (int)((end - start) / 1000), mi.uordblks, footprint);
 #else
     uordblks = footprint = 0;
@@ -382,10 +382,10 @@ void dvmDumpHeapToFile(const char *fileName)
 
     fp = fopen(fileName, "w+");
     if (fp == NULL) {
-        LOGE("Can't open %s for writing: %s\n", fileName, strerror(errno));
+        ALOGE("Can't open %s for writing: %s\n", fileName, strerror(errno));
         return;
     }
-    LOGW("Dumping heap to %s...\n", fileName);
+    ALOGW("Dumping heap to %s...\n", fileName);
 
     fprintf(fp, "==== Dalvik heap dump ====\n");
     memset(&ctx, 0, sizeof(ctx));
@@ -394,7 +394,7 @@ void dvmDumpHeapToFile(const char *fileName)
     dump_context(&ctx);
     fprintf(fp, "==== end heap dump ====\n");
 
-    LOGW("Dumped heap to %s.\n", fileName);
+    ALOGW("Dumped heap to %s.\n", fileName);
 
     fclose(fp);
 }

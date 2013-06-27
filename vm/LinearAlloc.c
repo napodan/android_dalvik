@@ -134,7 +134,7 @@ LinearAllocHdr* dvmLinearAllocCreate(Object* classLoader)
 
     fd = ashmem_create_region("dalvik-LinearAlloc", DEFAULT_MAX_LENGTH);
     if (fd < 0) {
-        LOGE("ashmem LinearAlloc failed %s", strerror(errno));
+        ALOGE("ashmem LinearAlloc failed %s", strerror(errno));
         free(pHdr);
         return NULL;
     }
@@ -142,7 +142,7 @@ LinearAllocHdr* dvmLinearAllocCreate(Object* classLoader)
     pHdr->mapAddr = mmap(NULL, pHdr->mapLength, PROT_READ | PROT_WRITE,
         MAP_PRIVATE, fd, 0);
     if (pHdr->mapAddr == MAP_FAILED) {
-        LOGE("LinearAlloc mmap(%d) failed: %s\n", pHdr->mapLength,
+        ALOGE("LinearAlloc mmap(%d) failed: %s\n", pHdr->mapLength,
             strerror(errno));
         free(pHdr);
         close(fd);
@@ -156,7 +156,7 @@ LinearAllocHdr* dvmLinearAllocCreate(Object* classLoader)
     pHdr->mapAddr = mmap(NULL, pHdr->mapLength, PROT_READ | PROT_WRITE,
         MAP_PRIVATE | MAP_ANON, -1, 0);
     if (pHdr->mapAddr == MAP_FAILED) {
-        LOGE("LinearAlloc mmap(%d) failed: %s\n", pHdr->mapLength,
+        ALOGE("LinearAlloc mmap(%d) failed: %s\n", pHdr->mapLength,
             strerror(errno));
         free(pHdr);
         return NULL;
@@ -187,14 +187,14 @@ LinearAllocHdr* dvmLinearAllocCreate(Object* classLoader)
      * the extra page now that we have ashmem?]
      */
     if (mprotect(pHdr->mapAddr, pHdr->mapLength, PROT_NONE) != 0) {
-        LOGW("LinearAlloc init mprotect failed: %s\n", strerror(errno));
+        ALOGW("LinearAlloc init mprotect failed: %s\n", strerror(errno));
         free(pHdr);
         return NULL;
     }
     if (mprotect(pHdr->mapAddr + SYSTEM_PAGE_SIZE, SYSTEM_PAGE_SIZE,
             ENFORCE_READ_ONLY ? PROT_READ : PROT_READ|PROT_WRITE) != 0)
     {
-        LOGW("LinearAlloc init mprotect #2 failed: %s\n", strerror(errno));
+        ALOGW("LinearAlloc init mprotect #2 failed: %s\n", strerror(errno));
         free(pHdr);
         return NULL;
     }
@@ -211,7 +211,7 @@ LinearAllocHdr* dvmLinearAllocCreate(Object* classLoader)
 
     dvmInitMutex(&pHdr->lock);
 
-    LOGV("LinearAlloc: created region at %p-%p\n",
+    ALOGV("LinearAlloc: created region at %p-%p\n",
         pHdr->mapAddr, pHdr->mapAddr + pHdr->mapLength-1);
 
     return pHdr;
@@ -237,14 +237,14 @@ void dvmLinearAllocDestroy(Object* classLoader)
     //dvmLinearAllocDump(classLoader);
 
     if (gDvm.verboseShutdown) {
-        LOGV("Unmapping linear allocator base=%p\n", pHdr->mapAddr);
-        LOGD("LinearAlloc %p used %d of %d (%d%%)\n",
+        ALOGV("Unmapping linear allocator base=%p\n", pHdr->mapAddr);
+        ALOGD("LinearAlloc %p used %d of %d (%d%%)\n",
             classLoader, pHdr->curOffset, pHdr->mapLength,
             (pHdr->curOffset * 100) / pHdr->mapLength);
     }
 
     if (munmap(pHdr->mapAddr, pHdr->mapLength) != 0) {
-        LOGW("LinearAlloc munmap(%p, %d) failed: %s\n",
+        ALOGW("LinearAlloc munmap(%p, %d) failed: %s\n",
             pHdr->mapAddr, pHdr->mapLength, strerror(errno));
     }
     free(pHdr);
@@ -312,7 +312,7 @@ void* dvmLinearAlloc(Object* classLoader, size_t size)
          * works if the users of these functions actually free everything
          * they allocate.
          */
-        LOGE("LinearAlloc exceeded capacity (%d), last=%d\n",
+        ALOGE("LinearAlloc exceeded capacity (%d), last=%d\n",
             pHdr->mapLength, (int) size);
         dvmAbort();
     }
@@ -354,7 +354,7 @@ void* dvmLinearAlloc(Object* classLoader, size_t size)
         LOGVV("---    calling mprotect(start=%d len=%d RW)\n", start, len);
         cc = mprotect(pHdr->mapAddr + start, len, PROT_READ | PROT_WRITE);
         if (cc != 0) {
-            LOGE("LinearAlloc mprotect (+%d %d) failed: %s\n",
+            ALOGE("LinearAlloc mprotect (+%d %d) failed: %s\n",
                 start, len, strerror(errno));
             /* we're going to fail soon, might as do it now */
             dvmAbort();
@@ -426,7 +426,7 @@ void* dvmLinearRealloc(Object* classLoader, void* mem, size_t newSize)
                           getHeader(classLoader)->curOffset));
 
     const u4* pLen = getBlockHeader(mem);
-    LOGV("--- LinearRealloc(%d) old=%d\n", newSize, *pLen);
+    ALOGV("--- LinearRealloc(%d) old=%d\n", newSize, *pLen);
 
     /* handle size reduction case */
     if (*pLen >= newSize) {
@@ -480,14 +480,14 @@ static void updatePages(Object* classLoader, void* mem, int direction)
              */
             if (i == firstPage) {
                 if ((*pLen & LENGTHFLAG_RW) == 0) {
-                    LOGW("Double RO on %p\n", mem);
+                    ALOGW("Double RO on %p\n", mem);
                     dvmAbort();
                 } else
                     *pLen &= ~LENGTHFLAG_RW;
             }
 
             if (pHdr->writeRefCount[i] == 0) {
-                LOGE("Can't make page %d any less writable\n", i);
+                ALOGE("Can't make page %d any less writable\n", i);
                 dvmAbort();
             }
             pHdr->writeRefCount[i]--;
@@ -502,7 +502,7 @@ static void updatePages(Object* classLoader, void* mem, int direction)
              * Trying to mark writable.
              */
             if (pHdr->writeRefCount[i] >= 32767) {
-                LOGE("Can't make page %d any more writable\n", i);
+                ALOGE("Can't make page %d any more writable\n", i);
                 dvmAbort();
             }
             if (pHdr->writeRefCount[i] == 0) {
@@ -515,7 +515,7 @@ static void updatePages(Object* classLoader, void* mem, int direction)
 
             if (i == firstPage) {
                 if ((*pLen & LENGTHFLAG_RW) != 0) {
-                    LOGW("Double RW on %p\n", mem);
+                    ALOGW("Double RW on %p\n", mem);
                     dvmAbort();
                 } else
                     *pLen |= LENGTHFLAG_RW;
@@ -599,10 +599,10 @@ void dvmLinearAllocDump(Object* classLoader)
 
     dvmLockMutex(&pHdr->lock);
 
-    LOGI("LinearAlloc classLoader=%p\n", classLoader);
-    LOGI("  mapAddr=%p mapLength=%d firstOffset=%d\n",
+    ALOGI("LinearAlloc classLoader=%p\n", classLoader);
+    ALOGI("  mapAddr=%p mapLength=%d firstOffset=%d\n",
         pHdr->mapAddr, pHdr->mapLength, pHdr->firstOffset);
-    LOGI("  curOffset=%d\n", pHdr->curOffset);
+    ALOGI("  curOffset=%d\n", pHdr->curOffset);
 
     int off = pHdr->firstOffset;
     u4 rawLen, fullLen;
@@ -612,7 +612,7 @@ void dvmLinearAllocDump(Object* classLoader)
         fullLen = ((HEADER_EXTRA*2 + (rawLen & LENGTHFLAG_MASK))
                     & ~(BLOCK_ALIGN-1));
 
-        LOGI("  %p (%3d): %clen=%d%s\n", pHdr->mapAddr + off + HEADER_EXTRA,
+        ALOGI("  %p (%3d): %clen=%d%s\n", pHdr->mapAddr + off + HEADER_EXTRA,
             (int) ((off + HEADER_EXTRA) / SYSTEM_PAGE_SIZE),
             (rawLen & LENGTHFLAG_FREE) != 0 ? '*' : ' ',
             rawLen & LENGTHFLAG_MASK,
@@ -622,7 +622,7 @@ void dvmLinearAllocDump(Object* classLoader)
     }
 
     if (ENFORCE_READ_ONLY) {
-        LOGI("writeRefCount map:\n");
+        ALOGI("writeRefCount map:\n");
 
         int numPages = (pHdr->mapLength+SYSTEM_PAGE_SIZE-1) / SYSTEM_PAGE_SIZE;
         int zstart = 0;
@@ -644,7 +644,7 @@ void dvmLinearAllocDump(Object* classLoader)
             printf(" %d-%d: zero\n", zstart, i-1);
     }
 
-    LOGD("LinearAlloc %p using %d of %d (%d%%)\n",
+    ALOGD("LinearAlloc %p using %d of %d (%d%%)\n",
         classLoader, pHdr->curOffset, pHdr->mapLength,
         (pHdr->curOffset * 100) / pHdr->mapLength);
 
@@ -675,7 +675,7 @@ static void checkAllFree(Object* classLoader)
                     & ~(BLOCK_ALIGN-1));
 
         if ((rawLen & LENGTHFLAG_FREE) == 0) {
-            LOGW("LinearAlloc %p not freed: %p len=%d\n", classLoader,
+            ALOGW("LinearAlloc %p not freed: %p len=%d\n", classLoader,
                 pHdr->mapAddr + off + HEADER_EXTRA, rawLen & LENGTHFLAG_MASK);
         }
 

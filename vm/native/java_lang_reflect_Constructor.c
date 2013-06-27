@@ -67,7 +67,7 @@ static void Dalvik_java_lang_reflect_Constructor_constructNative(
     /* initialize the class if it hasn't been already */
     if (!dvmIsClassInitialized(declaringClass)) {
         if (!dvmInitClass(declaringClass)) {
-            LOGW("Class init failed in Constructor.constructNative (%s)\n",
+            ALOGW("Class init failed in Constructor.constructNative (%s)\n",
                 declaringClass->descriptor);
             assert(dvmCheckException(dvmThreadSelf()));
             RETURN_VOID();

@@ -43,7 +43,7 @@ InstructionWidth* dexCreateInstrWidthTable(void)
 {
 #ifdef __ARM_ARCH_7A__
     /* hack to work around mysterious problem on emulator */
-    LOGD("creating instr width table\n");
+    ALOGD("creating instr width table\n");
 #endif
     InstructionWidth* instrWidth;
     int i;
@@ -1165,7 +1165,7 @@ void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
             regList = FETCH(2);
 
             if (pDec->vA > 5) {
-                LOGW("Invalid arg count in 35c/35ms (%d)\n", pDec->vA);
+                ALOGW("Invalid arg count in 35c/35ms (%d)\n", pDec->vA);
                 goto bail;
             }
             count = pDec->vA;
@@ -1193,7 +1193,7 @@ void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
             regList = FETCH(2);
 
             if (pDec->vA > 4) {
-                LOGW("Invalid arg count in 3inline (%d)\n", pDec->vA);
+                ALOGW("Invalid arg count in 3inline (%d)\n", pDec->vA);
                 goto bail;
             }
             for (i = 0; i < (int) pDec->vA; i++) {
@@ -1226,7 +1226,7 @@ void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
         pDec->vB_wide |= (u8)FETCH(4) << 48;
         break;
     default:
-        LOGW("Can't decode unexpected format %d (op=%d)\n",
+        ALOGW("Can't decode unexpected format %d (op=%d)\n",
             dexGetInstrFormat(fmts, pDec->opCode), pDec->opCode);
         assert(false);
         break;

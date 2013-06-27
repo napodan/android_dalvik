@@ -48,7 +48,7 @@ ArrayObject* dvmAllocArray(ClassObject* arrayClass, size_t length,
 
     if (length > 0x0fffffff) {
         /* too large and (length * elemWidth) will overflow 32 bits */
-        LOGE("Rejecting allocation of %u-element array\n", length);
+        ALOGE("Rejecting allocation of %u-element array\n", length);
         dvmThrowBadAllocException("array size too large");
         return NULL;
     }
@@ -191,7 +191,7 @@ ArrayObject* dvmAllocPrimitiveArray(char type, size_t length, int allocFlags)
         width = 8;
         break;
     default:
-        LOGE("Unknown type '%c'\n", type);
+        ALOGE("Unknown type '%c'\n", type);
         assert(false);
         return NULL;
     }
@@ -203,7 +203,7 @@ ArrayObject* dvmAllocPrimitiveArray(char type, size_t length, int allocFlags)
 
         *pTypeClass = dvmFindArrayClass(typeClassName, NULL);
         if (*pTypeClass == NULL) {
-            LOGE("ERROR: failed to generate array class for '%s'\n",
+            ALOGE("ERROR: failed to generate array class for '%s'\n",
                 typeClassName);
             return NULL;
         }
@@ -299,11 +299,11 @@ ClassObject* dvmFindArrayClass(const char* descriptor, Object* loader)
     ClassObject* clazz;
 
     assert(descriptor[0] == '[');
-    //LOGV("dvmFindArrayClass: '%s' %p\n", descriptor, loader);
+    //ALOGV("dvmFindArrayClass: '%s' %p\n", descriptor, loader);
 
     clazz = dvmLookupClass(descriptor, loader, false);
     if (clazz == NULL) {
-        LOGV("Array class '%s' %p not found; creating\n", descriptor, loader);
+        ALOGV("Array class '%s' %p not found; creating\n", descriptor, loader);
         clazz = createArrayClass(descriptor, loader);
         if (clazz != NULL)
             dvmAddInitiatingLoader(clazz, loader);
@@ -399,7 +399,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
             descriptor, loader, elementClass->classLoader);
         newClass = dvmLookupClass(descriptor, elementClass->classLoader, false);
         if (newClass != NULL) {
-            LOGV("--- we already have %s in %p, don't need in %p\n",
+            ALOGV("--- we already have %s in %p, don't need in %p\n",
                 descriptor, elementClass->classLoader, loader);
             return newClass;
         }
@@ -470,7 +470,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
         dvmFindSystemClassNoInit("Ljava/io/Serializable;");
     dvmLinearReadOnly(newClass->classLoader, newClass->interfaces);
     if (newClass->interfaces[0] == NULL || newClass->interfaces[1] == NULL) {
-        LOGE("Unable to create array class '%s': missing interfaces\n",
+        ALOGE("Unable to create array class '%s': missing interfaces\n",
             descriptor);
         dvmFreeClassInnards(newClass);
         dvmThrowException("Ljava/lang/InternalError;", "missing array ifaces");
@@ -514,7 +514,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
          * started but before we finished.  Discard what we've
          * done and leave some hints for the GC.
          */
-        LOGI("WOW: somebody generated %s simultaneously\n",
+        ALOGI("WOW: somebody generated %s simultaneously\n",
             newClass->descriptor);
 
         /* Clean up the class before letting the
@@ -534,7 +534,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
     }
     dvmReleaseTrackedAlloc((Object*) newClass, NULL);
 
-    LOGV("Created array class '%s' %p (access=0x%04x.%04x)\n",
+    ALOGV("Created array class '%s' %p (access=0x%04x.%04x)\n",
         descriptor, newClass->classLoader,
         newClass->accessFlags >> 16,
         newClass->accessFlags & JAVA_FLAGS_MASK);
@@ -585,7 +585,7 @@ ClassObject* dvmFindPrimitiveClass(char type)
         idx = PRIM_VOID;
         break;
     default:
-        LOGW("Unknown primitive type '%c'\n", type);
+        ALOGW("Unknown primitive type '%c'\n", type);
         return NULL;
     }
 
@@ -673,7 +673,7 @@ bool dvmCopyObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
     length = dstArray->length;
     for (count = 0; count < length; count++) {
         if (!dvmInstanceof(src[count]->clazz, dstElemClass)) {
-            LOGW("dvmCopyObjectArray: can't store %s in %s\n",
+            ALOGW("dvmCopyObjectArray: can't store %s in %s\n",
                 src[count]->clazz->descriptor, dstElemClass->descriptor);
             return false;
         }
@@ -709,7 +709,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
          * necessary for correctness.
          */
         if (!dvmUnwrapPrimitive(*src, dstElemClass, &result)) {
-            LOGW("dvmCopyObjectArray: can't store %s in %s\n",
+            ALOGW("dvmCopyObjectArray: can't store %s in %s\n",
                 (*src)->clazz->descriptor, dstElemClass->descriptor);
             return false;
         }
@@ -784,7 +784,7 @@ size_t dvmArrayClassElementWidth(const ClassObject* arrayClass)
         case 'Z': return 1;  /* boolean */
         }
     }
-    LOGE("class %p has an unhandled descriptor '%s'", arrayClass, descriptor);
+    ALOGE("class %p has an unhandled descriptor '%s'", arrayClass, descriptor);
     dvmDumpThread(dvmThreadSelf(), false);
     dvmAbort();
     return 0;  /* Quiet the compiler. */

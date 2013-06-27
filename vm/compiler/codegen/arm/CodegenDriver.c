@@ -692,7 +692,7 @@ static bool genArithOpLong(CompilationUnit *cUnit, MIR *mir,
             return false;
         }
         default:
-            LOGE("Invalid long arith op");
+            ALOGE("Invalid long arith op");
             dvmCompilerAbort(cUnit);
     }
     if (!callOut) {
@@ -791,7 +791,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
             op = kOpLsr;
             break;
         default:
-            LOGE("Invalid word arith op: 0x%x(%d)",
+            ALOGE("Invalid word arith op: 0x%x(%d)",
                  mir->dalvikInsn.opCode, mir->dalvikInsn.opCode);
             dvmCompilerAbort(cUnit);
     }
@@ -1322,7 +1322,7 @@ static bool handleFmt10x(CompilationUnit *cUnit, MIR *mir)
 {
     OpCode dalvikOpCode = mir->dalvikInsn.opCode;
     if ((dalvikOpCode >= OP_UNUSED_3E) && (dalvikOpCode <= OP_UNUSED_43)) {
-        LOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
+        ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
         return true;
     }
     switch (dalvikOpCode) {
@@ -1334,7 +1334,7 @@ static bool handleFmt10x(CompilationUnit *cUnit, MIR *mir)
         case OP_UNUSED_7A:
         case OP_UNUSED_F1:
         case OP_UNUSED_FF:
-            LOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
+            ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
             return true;
         case OP_NOP:
             break;
@@ -1428,7 +1428,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (cUnit->method->clazz->pDvmDex->pResStrings[mir->dalvikInsn.vB]);
 
             if (strPtr == NULL) {
-                LOGE("Unexpected null string");
+                ALOGE("Unexpected null string");
                 dvmAbort();
             }
 
@@ -1443,7 +1443,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (cUnit->method->clazz->pDvmDex->pResClasses[mir->dalvikInsn.vB]);
 
             if (classPtr == NULL) {
-                LOGE("Unexpected null class");
+                ALOGE("Unexpected null class");
                 dvmAbort();
             }
 
@@ -1470,7 +1470,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (method->clazz->pDvmDex->pResFields[mir->dalvikInsn.vB]);
 
             if (fieldPtr == NULL) {
-                LOGE("Unexpected null static field");
+                ALOGE("Unexpected null static field");
                 dvmAbort();
             }
 
@@ -1500,7 +1500,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (method->clazz->pDvmDex->pResFields[mir->dalvikInsn.vB]);
 
             if (fieldPtr == NULL) {
-                LOGE("Unexpected null static field");
+                ALOGE("Unexpected null static field");
                 dvmAbort();
             }
 
@@ -1542,7 +1542,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
                            (mir->dalvikInsn.opCode == OP_SPUT_OBJECT_VOLATILE);
 
             if (fieldPtr == NULL) {
-                LOGE("Unexpected null static field");
+                ALOGE("Unexpected null static field");
                 dvmAbort();
             }
 
@@ -1577,7 +1577,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (method->clazz->pDvmDex->pResFields[mir->dalvikInsn.vB]);
 
             if (fieldPtr == NULL) {
-                LOGE("Unexpected null static field");
+                ALOGE("Unexpected null static field");
                 dvmAbort();
             }
 
@@ -1599,7 +1599,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
               (cUnit->method->clazz->pDvmDex->pResClasses[mir->dalvikInsn.vB]);
 
             if (classPtr == NULL) {
-                LOGE("Unexpected null class");
+                ALOGE("Unexpected null class");
                 dvmAbort();
             }
 
@@ -1942,7 +1942,7 @@ static bool handleFmt21t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             break;
         default:
             cond = 0;
-            LOGE("Unexpected opcode (%d) for Fmt21t\n", dalvikOpCode);
+            ALOGE("Unexpected opcode (%d) for Fmt21t\n", dalvikOpCode);
             dvmCompilerAbort(cUnit);
     }
     genConditionalBranch(cUnit, cond, &labelList[bb->taken->id]);
@@ -2224,7 +2224,7 @@ static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
                 method->clazz->pDvmDex->pResFields[mir->dalvikInsn.vC];
 
             if (fieldPtr == NULL) {
-                LOGE("Unexpected null instance field");
+                ALOGE("Unexpected null instance field");
                 dvmAbort();
             }
             isVolatile = dvmIsVolatileField(fieldPtr);
@@ -2245,7 +2245,7 @@ static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
               (cUnit->method->clazz->pDvmDex->pResClasses[mir->dalvikInsn.vC]);
 
             if (classPtr == NULL) {
-                LOGE("Unexpected null class");
+                ALOGE("Unexpected null class");
                 dvmAbort();
             }
 
@@ -2296,7 +2296,7 @@ static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
              * so that we can tell if it happens frequently.
              */
             if (classPtr == NULL) {
-                LOGD("null clazz in OP_INSTANCE_OF, single-stepping");
+                ALOGD("null clazz in OP_INSTANCE_OF, single-stepping");
                 genInterpSingleStep(cUnit, mir);
                 break;
             }
@@ -2431,7 +2431,7 @@ static bool handleFmt22t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             break;
         default:
             cond = 0;
-            LOGE("Unexpected opcode (%d) for Fmt22t\n", dalvikOpCode);
+            ALOGE("Unexpected opcode (%d) for Fmt22t\n", dalvikOpCode);
             dvmCompilerAbort(cUnit);
     }
     genConditionalBranch(cUnit, cond, &labelList[bb->taken->id]);
@@ -4228,7 +4228,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                 }
             }
             if (notHandled) {
-                LOGE("%#06x: Opcode 0x%x (%s) / Fmt %d not handled\n",
+                ALOGE("%#06x: Opcode 0x%x (%s) / Fmt %d not handled\n",
                      mir->offset,
                      dalvikOpCode, dexGetOpcodeName(dalvikOpCode),
                      dalvikFormat);
@@ -4312,7 +4312,7 @@ gen_fallthrough:
                     break;
 #endif
                 default:
-                    LOGE("Bad blocktype %d", blockList[blockId]->blockType);
+                    ALOGE("Bad blocktype %d", blockList[blockId]->blockType);
                     dvmCompilerAbort(cUnit);
             }
         }
@@ -4370,7 +4370,7 @@ bool dvmCompilerDoWork(CompilerWorkOrder *work)
         }
         default:
             res = false;
-            LOGE("Jit: unknown work order type");
+            ALOGE("Jit: unknown work order type");
             assert(0);  // Bail if debug build, discard otherwise
     }
     return res;
@@ -4418,7 +4418,7 @@ void dvmCompilerArchDump(void)
         }
     }
     if (strlen(buf)) {
-        LOGD("dalvik.vm.jit.op = %s", buf);
+        ALOGD("dalvik.vm.jit.op = %s", buf);
     }
 }
 
@@ -4429,7 +4429,7 @@ bool dvmCompilerArchInit()
 
     for (i = 0; i < kArmLast; i++) {
         if (EncodingMap[i].opCode != i) {
-            LOGE("Encoding order for %s is wrong: expecting %d, seeing %d",
+            ALOGE("Encoding order for %s is wrong: expecting %d, seeing %d",
                  EncodingMap[i].name, i, EncodingMap[i].opCode);
             dvmAbort();  // OK to dvmAbort - build error
         }

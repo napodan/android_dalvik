@@ -19,7 +19,7 @@
 #if defined(TEST_VM_IN_ECLAIR)
 FILE *open_memstream(char **ptr, size_t *sizeloc)
 {
-    LOGE("Fake open_memstream entered");
+    ALOGE("Fake open_memstream entered");
     dvmAbort();
     return NULL;
 }

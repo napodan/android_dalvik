@@ -59,30 +59,30 @@ static void sigchldHandler(int s)
            become unsafe. */
         if (WIFEXITED(status)) {
             if (WEXITSTATUS(status)) {
-                LOG(LOG_DEBUG, ZYGOTE_LOG_TAG, "Process %d exited cleanly (%d)\n",
+                ALOG(LOG_DEBUG, ZYGOTE_LOG_TAG, "Process %d exited cleanly (%d)\n",
                     (int) pid, WEXITSTATUS(status));
             } else {
-                IF_LOGV(/*should use ZYGOTE_LOG_TAG*/) {
-                    LOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
+                IF_ALOGV(/*should use ZYGOTE_LOG_TAG*/) {
+                    ALOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
                         "Process %d exited cleanly (%d)\n",
                         (int) pid, WEXITSTATUS(status));
                 }
             }
         } else if (WIFSIGNALED(status)) {
             if (WTERMSIG(status) != SIGKILL) {
-                LOG(LOG_DEBUG, ZYGOTE_LOG_TAG,
+                ALOG(LOG_DEBUG, ZYGOTE_LOG_TAG,
                     "Process %d terminated by signal (%d)\n",
                     (int) pid, WTERMSIG(status));
             } else {
-                IF_LOGV(/*should use ZYGOTE_LOG_TAG*/) {
-                    LOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
+                IF_ALOGV(/*should use ZYGOTE_LOG_TAG*/) {
+                    ALOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
                         "Process %d terminated by signal (%d)\n",
                         (int) pid, WTERMSIG(status));
                 }
             }
 #ifdef WCOREDUMP
             if (WCOREDUMP(status)) {
-                LOG(LOG_INFO, ZYGOTE_LOG_TAG, "Process %d dumped core\n",
+                ALOG(LOG_INFO, ZYGOTE_LOG_TAG, "Process %d dumped core\n",
                     (int) pid);
             }
 #endif /* ifdef WCOREDUMP */
@@ -94,7 +94,7 @@ static void sigchldHandler(int s)
          * from there.
          */
         if (pid == gDvm.systemServerPid) {
-            LOG(LOG_INFO, ZYGOTE_LOG_TAG,
+            ALOG(LOG_INFO, ZYGOTE_LOG_TAG,
                 "Exit zygote because system server (%d) has terminated\n",
                 (int) pid);
             kill(getpid(), SIGKILL);
@@ -102,7 +102,7 @@ static void sigchldHandler(int s)
     }
 
     if (pid < 0) {
-        LOG(LOG_WARN, ZYGOTE_LOG_TAG,
+        ALOG(LOG_WARN, ZYGOTE_LOG_TAG,
             "Zygote SIGCHLD error in waitpid: %s\n",strerror(errno));
     }
 }
@@ -128,7 +128,7 @@ static void setSignalHandler()
     err = sigaction (SIGCHLD, &sa, NULL);
 
     if (err < 0) {
-        LOGW("Error setting SIGCHLD handler: %s", strerror(errno));
+        ALOGW("Error setting SIGCHLD handler: %s", strerror(errno));
     }
 }
 
@@ -147,7 +147,7 @@ static void unsetSignalHandler()
     err = sigaction (SIGCHLD, &sa, NULL);
 
     if (err < 0) {
-        LOGW("Error unsetting SIGCHLD handler: %s", strerror(errno));
+        ALOGW("Error unsetting SIGCHLD handler: %s", strerror(errno));
     }
 }
 
@@ -204,7 +204,7 @@ static int setrlimitsFromArray(ArrayObject* rlimits)
         int err;
 
         if (rlimit_tuple->length != 3) {
-            LOGE("rlimits array must have a second dimension of size 3");
+            ALOGE("rlimits array must have a second dimension of size 3");
             return -1;
         }
 
@@ -234,7 +234,7 @@ static void Dalvik_dalvik_system_Zygote_fork(const u4* args, JValue* pResult)
     }
 
     if (!dvmGcPreZygoteFork()) {
-        LOGE("pre-fork heap failed\n");
+        ALOGE("pre-fork heap failed\n");
         dvmAbort();
     }
 
@@ -277,7 +277,7 @@ static void Dalvik_dalvik_system_Zygote_fork(const u4* args, JValue* pResult)
  */
 static void enableDebugFeatures(u4 debugFlags)
 {
-    LOGV("debugFlags is 0x%02x\n", debugFlags);
+    ALOGV("debugFlags is 0x%02x\n", debugFlags);
 
     gDvm.jdwpAllowed = ((debugFlags & DEBUG_ENABLE_DEBUGGER) != 0);
 
@@ -308,14 +308,14 @@ static void enableDebugFeatures(u4 debugFlags)
          * to disable that
          */
         if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
-            LOGE("could not set dumpable bit flag for pid %d: %s",
+            ALOGE("could not set dumpable bit flag for pid %d: %s",
                  getpid(), strerror(errno));
         } else {
             struct rlimit rl;
             rl.rlim_cur = 0;
             rl.rlim_max = RLIM_INFINITY;
             if (setrlimit(RLIMIT_CORE, &rl) < 0) {
-                LOGE("could not disable core file generation for pid %d: %s",
+                ALOGE("could not disable core file generation for pid %d: %s",
                     getpid(), strerror(errno));
             }
         }
@@ -343,7 +343,7 @@ static int setCapabilities(int64_t permitted, int64_t effective)
     capdata.effective = effective;
     capdata.permitted = permitted;
 
-    LOGV("CAPSET perm=%llx eff=%llx\n", permitted, effective);
+    ALOGV("CAPSET perm=%llx eff=%llx\n", permitted, effective);
     if (capset(&capheader, &capdata) != 0)
         return errno;
 #endif /*HAVE_ANDROID_OS*/
@@ -387,7 +387,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
     }
 
     if (!dvmGcPreZygoteFork()) {
-        LOGE("pre-fork heap failed\n");
+        ALOGE("pre-fork heap failed\n");
         dvmAbort();
     }
 
@@ -409,7 +409,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
             err = prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);
 
             if (err < 0) {
-                LOGE("cannot PR_SET_KEEPCAPS: %s", strerror(errno));
+                ALOGE("cannot PR_SET_KEEPCAPS: %s", strerror(errno));
                 dvmAbort();
             }
         }
@@ -419,32 +419,32 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
         err = setgroupsIntarray(gids);
 
         if (err < 0) {
-            LOGE("cannot setgroups(): %s", strerror(errno));
+            ALOGE("cannot setgroups(): %s", strerror(errno));
             dvmAbort();
         }
 
         err = setrlimitsFromArray(rlimits);
 
         if (err < 0) {
-            LOGE("cannot setrlimit(): %s", strerror(errno));
+            ALOGE("cannot setrlimit(): %s", strerror(errno));
             dvmAbort();
         }
 
         err = setgid(gid);
         if (err < 0) {
-            LOGE("cannot setgid(%d): %s", gid, strerror(errno));
+            ALOGE("cannot setgid(%d): %s", gid, strerror(errno));
             dvmAbort();
         }
 
         err = setuid(uid);
         if (err < 0) {
-            LOGE("cannot setuid(%d): %s", uid, strerror(errno));
+            ALOGE("cannot setuid(%d): %s", uid, strerror(errno));
             dvmAbort();
         }
 
         err = setCapabilities(permittedCapabilities, effectiveCapabilities);
         if (err != 0) {
-            LOGE("cannot set capabilities (%llx,%llx): %s\n",
+            ALOGE("cannot set capabilities (%llx,%llx): %s\n",
                 permittedCapabilities, effectiveCapabilities, strerror(err));
             dvmAbort();
         }
@@ -461,7 +461,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
         unsetSignalHandler();
         gDvm.zygote = false;
         if (!dvmInitAfterZygote()) {
-            LOGE("error in post-zygote initialization\n");
+            ALOGE("error in post-zygote initialization\n");
             dvmAbort();
         }
     } else if (pid > 0) {
@@ -498,14 +498,14 @@ static void Dalvik_dalvik_system_Zygote_forkSystemServer(
     if (pid > 0) {
         int status;
 
-        LOGI("System server process %d has been created", pid);
+        ALOGI("System server process %d has been created", pid);
         gDvm.systemServerPid = pid;
         /* There is a slight window that the system server process has crashed
          * but it went unnoticed because we haven't published its pid yet. So
          * we recheck here just to make sure that all is well.
          */
         if (waitpid(pid, &status, WNOHANG) == pid) {
-            LOGE("System server process %d has died. Restarting Zygote!", pid);
+            ALOGE("System server process %d has died. Restarting Zygote!", pid);
             kill(getpid(), SIGKILL);
         }
     }

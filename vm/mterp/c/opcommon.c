@@ -458,7 +458,7 @@ GOTO_TARGET_DECL(exceptionThrown);
         if (!checkForNull((Object*) arrayObj))                              \
             GOTO_exceptionThrown();                                         \
         if (GET_REGISTER(vsrc2) >= arrayObj->length) {                      \
-            LOGV("Invalid array access: %p %d (len=%d)\n",                  \
+            ALOGV("Invalid array access: %p %d (len=%d)\n",                  \
                 arrayObj, vsrc2, arrayObj->length);                         \
             dvmThrowException("Ljava/lang/ArrayIndexOutOfBoundsException;", \
                 NULL);                                                      \

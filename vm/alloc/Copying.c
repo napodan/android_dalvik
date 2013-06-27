@@ -124,13 +124,13 @@
 #define ARRAYSIZE(x) (sizeof(x) / sizeof(x[0]))
 
 #if 0
-#define LOG_ALLOC LOGI
-#define LOG_PIN LOGI
-#define LOG_PROM LOGI
-#define LOG_REF LOGI
-#define LOG_SCAV LOGI
-#define LOG_TRAN LOGI
-#define LOG_VER LOGI
+#define LOG_ALLOC ALOGI
+#define LOG_PIN ALOGI
+#define LOG_PROM ALOGI
+#define LOG_REF ALOGI
+#define LOG_SCAV ALOGI
+#define LOG_TRAN ALOGI
+#define LOG_VER ALOGI
 #else
 #define LOG_ALLOC(...) ((void)0)
 #define LOG_PIN(...) ((void)0)
@@ -350,7 +350,7 @@ static void *allocateBlocks(HeapSource *heapSource, size_t blocks)
         return addr;
     }
     /* Insufficient space, fail. */
-    LOGE("Insufficient space, %zu blocks, %zu blocks allocated and %zu bytes allocated",
+    ALOGE("Insufficient space, %zu blocks, %zu blocks allocated and %zu bytes allocated",
          heapSource->totalBlocks,
          heapSource->allocBlocks,
          heapSource->bytesAllocated);
@@ -1043,7 +1043,7 @@ static void enqueueReference(Object *ref)
     assert(dvmGetFieldObject(ref, gDvm.offJavaLangRefReference_queue) != NULL);
     assert(dvmGetFieldObject(ref, gDvm.offJavaLangRefReference_queueNext) == NULL);
     if (!dvmHeapAddRefToLargeTable(&gDvm.gcHeap->referenceOperations, ref)) {
-        LOGE("no room for any more reference operations");
+        ALOGE("no room for any more reference operations");
         dvmAbort();
     }
 }
@@ -1640,13 +1640,13 @@ static void scavengeThreadStack(Thread *thread)
                  * some value.
                  */
                 if (saveArea->xtra.currentPc != thread->currentPc2) {
-                    LOGW("PGC: savedPC(%p) != current PC(%p), %s.%s ins=%p\n",
+                    ALOGW("PGC: savedPC(%p) != current PC(%p), %s.%s ins=%p\n",
                         saveArea->xtra.currentPc, thread->currentPc2,
                         method->clazz->descriptor, method->name, method->insns);
                     if (saveArea->xtra.currentPc != NULL)
-                        LOGE("  pc inst = 0x%04x\n", *saveArea->xtra.currentPc);
+                        ALOGE("  pc inst = 0x%04x\n", *saveArea->xtra.currentPc);
                     if (thread->currentPc2 != NULL)
-                        LOGE("  pc2 inst = 0x%04x\n", *thread->currentPc2);
+                        ALOGE("  pc2 inst = 0x%04x\n", *thread->currentPc2);
                     dvmDumpThread(thread, false);
                 }
             } else {
@@ -1734,7 +1734,7 @@ static void scavengeThreadStack(Thread *thread)
 #if WITH_EXTRA_GC_CHECKS > 0
                         if ((rval & 0x3) != 0 || !dvmIsValidObject((Object*) rval)) {
                             /* this is very bad */
-                            LOGE("PGC: invalid ref in reg %d: 0x%08x\n",
+                            ALOGE("PGC: invalid ref in reg %d: 0x%08x\n",
                                 method->registersSize-1 - i, rval);
                         } else
 #endif
@@ -1751,7 +1751,7 @@ static void scavengeThreadStack(Thread *thread)
 #if WITH_EXTRA_GC_CHECKS > 1
                         if (dvmIsValidObject((Object*) rval)) {
                             /* this is normal, but we feel chatty */
-                            LOGD("PGC: ignoring valid ref in reg %d: 0x%08x\n",
+                            ALOGD("PGC: ignoring valid ref in reg %d: 0x%08x\n",
                                  method->registersSize-1 - i, rval);
                         }
 #endif
@@ -1880,7 +1880,7 @@ static void pinThreadStack(const Thread *thread)
             const RegisterMap* pMap = dvmGetExpandedRegisterMap(method);
             const u1* regVector = NULL;
 
-            LOGI("conservative : %s.%s\n", method->clazz->descriptor, method->name);
+            ALOGI("conservative : %s.%s\n", method->clazz->descriptor, method->name);
 
             if (pMap != NULL) {
                 int addr = saveArea->xtra.currentPc - method->insns;

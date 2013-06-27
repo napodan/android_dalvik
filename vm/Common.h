@@ -30,7 +30,7 @@
 #if !defined(NDEBUG) && defined(WITH_DALVIK_ASSERT)
 # undef assert
 # define assert(x) \
-    ((x) ? ((void)0) : (LOGE("ASSERT FAILED (%s:%d): %s\n", \
+    ((x) ? ((void)0) : (ALOGE("ASSERT FAILED (%s:%d): %s\n", \
         __FILE__, __LINE__, #x), *(int*)39=39, 0) )
 #endif
 
@@ -41,7 +41,7 @@
 #define UNLIKELY(exp) (__builtin_expect((exp) != 0, false))
 
 /*
- * If "very verbose" logging is enabled, make it equivalent to LOGV.
+ * If "very verbose" logging is enabled, make it equivalent to ALOGV.
  * Otherwise, make it disappear.
  *
  * Define this above the #include "Dalvik.h" to enable for only a
@@ -49,8 +49,8 @@
  */
 /* #define VERY_VERBOSE_LOG */
 #if defined(VERY_VERBOSE_LOG)
-# define LOGVV      LOGV
-# define IF_LOGVV() IF_LOGV()
+# define LOGVV      ALOGV
+# define IF_LOGVV() IF_ALOGV()
 #else
 # define LOGVV(...) ((void)0)
 # define IF_LOGVV() if (false)
@@ -135,11 +135,11 @@ typedef enum { false=0, true=!false } bool;
  * Android logging implementation.
  */
 #define ANDROID_LOG_DEBUG 3
-#define LOGV(...)    LOG_PRI(2, 0, __VA_ARGS__)
-#define LOGD(...)    LOG_PRI(3, 0, __VA_ARGS__)
-#define LOGI(...)    LOG_PRI(4, 0, __VA_ARGS__)
-#define LOGW(...)    LOG_PRI(5, 0, __VA_ARGS__)
-#define LOGE(...)    LOG_PRI(6, 0, __VA_ARGS__)
+#define ALOGV(...)    LOG_PRI(2, 0, __VA_ARGS__)
+#define ALOGD(...)    LOG_PRI(3, 0, __VA_ARGS__)
+#define ALOGI(...)    LOG_PRI(4, 0, __VA_ARGS__)
+#define ALOGW(...)    LOG_PRI(5, 0, __VA_ARGS__)
+#define ALOGE(...)    LOG_PRI(6, 0, __VA_ARGS__)
 #define MIN_LOG_LEVEL   2
 
 #define LOG_PRI(priority, tag, ...) do {                            \

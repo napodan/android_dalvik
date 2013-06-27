@@ -91,7 +91,7 @@ static inline u8 getClock()
 
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tm);
         if (!(tm.tv_nsec >= 0 && tm.tv_nsec < 1*1000*1000*1000)) {
-            LOGE("bad nsec: %ld\n", tm.tv_nsec);
+            ALOGE("bad nsec: %ld\n", tm.tv_nsec);
             dvmAbort();
         }
 
@@ -155,7 +155,7 @@ bool dvmProfilingStartup(void)
     if (gDvm.methodTrace.gcMethod == NULL ||
         gDvm.methodTrace.classPrepMethod == NULL)
     {
-        LOGE("Unable to find startGC or startClassPrep\n");
+        ALOGE("Unable to find startGC or startClassPrep\n");
         return false;
     }
 
@@ -180,13 +180,13 @@ bool dvmProfilingStartup(void)
      */
     int fd = open("/dev/qemu_trace", O_RDWR);
     if (fd < 0) {
-        LOGV("Unable to open /dev/qemu_trace\n");
+        ALOGV("Unable to open /dev/qemu_trace\n");
     } else {
         gDvm.emulatorTracePage = mmap(0, SYSTEM_PAGE_SIZE, PROT_READ|PROT_WRITE,
                                       MAP_SHARED, fd, 0);
         close(fd);
         if (gDvm.emulatorTracePage == MAP_FAILED) {
-            LOGE("Unable to mmap /dev/qemu_trace\n");
+            ALOGE("Unable to mmap /dev/qemu_trace\n");
             gDvm.emulatorTracePage = NULL;
         } else {
             *(u4*) gDvm.emulatorTracePage = 0;
@@ -224,13 +224,13 @@ static void updateActiveProfilers(int count)
         oldValue = gDvm.activeProfilers;
         newValue = oldValue + count;
         if (newValue < 0) {
-            LOGE("Can't have %d active profilers\n", newValue);
+            ALOGE("Can't have %d active profilers\n", newValue);
             dvmAbort();
         }
     } while (android_atomic_release_cas(oldValue, newValue,
             &gDvm.activeProfilers) != 0);
 
-    LOGD("+++ active profiler count now %d\n", newValue);
+    ALOGD("+++ active profiler count now %d\n", newValue);
 #if defined(WITH_JIT)
     dvmCompilerStateRefresh();
 #endif
@@ -343,13 +343,13 @@ void dvmMethodTraceStart(const char* traceFileName, int traceFd, int bufferSize,
 
     dvmLockMutex(&state->startStopLock);
     while (state->traceEnabled != 0) {
-        LOGI("TRACE start requested, but already in progress; stopping\n");
+        ALOGI("TRACE start requested, but already in progress; stopping\n");
         dvmUnlockMutex(&state->startStopLock);
         dvmMethodTraceStop();
         dvmLockMutex(&state->startStopLock);
     }
     updateActiveProfilers(1);
-    LOGI("TRACE STARTED: '%s' %dKB\n", traceFileName, bufferSize / 1024);
+    ALOGI("TRACE STARTED: '%s' %dKB\n", traceFileName, bufferSize / 1024);
 
     /*
      * Allocate storage and open files.
@@ -370,7 +370,7 @@ void dvmMethodTraceStart(const char* traceFileName, int traceFd, int bufferSize,
         }
         if (state->traceFile == NULL) {
             int err = errno;
-            LOGE("Unable to open trace file '%s': %s\n",
+            ALOGE("Unable to open trace file '%s': %s\n",
                 traceFileName, strerror(err));
             dvmThrowExceptionFmt("Ljava/lang/RuntimeException;",
                 "Unable to open trace file '%s': %s",
@@ -504,7 +504,7 @@ void dvmMethodTraceStop(void)
 
     if (!state->traceEnabled) {
         /* somebody already stopped it, or it was never started */
-        LOGD("TRACE stop requested, but not running\n");
+        ALOGD("TRACE stop requested, but not running\n");
         dvmUnlockMutex(&state->startStopLock);
         return;
     } else {
@@ -560,7 +560,7 @@ void dvmMethodTraceStop(void)
                         | (scanPtr[4] << 24);
             if (METHOD_ID(methodVal) == fillVal) {
                 u1* scanBase = state->buf + TRACE_HEADER_LEN;
-                LOGW("Found unfilled record at %d (of %d)\n",
+                ALOGW("Found unfilled record at %d (of %d)\n",
                     (scanPtr - scanBase) / TRACE_REC_SIZE,
                     (finalCurOffset - TRACE_HEADER_LEN) / TRACE_REC_SIZE);
                 finalCurOffset = scanPtr - state->buf;
@@ -571,11 +571,11 @@ void dvmMethodTraceStop(void)
         }
     }
 
-    LOGI("TRACE STOPPED%s: writing %d records\n",
+    ALOGI("TRACE STOPPED%s: writing %d records\n",
         state->overflow ? " (NOTE: overflowed buffer)" : "",
         (finalCurOffset - TRACE_HEADER_LEN) / TRACE_REC_SIZE);
     if (gDvm.debuggerActive) {
-        LOGW("WARNING: a debugger is active; method-tracing results "
+        ALOGW("WARNING: a debugger is active; method-tracing results "
              "will be skewed\n");
     }
 
@@ -593,7 +593,7 @@ void dvmMethodTraceStop(void)
         state->traceFile = open_memstream(&memStreamPtr, &memStreamSize);
         if (state->traceFile == NULL) {
             /* not expected */
-            LOGE("Unable to open memstream\n");
+            ALOGE("Unable to open memstream\n");
             dvmAbort();
         }
     }
@@ -647,7 +647,7 @@ void dvmMethodTraceStop(void)
         /* append the profiling data */
         if (fwrite(state->buf, finalCurOffset, 1, state->traceFile) != 1) {
             int err = errno;
-            LOGE("trace fwrite(%d) failed: %s\n",
+            ALOGE("trace fwrite(%d) failed: %s\n",
                 finalCurOffset, strerror(err));
             dvmThrowExceptionFmt("Ljava/lang/RuntimeException;",
                 "Trace data write failed: %s", strerror(err));
@@ -688,7 +688,7 @@ void dvmMethodTraceAdd(Thread* self, const Method* method, int action)
     if (!self->cpuClockBaseSet) {
         self->cpuClockBase = getClock();
         self->cpuClockBaseSet = true;
-        //LOGI("thread base id=%d 0x%llx\n",
+        //ALOGI("thread base id=%d 0x%llx\n",
         //    self->threadId, self->cpuClockBase);
     }
 
@@ -833,7 +833,7 @@ void dvmEmulatorTraceStart(void)
     /* in theory we should make this an atomic inc; in practice not important */
     gDvm.emulatorTraceEnableCount++;
     if (gDvm.emulatorTraceEnableCount == 1)
-        LOGD("--- emulator method traces enabled\n");
+        ALOGD("--- emulator method traces enabled\n");
 }
 
 /*
@@ -842,14 +842,14 @@ void dvmEmulatorTraceStart(void)
 void dvmEmulatorTraceStop(void)
 {
     if (gDvm.emulatorTraceEnableCount == 0) {
-        LOGE("ERROR: emulator tracing not enabled\n");
+        ALOGE("ERROR: emulator tracing not enabled\n");
         return;
     }
     updateActiveProfilers(-1);
     /* in theory we should make this an atomic inc; in practice not important */
     gDvm.emulatorTraceEnableCount--;
     if (gDvm.emulatorTraceEnableCount == 0)
-        LOGD("--- emulator method traces disabled\n");
+        ALOGD("--- emulator method traces disabled\n");
 }
 
 
@@ -869,7 +869,7 @@ void dvmStartInstructionCounting()
 void dvmStopInstructionCounting()
 {
     if (gDvm.instructionCountEnableCount == 0) {
-        LOGE("ERROR: instruction counting not enabled\n");
+        ALOGE("ERROR: instruction counting not enabled\n");
         dvmAbort();
     }
     updateActiveProfilers(-1);

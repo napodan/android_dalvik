@@ -69,10 +69,10 @@ static void Dalvik_java_lang_Class_desiredAssertionStatus(const u4* args,
             if (pCtrl->pkgOrClassLen > pkgLen ||
                 memcmp(pCtrl->pkgOrClass, className, pCtrl->pkgOrClassLen) != 0)
             {
-                LOGV("ASRT: pkg no match: '%s'(%d) vs '%s'\n",
+                ALOGV("ASRT: pkg no match: '%s'(%d) vs '%s'\n",
                     className, pkgLen, pCtrl->pkgOrClass);
             } else {
-                LOGV("ASRT: pkg match: '%s'(%d) vs '%s' --> %d\n",
+                ALOGV("ASRT: pkg match: '%s'(%d) vs '%s' --> %d\n",
                     className, pkgLen, pCtrl->pkgOrClass, pCtrl->enable);
                 enable = pCtrl->enable;
             }
@@ -84,22 +84,22 @@ static void Dalvik_java_lang_Class_desiredAssertionStatus(const u4* args,
             if (pCtrl->pkgOrClass == NULL) {
                 /* -esa/-dsa; see if class is a "system" class */
                 if (strncmp(className, "java/", 5) != 0) {
-                    LOGV("ASRT: sys no match: '%s'\n", className);
+                    ALOGV("ASRT: sys no match: '%s'\n", className);
                 } else {
-                    LOGV("ASRT: sys match: '%s' --> %d\n",
+                    ALOGV("ASRT: sys match: '%s' --> %d\n",
                         className, pCtrl->enable);
                     enable = pCtrl->enable;
                 }
             } else if (*pCtrl->pkgOrClass == '\0') {
-                LOGV("ASRT: class all: '%s' --> %d\n",
+                ALOGV("ASRT: class all: '%s' --> %d\n",
                     className, pCtrl->enable);
                 enable = pCtrl->enable;
             } else {
                 if (strcmp(pCtrl->pkgOrClass, className) != 0) {
-                    LOGV("ASRT: cls no match: '%s' vs '%s'\n",
+                    ALOGV("ASRT: cls no match: '%s' vs '%s'\n",
                         className, pCtrl->pkgOrClass);
                 } else {
-                    LOGV("ASRT: cls match: '%s' vs '%s' --> %d\n",
+                    ALOGV("ASRT: cls match: '%s' vs '%s' --> %d\n",
                         className, pCtrl->pkgOrClass, pCtrl->enable);
                     enable = pCtrl->enable;
                 }
@@ -347,7 +347,7 @@ static void Dalvik_java_lang_Class_getNameNative(const u4* args, JValue* pResult
             case 'D': name = "double";  break;
             case 'V': name = "void";    break;
             default: {
-                LOGE("Unknown primitive type '%c'\n", descriptor[0]);
+                ALOGE("Unknown primitive type '%c'\n", descriptor[0]);
                 assert(false);
                 RETURN_PTR(NULL);
             }
@@ -395,7 +395,7 @@ static void Dalvik_java_lang_Class_getNameNative(const u4* args, JValue* pResult
         if (nameObj == NULL) {
             nameObj = dvmResolveString(clazz, pClassId->nameIdx);
             if (nameObj == NULL)
-                LOGW("WARNING: couldn't find string %u for '%s'\n",
+                ALOGW("WARNING: couldn't find string %u for '%s'\n",
                     pClassId->nameIdx, clazz->name);
         }
     }
@@ -496,7 +496,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     if (dvmIsPrimitiveClass(clazz) || dvmIsInterfaceClass(clazz)
         || dvmIsArrayClass(clazz) || dvmIsAbstractClass(clazz))
     {
-        LOGD("newInstance failed: p%d i%d [%d a%d\n",
+        ALOGD("newInstance failed: p%d i%d [%d a%d\n",
             dvmIsPrimitiveClass(clazz), dvmIsInterfaceClass(clazz),
             dvmIsArrayClass(clazz), dvmIsAbstractClass(clazz));
         dvmThrowExceptionWithClassMessage("Ljava/lang/InstantiationException;",
@@ -507,7 +507,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     /* initialize the class if it hasn't been already */
     if (!dvmIsClassInitialized(clazz)) {
         if (!dvmInitClass(clazz)) {
-            LOGW("Class init failed in newInstance call (%s)\n",
+            ALOGW("Class init failed in newInstance call (%s)\n",
                 clazz->descriptor);
             assert(dvmCheckException(self));
             RETURN_VOID();
@@ -518,7 +518,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     init = dvmFindDirectMethodByDescriptor(clazz, "<init>", "()V");
     if (init == NULL) {
         /* common cause: secret "this" arg on non-static inner class ctor */
-        LOGD("newInstance failed: no <init>()\n");
+        ALOGD("newInstance failed: no <init>()\n");
         dvmThrowExceptionWithClassMessage("Ljava/lang/InstantiationException;",
             clazz->descriptor);
         RETURN_VOID();
@@ -537,14 +537,14 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     ClassObject* callerClass = dvmGetCaller2Class(self->curFrame);
 
     if (!dvmCheckClassAccess(callerClass, clazz)) {
-        LOGD("newInstance failed: %s not accessible to %s\n",
+        ALOGD("newInstance failed: %s not accessible to %s\n",
             clazz->descriptor, callerClass->descriptor);
         dvmThrowException("Ljava/lang/IllegalAccessException;",
             "access to class not allowed");
         RETURN_VOID();
     }
     if (!dvmCheckMethodAccess(callerClass, init)) {
-        LOGD("newInstance failed: %s.<init>() not accessible to %s\n",
+        ALOGD("newInstance failed: %s.<init>() not accessible to %s\n",
             clazz->descriptor, callerClass->descriptor);
         dvmThrowException("Ljava/lang/IllegalAccessException;",
             "access to constructor not allowed");

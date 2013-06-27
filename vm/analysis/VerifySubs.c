@@ -376,7 +376,7 @@ void dvmLogUnableToResolveClass(const char* missingClassDescr,
     char* dotFromClass = dvmDescriptorToDot(meth->clazz->descriptor);
     //char* methodDescr = dexProtoCopyMethodDescriptor(&meth->prototype);
 
-    LOGE("Could not find class '%s', referenced from method %s.%s\n",
+    ALOGE("Could not find class '%s', referenced from method %s.%s\n",
         dotMissingClass, dotFromClass, meth->name/*, methodDescr*/);
 
     free(dotMissingClass);

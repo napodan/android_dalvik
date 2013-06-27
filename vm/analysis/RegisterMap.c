@@ -141,11 +141,11 @@ void dvmRegisterMapDumpStats(void)
             break;
     }
 
-    LOGI("Register Map gcPointGap stats (diff count=%d, total=%d):\n",
+    ALOGI("Register Map gcPointGap stats (diff count=%d, total=%d):\n",
         pStats->gcGapCount, pStats->totalGcPointCount);
     assert(pStats->gcPointGap[0] == 0);
     for (i = 1; i <= end; i++) {
-        LOGI(" %2d %d\n", i, pStats->gcPointGap[i]);
+        ALOGI(" %2d %d\n", i, pStats->gcPointGap[i]);
     }
 
 
@@ -154,16 +154,16 @@ void dvmRegisterMapDumpStats(void)
             break;
     }
 
-    LOGI("Register Map bit difference stats:\n");
+    ALOGI("Register Map bit difference stats:\n");
     for (i = 0; i <= end; i++) {
-        LOGI(" %2d %d\n", i, pStats->numDiffBits[i]);
+        ALOGI(" %2d %d\n", i, pStats->numDiffBits[i]);
     }
 
 
-    LOGI("Register Map update position stats (lt16=%d ge16=%d):\n",
+    ALOGI("Register Map update position stats (lt16=%d ge16=%d):\n",
         pStats->updateLT16, pStats->updateGE16);
     for (i = 0; i < kNumUpdatePosns; i++) {
-        LOGI(" %2d %d\n", i, pStats->updatePosn[i]);
+        ALOGI(" %2d %d\n", i, pStats->updatePosn[i]);
     }
 #endif
 }
@@ -196,7 +196,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
     int bufSize;
 
     if (vdata->method->registersSize >= 2048) {
-        LOGE("ERROR: register map can't handle %d registers\n",
+        ALOGE("ERROR: register map can't handle %d registers\n",
             vdata->method->registersSize);
         goto bail;
     }
@@ -230,7 +230,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
     }
     if (gcPointCount >= 65536) {
         /* we could handle this, but in practice we don't get near this */
-        LOGE("ERROR: register map can't handle %d gc points in one method\n",
+        ALOGE("ERROR: register map can't handle %d gc points in one method\n",
             gcPointCount);
         goto bail;
     }
@@ -240,7 +240,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
      */
     bufSize = kHeaderSize + gcPointCount * (bytesForAddr + regWidth);
 
-    LOGV("+++ grm: %s.%s (adr=%d gpc=%d rwd=%d bsz=%d)\n",
+    ALOGV("+++ grm: %s.%s (adr=%d gpc=%d rwd=%d bsz=%d)\n",
         vdata->method->clazz->descriptor, vdata->method->name,
         bytesForAddr, gcPointCount, regWidth, bufSize);
 
@@ -268,7 +268,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
         }
     }
 
-    LOGV("mapData=%p pMap=%p bufSize=%d\n", mapData, pMap, bufSize);
+    ALOGV("mapData=%p pMap=%p bufSize=%d\n", mapData, pMap, bufSize);
     assert(mapData - (const u1*) pMap == bufSize);
 
     if (REGISTER_MAP_VERIFY && !verifyMap(vdata, pMap))
@@ -292,7 +292,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
             RegisterMap* pUncompMap;
             pUncompMap = uncompressMapDifferential(pCompMap);
             if (pUncompMap == NULL) {
-                LOGE("Map failed to uncompress - %s.%s\n",
+                ALOGE("Map failed to uncompress - %s.%s\n",
                     vdata->method->clazz->descriptor,
                     vdata->method->name);
                 free(pCompMap);
@@ -300,7 +300,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
                 dvmAbort();
             } else {
                 if (compareMaps(pMap, pUncompMap) != 0) {
-                    LOGE("Map comparison failed - %s.%s\n",
+                    ALOGE("Map comparison failed - %s.%s\n",
                         vdata->method->clazz->descriptor,
                         vdata->method->name);
                     free(pCompMap);
@@ -314,7 +314,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
         }
 
         if (REGISTER_MAP_VERBOSE) {
-            LOGD("Good compress on %s.%s\n",
+            ALOGD("Good compress on %s.%s\n",
                 vdata->method->clazz->descriptor,
                 vdata->method->name);
         }
@@ -322,7 +322,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
         pMap = pCompMap;
     } else {
         if (REGISTER_MAP_VERBOSE) {
-            LOGD("Unable to compress %s.%s (ent=%d rw=%d)\n",
+            ALOGD("Unable to compress %s.%s (ent=%d rw=%d)\n",
                 vdata->method->clazz->descriptor,
                 vdata->method->name,
                 dvmRegisterMapGetNumEntries(pMap),
@@ -411,7 +411,7 @@ static void dumpRegisterMap(const RegisterMap* pMap, int registersSize)
         break;
     default:
         /* can't happen */
-        LOGE("Can only dump Compact8 / Compact16 maps (not %d)\n", format);
+        ALOGE("Can only dump Compact8 / Compact16 maps (not %d)\n", format);
         return;
     }
 
@@ -451,7 +451,7 @@ static void dumpRegisterMap(const RegisterMap* pMap, int registersSize)
         }
         hexBuf[i * 3] = '\0';
 
-        LOGD("  %04x %s %s\n", addr, outBuf, hexBuf);
+        ALOGD("  %04x %s %s\n", addr, outBuf, hexBuf);
     }
 }
 
@@ -477,7 +477,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
         {
             char* desc;
             desc = dexProtoCopyMethodDescriptor(&vdata->method->prototype);
-            LOGI("Map for %s.%s %s\n", vdata->method->clazz->descriptor,
+            ALOGI("Map for %s.%s %s\n", vdata->method->clazz->descriptor,
                 vdata->method->name, desc);
             free(desc);
 
@@ -486,7 +486,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
     }
 
     if ((vdata->method->registersSize + 7) / 8 != pMap->regWidth) {
-        LOGE("GLITCH: registersSize=%d, regWidth=%d\n",
+        ALOGE("GLITCH: registersSize=%d, regWidth=%d\n",
             vdata->method->registersSize, pMap->regWidth);
         return false;
     }
@@ -504,13 +504,13 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
             break;
         default:
             /* shouldn't happen */
-            LOGE("GLITCH: bad format (%d)", format);
+            ALOGE("GLITCH: bad format (%d)", format);
             dvmAbort();
         }
 
         const RegType* regs = vdata->addrRegs[addr];
         if (regs == NULL) {
-            LOGE("GLITCH: addr %d has no data\n", addr);
+            ALOGE("GLITCH: addr %d has no data\n", addr);
             return false;
         }
 
@@ -532,7 +532,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
             regIsRef = isReferenceType(type);
 
             if (bitIsRef != regIsRef) {
-                LOGE("GLITCH: addr %d reg %d: bit=%d reg=%d(%d)\n",
+                ALOGE("GLITCH: addr %d reg %d: bit=%d reg=%d(%d)\n",
                     addr, i, bitIsRef, regIsRef, type);
                 return false;
             }
@@ -588,7 +588,7 @@ static size_t computeRegisterMapSize(const RegisterMap* pMap)
             return len + (ptr - (u1*) pMap);
         }
     default:
-        LOGE("Bad register map format %d\n", format);
+        ALOGE("Bad register map format %d\n", format);
         dvmAbort();
         return 0;
     }
@@ -607,7 +607,7 @@ static bool writeMapForMethod(const Method* meth, u1** pPtr)
 {
     if (meth->registerMap == NULL) {
         if (!dvmIsAbstractMethod(meth) && !dvmIsNativeMethod(meth)) {
-            LOGW("Warning: no map available for %s.%s\n",
+            ALOGW("Warning: no map available for %s.%s\n",
                 meth->clazz->descriptor, meth->name);
             /* weird, but keep going */
         }
@@ -642,7 +642,7 @@ static bool writeMapsAllMethods(DvmDex* pDvmDex, const ClassObject* clazz,
 
     /* artificial limit */
     if (clazz->virtualMethodCount + clazz->directMethodCount >= 65536) {
-        LOGE("Too many methods in %s\n", clazz->descriptor);
+        ALOGE("Too many methods in %s\n", clazz->descriptor);
         return false;
     }
 
@@ -755,14 +755,14 @@ static size_t writeMapsAllClasses(DvmDex* pDvmDex, u1* basePtr, size_t length)
                 clazz->directMethodCount, clazz->virtualMethodCount,
                 (ptr - basePtr) - offsetTable[idx]);
         } else {
-            LOGV("%4d NOT mapadding '%s'\n", idx, classDescriptor);
+            ALOGV("%4d NOT mapadding '%s'\n", idx, classDescriptor);
             assert(offsetTable[idx] == 0);
         }
     }
 
     if (ptr - basePtr >= (int)length) {
         /* a bit late */
-        LOGE("Buffer overrun\n");
+        ALOGE("Buffer overrun\n");
         dvmAbort();
     }
 
@@ -811,7 +811,7 @@ RegisterMapBuilder* dvmGenerateRegisterMaps(DvmDex* pDvmDex)
         return NULL;
     }
 
-    LOGV("TOTAL size of register maps: %d\n", actual);
+    ALOGV("TOTAL size of register maps: %d\n", actual);
 
     pBuilder->data = pBuilder->memMap.addr;
     pBuilder->size = actual;
@@ -847,13 +847,13 @@ const void* dvmRegisterMapGetClassData(const DexFile* pDexFile, u4 classIdx,
         return NULL;
 
     if (classIdx >= pClassPool->numClasses) {
-        LOGE("bad class index (%d vs %d)\n", classIdx, pClassPool->numClasses);
+        ALOGE("bad class index (%d vs %d)\n", classIdx, pClassPool->numClasses);
         dvmAbort();
     }
 
     u4 classOffset = pClassPool->classDataOffset[classIdx];
     if (classOffset == 0) {
-        LOGV("+++ no map for classIdx=%d\n", classIdx);
+        ALOGV("+++ no map for classIdx=%d\n", classIdx);
         return NULL;
     }
 
@@ -908,7 +908,7 @@ const u1* dvmRegisterMapGetLine(const RegisterMap* pMap, int addr)
         addrWidth = 2;
         break;
     default:
-        LOGE("Unknown format %d\n", format);
+        ALOGE("Unknown format %d\n", format);
         dvmAbort();
         return NULL;
     }
@@ -975,12 +975,12 @@ static int compareMaps(const RegisterMap* pMap1, const RegisterMap* pMap2)
     size1 = computeRegisterMapSize(pMap1);
     size2 = computeRegisterMapSize(pMap2);
     if (size1 != size2) {
-        LOGI("compareMaps: size mismatch (%zd vs %zd)\n", size1, size2);
+        ALOGI("compareMaps: size mismatch (%zd vs %zd)\n", size1, size2);
         return -1;
     }
 
     if (memcmp(pMap1, pMap2, size1) != 0) {
-        LOGI("compareMaps: content mismatch\n");
+        ALOGI("compareMaps: content mismatch\n");
         return -1;
     }
 
@@ -1010,7 +1010,7 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
     /* (if we use this at a time other than during GC, fix/remove this test) */
     if (true) {
         if (!gDvm.zygote && dvmTryLockMutex(&gDvm.gcHeapLock) == 0) {
-            LOGE("GLITCH: dvmGetExpandedRegisterMap not called at GC time\n");
+            ALOGE("GLITCH: dvmGetExpandedRegisterMap not called at GC time\n");
             dvmAbort();
         }
     }
@@ -1021,10 +1021,10 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
     case kRegMapFormatCompact16:
         if (REGISTER_MAP_VERBOSE) {
             if (dvmRegisterMapGetOnHeap(curMap)) {
-                LOGD("RegMap: already expanded: %s.%s\n",
+                ALOGD("RegMap: already expanded: %s.%s\n",
                     method->clazz->descriptor, method->name);
             } else {
-                LOGD("RegMap: stored w/o compression: %s.%s\n",
+                ALOGD("RegMap: stored w/o compression: %s.%s\n",
                     method->clazz->descriptor, method->name);
             }
         }
@@ -1033,13 +1033,13 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
         newMap = uncompressMapDifferential(curMap);
         break;
     default:
-        LOGE("Unknown format %d in dvmGetExpandedRegisterMap\n", format);
+        ALOGE("Unknown format %d in dvmGetExpandedRegisterMap\n", format);
         dvmAbort();
         newMap = NULL;      // make gcc happy
     }
 
     if (newMap == NULL) {
-        LOGE("Map failed to uncompress (fmt=%d) %s.%s\n",
+        ALOGE("Map failed to uncompress (fmt=%d) %s.%s\n",
             format, method->clazz->descriptor, method->name);
         return NULL;
     }
@@ -1052,14 +1052,14 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
         MapStats* pStats = (MapStats*) gDvm.registerMapStats;
         pStats->numExpandedMaps++;
         pStats->totalExpandedMapSize += computeRegisterMapSize(newMap);
-        LOGD("RMAP: count=%d size=%d\n",
+        ALOGD("RMAP: count=%d size=%d\n",
             pStats->numExpandedMaps, pStats->totalExpandedMapSize);
     }
 #endif
 
-    IF_LOGV() {
+    IF_ALOGV() {
         char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-        LOGV("Expanding map -> %s.%s:%s\n",
+        ALOGV("Expanding map -> %s.%s:%s\n",
             method->clazz->descriptor, method->name, desc);
         free(desc);
     }
@@ -1263,7 +1263,7 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
             break;
         default:
             /* shouldn't happen */
-            LOGE("GLITCH: bad format (%d)", format);
+            ALOGE("GLITCH: bad format (%d)", format);
             dvmAbort();
         }
 
@@ -1280,11 +1280,11 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
             int addrDiff = addr - prevAddr;
 
             if (addrDiff < 0) {
-                LOGE("GLITCH: address went backward (0x%04x->0x%04x, %s.%s)\n",
+                ALOGE("GLITCH: address went backward (0x%04x->0x%04x, %s.%s)\n",
                     prevAddr, addr, method->clazz->descriptor, method->name);
             } else if (addrDiff > kMaxGcPointGap) {
                 if (REGISTER_MAP_VERBOSE) {
-                    LOGI("HEY: addrDiff is %d, max %d (0x%04x->0x%04x %s.%s)\n",
+                    ALOGI("HEY: addrDiff is %d, max %d (0x%04x->0x%04x %s.%s)\n",
                         addrDiff, kMaxGcPointGap, prevAddr, addr,
                         method->clazz->descriptor, method->name);
                 }
@@ -1329,14 +1329,14 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
 
                         if (bitNum >= method->registersSize) {
                             /* stuff off the end should be zero in both */
-                            LOGE("WEIRD: bit=%d (%d/%d), prev=%02x cur=%02x\n",
+                            ALOGE("WEIRD: bit=%d (%d/%d), prev=%02x cur=%02x\n",
                                 bit, regByte, method->registersSize,
                                 prev, cur);
                             assert(false);
                         }
                         int idx = (int) (bitNum * div);
                         if (!(idx >= 0 && idx < kNumUpdatePosns)) {
-                            LOGE("FAIL: bitNum=%d (of %d) div=%.3f idx=%d\n",
+                            ALOGE("FAIL: bitNum=%d (of %d) div=%.3f idx=%d\n",
                                 bitNum, method->registersSize, div, idx);
                             assert(false);
                         }
@@ -1347,7 +1347,7 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
 
             if (numDiff > kMaxDiffBits) {
                 if (REGISTER_MAP_VERBOSE) {
-                    LOGI("WOW: numDiff is %d, max %d\n", numDiff, kMaxDiffBits);
+                    ALOGI("WOW: numDiff is %d, max %d\n", numDiff, kMaxDiffBits);
                 }
             } else {
                 pStats->numDiffBits[numDiff]++;
@@ -1463,7 +1463,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
         addrWidth = 2;
         break;
     default:
-        LOGE("ERROR: can't compress map with format=%d\n", format);
+        ALOGE("ERROR: can't compress map with format=%d\n", format);
         goto bail;
     }
 
@@ -1471,14 +1471,14 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
     numEntries = dvmRegisterMapGetNumEntries(pMap);
 
     if (debug) {
-        LOGI("COMPRESS: %s.%s aw=%d rw=%d ne=%d\n",
+        ALOGI("COMPRESS: %s.%s aw=%d rw=%d ne=%d\n",
             meth->clazz->descriptor, meth->name,
             addrWidth, regWidth, numEntries);
         dumpRegisterMap(pMap, -1);
     }
 
     if (numEntries <= 1) {
-        LOGV("Can't compress map with 0 or 1 entries\n");
+        ALOGV("Can't compress map with 0 or 1 entries\n");
         goto bail;
     }
 
@@ -1514,7 +1514,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
         addr |= (*mapData++) << 8;
 
     if (addr >= 128) {
-        LOGV("Can't compress map with starting address >= 128\n");
+        ALOGV("Can't compress map with starting address >= 128\n");
         goto bail;
     }
 
@@ -1549,7 +1549,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             addr |= (*mapData++) << 8;
 
         if (debug)
-            LOGI(" addr=0x%04x ent=%d (aw=%d)\n", addr, entry, addrWidth);
+            ALOGI(" addr=0x%04x ent=%d (aw=%d)\n", addr, entry, addrWidth);
 
         addrDiff = addr - prevAddr;
         assert(addrDiff > 0);
@@ -1557,12 +1557,12 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             /* small difference, encode in 3 bits */
             key = addrDiff -1;          /* set 00000AAA */
             if (debug)
-                LOGI(" : small %d, key=0x%02x\n", addrDiff, key);
+                ALOGI(" : small %d, key=0x%02x\n", addrDiff, key);
         } else {
             /* large difference, output escape code */
             key = 0x07;                 /* escape code for AAA */
             if (debug)
-                LOGI(" : large %d, key=0x%02x\n", addrDiff, key);
+                ALOGI(" : large %d, key=0x%02x\n", addrDiff, key);
         }
 
         int numBitsChanged, firstBitChanged, lebSize;
@@ -1571,26 +1571,26 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             &firstBitChanged, &numBitsChanged, NULL);
 
         if (debug) {
-            LOGI(" : diff fbc=%d nbc=%d ls=%d (rw=%d)\n",
+            ALOGI(" : diff fbc=%d nbc=%d ls=%d (rw=%d)\n",
                 firstBitChanged, numBitsChanged, lebSize, regWidth);
         }
 
         if (numBitsChanged == 0) {
             /* set B to 1 and CCCC to zero to indicate no bits were changed */
             key |= 0x08;
-            if (debug) LOGI(" : no bits changed\n");
+            if (debug) ALOGI(" : no bits changed\n");
         } else if (numBitsChanged == 1 && firstBitChanged < 16) {
             /* set B to 0 and CCCC to the index of the changed bit */
             key |= firstBitChanged << 4;
-            if (debug) LOGI(" : 1 low bit changed\n");
+            if (debug) ALOGI(" : 1 low bit changed\n");
         } else if (numBitsChanged < 15 && lebSize < regWidth) {
             /* set B to 1 and CCCC to the number of bits */
             key |= 0x08 | (numBitsChanged << 4);
-            if (debug) LOGI(" : some bits changed\n");
+            if (debug) ALOGI(" : some bits changed\n");
         } else {
             /* set B to 1 and CCCC to 0x0f so we store the entire vector */
             key |= 0x08 | 0xf0;
-            if (debug) LOGI(" : encode original\n");
+            if (debug) ALOGI(" : encode original\n");
         }
 
         /*
@@ -1628,7 +1628,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
          */
         if (tmpPtr - tmpBuf >= origSize) {
             if (debug) {
-                LOGD("Compressed size >= original (%d vs %d): %s.%s\n",
+                ALOGD("Compressed size >= original (%d vs %d): %s.%s\n",
                     tmpPtr - tmpBuf, origSize,
                     meth->clazz->descriptor, meth->name);
             }
@@ -1649,7 +1649,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
     newMapSize = kHeaderSize + unsignedLeb128Size(newDataSize) + newDataSize;
     if (newMapSize >= origSize) {
         if (debug) {
-            LOGD("Final comp size >= original (%d vs %d): %s.%s\n",
+            ALOGD("Final comp size >= original (%d vs %d): %s.%s\n",
                 newMapSize, origSize, meth->clazz->descriptor, meth->name);
         }
         goto bail;
@@ -1668,7 +1668,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
     memcpy(tmpPtr, tmpBuf, newDataSize);
 
     if (REGISTER_MAP_VERBOSE) {
-        LOGD("Compression successful (%d -> %d) from aw=%d rw=%d ne=%d\n",
+        ALOGD("Compression successful (%d -> %d) from aw=%d rw=%d ne=%d\n",
             computeRegisterMapSize(pMap), computeRegisterMapSize(pNewMap),
             addrWidth, regWidth, numEntries);
     }
@@ -1703,7 +1703,7 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
     int regWidth, numEntries, newAddrWidth, newMapSize;
 
     if (format != kRegMapFormatDifferential) {
-        LOGE("Not differential (%d)\n", format);
+        ALOGE("Not differential (%d)\n", format);
         goto bail;
     }
 
@@ -1728,7 +1728,7 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
 
     /* now we know enough to allocate the new map */
     if (REGISTER_MAP_VERBOSE) {
-        LOGI("Expanding to map aw=%d rw=%d ne=%d\n",
+        ALOGI("Expanding to map aw=%d rw=%d ne=%d\n",
             newAddrWidth, regWidth, numEntries);
     }
     newMapSize = kHeaderSize + (newAddrWidth + regWidth) * numEntries;
@@ -1813,19 +1813,19 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
     }
 
     if (dstPtr - (u1*) pNewMap != newMapSize) {
-        LOGE("ERROR: output %d bytes, expected %d\n",
+        ALOGE("ERROR: output %d bytes, expected %d\n",
             dstPtr - (u1*) pNewMap, newMapSize);
         goto bail;
     }
 
     if (srcPtr - srcStart != expectedSrcLen) {
-        LOGE("ERROR: consumed %d bytes, expected %d\n",
+        ALOGE("ERROR: consumed %d bytes, expected %d\n",
             srcPtr - srcStart, expectedSrcLen);
         goto bail;
     }
 
     if (REGISTER_MAP_VERBOSE) {
-        LOGD("Expansion successful (%d -> %d)\n",
+        ALOGD("Expansion successful (%d -> %d)\n",
             computeRegisterMapSize(pMap), computeRegisterMapSize(pNewMap));
     }
 
@@ -2250,12 +2250,12 @@ static bool analyzeMethod(WorkState* pState)
     startGuess = 0;
 
     if (true) {
-        IF_LOGI() {
+        IF_ALOGI() {
             char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-            LOGI("Now mapping: %s.%s %s (ins=%d regs=%d)\n",
+            ALOGI("Now mapping: %s.%s %s (ins=%d regs=%d)\n",
                 meth->clazz->descriptor, meth->name, desc,
                 meth->insSize, meth->registersSize);
-            LOGI(" ------ [0    4    8    12   16   20   24   28   32   36\n");
+            ALOGI(" ------ [0    4    8    12   16   20   24   28   32   36\n");
             free(desc);
         }
     }

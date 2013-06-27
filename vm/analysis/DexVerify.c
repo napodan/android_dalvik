@@ -38,7 +38,7 @@ bool dvmVerificationStartup(void)
     if (gDvm.instrWidth == NULL || gDvm.instrFormat == NULL ||
         gDvm.instrFlags == NULL)
     {
-        LOGE("Unable to create instruction tables\n");
+        ALOGE("Unable to create instruction tables\n");
         return false;
     }
 
@@ -70,7 +70,7 @@ bool dvmVerifyClass(ClassObject* clazz)
     int i;
 
     if (dvmIsClassVerified(clazz)) {
-        LOGD("Ignoring duplicate verify attempt on %s\n", clazz->descriptor);
+        ALOGD("Ignoring duplicate verify attempt on %s\n", clazz->descriptor);
         return true;
     }
 
@@ -209,7 +209,7 @@ static bool verifyMethod(Method* meth)
      * to use a register.
      */
     if (!dvmVerifyCodeFlow(&vdata)) {
-        //LOGD("+++ %s failed code flow\n", meth->name);
+        //ALOGD("+++ %s failed code flow\n", meth->name);
         goto bail;
     }
 

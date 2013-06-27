@@ -31,13 +31,13 @@
 #define LOGV_GC(...)    ((void)0)
 #define LOGD_GC(...)    ((void)0)
 #else
-#define LOGV_GC(...)    LOG(LOG_VERBOSE, GC_LOG_TAG, __VA_ARGS__)
-#define LOGD_GC(...)    LOG(LOG_DEBUG, GC_LOG_TAG, __VA_ARGS__)
+#define LOGV_GC(...)    ALOG(LOG_VERBOSE, GC_LOG_TAG, __VA_ARGS__)
+#define LOGD_GC(...)    ALOG(LOG_DEBUG, GC_LOG_TAG, __VA_ARGS__)
 #endif
 
-#define LOGI_GC(...)    LOG(LOG_INFO, GC_LOG_TAG, __VA_ARGS__)
-#define LOGW_GC(...)    LOG(LOG_WARN, GC_LOG_TAG, __VA_ARGS__)
-#define LOGE_GC(...)    LOG(LOG_ERROR, GC_LOG_TAG, __VA_ARGS__)
+#define LOGI_GC(...)    ALOG(LOG_INFO, GC_LOG_TAG, __VA_ARGS__)
+#define LOGW_GC(...)    ALOG(LOG_WARN, GC_LOG_TAG, __VA_ARGS__)
+#define LOGE_GC(...)    ALOG(LOG_ERROR, GC_LOG_TAG, __VA_ARGS__)
 
 #define LOG_SCAN(...)   LOGV_GC("SCAN: " __VA_ARGS__)
 

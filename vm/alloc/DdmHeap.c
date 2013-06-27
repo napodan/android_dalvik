@@ -70,7 +70,7 @@ dvmDdmSendHeapInfo(int reason, bool shouldLock)
      */
     if (reason == gDvm.gcHeap->ddmHpifWhen) {
         if (shouldLock && ! dvmLockHeap()) {
-            LOGW("%s(): can't lock heap to clear when\n", __func__);
+            ALOGW("%s(): can't lock heap to clear when\n", __func__);
             goto skip_when;
         }
         if (reason == gDvm.gcHeap->ddmHpifWhen) {
@@ -137,12 +137,12 @@ dvmDdmHandleHpifChunk(int when)
             gDvm.gcHeap->ddmHpifWhen = when;
             dvmUnlockHeap();
         } else {
-            LOGI("%s(): can't lock heap to set when\n", __func__);
+            ALOGI("%s(): can't lock heap to set when\n", __func__);
             return false;
         }
         break;
     default:
-        LOGI("%s(): bad when value 0x%08x\n", __func__, when);
+        ALOGI("%s(): bad when value 0x%08x\n", __func__, when);
         return false;
     }
 
@@ -232,7 +232,7 @@ heap_chunk_callback(const void *chunkptr, size_t chunklen,
 
         bytesLeft = ctx->bufLen - (size_t)(ctx->p - ctx->buf);
         if (bytesLeft < needed) {
-            LOGW("chunk is too big to transmit (chunklen=%zd, %zd bytes)\n",
+            ALOGW("chunk is too big to transmit (chunklen=%zd, %zd bytes)\n",
                 chunklen, needed);
             return;
         }
@@ -420,7 +420,7 @@ dvmDdmSendHeapSegments(bool shouldLock, bool native)
         }
     }
     if (shouldLock && !dvmLockHeap()) {
-        LOGW("Can't lock heap for DDM HPSx dump\n");
+        ALOGW("Can't lock heap for DDM HPSx dump\n");
         return;
     }
 
@@ -458,14 +458,14 @@ dvmDdmSendHeapSegments(bool shouldLock, bool native)
 bool
 dvmDdmHandleHpsgNhsgChunk(int when, int what, bool native)
 {
-    LOGI("dvmDdmHandleHpsgChunk(when %d, what %d, heap %d)\n", when, what,
+    ALOGI("dvmDdmHandleHpsgChunk(when %d, what %d, heap %d)\n", when, what,
          native);
     switch (when) {
     case HPSG_WHEN_NEVER:
     case HPSG_WHEN_EVERY_GC:
         break;
     default:
-        LOGI("%s(): bad when value 0x%08x\n", __func__, when);
+        ALOGI("%s(): bad when value 0x%08x\n", __func__, when);
         return false;
     }
 
@@ -474,7 +474,7 @@ dvmDdmHandleHpsgNhsgChunk(int when, int what, bool native)
     case HPSG_WHAT_DISTINCT_OBJECTS:
         break;
     default:
-        LOGI("%s(): bad what value 0x%08x\n", __func__, what);
+        ALOGI("%s(): bad what value 0x%08x\n", __func__, what);
         return false;
     }
 
@@ -489,7 +489,7 @@ dvmDdmHandleHpsgNhsgChunk(int when, int what, bool native)
 //TODO: if what says we should dump immediately, signal (or do) it from here
         dvmUnlockHeap();
     } else {
-        LOGI("%s(): can't lock heap to set when/what\n", __func__);
+        ALOGI("%s(): can't lock heap to set when/what\n", __func__);
         return false;
     }
 

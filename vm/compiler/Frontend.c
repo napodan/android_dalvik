@@ -43,7 +43,7 @@ static inline int parseInsn(const u2 *codePtr, DecodedInstruction *decInsn,
     dexDecodeInstruction(gDvm.instrFormat, codePtr, decInsn);
     if (printMe) {
         char *decodedString = dvmCompilerGetDalvikDisassembly(decInsn, NULL);
-        LOGD("%p: %#06x %s\n", codePtr, opcode, decodedString);
+        ALOGD("%p: %#06x %s\n", codePtr, opcode, decodedString);
     }
     return insnWidth;
 }
@@ -350,22 +350,22 @@ CompilerMethodStats *dvmCompilerAnalyzeMethodBody(const Method *method,
 #if 0
     /* Uncomment the following to explore various callee patterns */
     if (attributes & METHOD_IS_THROW_FREE) {
-        LOGE("%s%s is inlinable%s", method->clazz->descriptor, method->name,
+        ALOGE("%s%s is inlinable%s", method->clazz->descriptor, method->name,
              (attributes & METHOD_IS_EMPTY) ? " empty" : "");
     }
 
     if (attributes & METHOD_IS_LEAF) {
-        LOGE("%s%s is leaf %d%s", method->clazz->descriptor, method->name,
+        ALOGE("%s%s is leaf %d%s", method->clazz->descriptor, method->name,
              insnSize, insnSize < 5 ? " (small)" : "");
     }
 
     if (attributes & (METHOD_IS_GETTER | METHOD_IS_SETTER)) {
-        LOGE("%s%s is %s", method->clazz->descriptor, method->name,
+        ALOGE("%s%s is %s", method->clazz->descriptor, method->name,
              attributes & METHOD_IS_GETTER ? "getter": "setter");
     }
     if (attributes ==
         (METHOD_IS_LEAF | METHOD_IS_THROW_FREE | METHOD_IS_CALLEE)) {
-        LOGE("%s%s is inlinable non setter/getter", method->clazz->descriptor,
+        ALOGE("%s%s is inlinable non setter/getter", method->clazz->descriptor,
              method->name);
     }
 #endif
@@ -391,7 +391,7 @@ bool filterMethodByCallGraph(Thread *thread, const char *curMethodName)
                                (HashCompareFunc) strcmp, false) !=
                 NULL;
             if (found) {
-                LOGD("Method %s (--> %s) found on the JIT %s list",
+                ALOGD("Method %s (--> %s) found on the JIT %s list",
                      method->name, curMethodName,
                      gDvmJit.includeSelectedMethod ? "white" : "black");
                 return true;
@@ -548,7 +548,7 @@ bool dvmCompileTrace(JitTraceDescription *desc, int numMaxInsts,
     lastBB = curBB;
 
     if (cUnit.printMe) {
-        LOGD("--------\nCompiler: Building trace for %s, offset 0x%x\n",
+        ALOGD("--------\nCompiler: Building trace for %s, offset 0x%x\n",
              desc->method->name, curOffset);
     }
 
@@ -693,7 +693,7 @@ bool dvmCompileTrace(JitTraceDescription *desc, int numMaxInsts,
             BasicBlock *exitChainingCell;
 
             if (cUnit.printMe) {
-                LOGD("Natural loop detected!");
+                ALOGD("Natural loop detected!");
             }
             exitBB = dvmCompilerNewBB(kTraceExitBlock);
             lastBB->next = exitBB;
@@ -855,7 +855,7 @@ bool dvmCompileTrace(JitTraceDescription *desc, int numMaxInsts,
 
     if (cUnit.printMe) {
         char* signature = dexProtoCopyMethodDescriptor(&desc->method->prototype);
-        LOGD("TRACEINFO (%d): 0x%08x %s%s.%s 0x%x %d of %d, %d blocks",
+        ALOGD("TRACEINFO (%d): 0x%08x %s%s.%s 0x%x %d of %d, %d blocks",
             compilationId,
             (intptr_t) desc->method->insns,
             desc->method->clazz->descriptor,
@@ -907,7 +907,7 @@ bool dvmCompileTrace(JitTraceDescription *desc, int numMaxInsts,
         bool loopOpt = dvmCompilerLoopOpt(&cUnit);
         if (loopOpt == false) {
             if (cUnit.printMe) {
-                LOGD("Loop is not optimizable - retry codegen");
+                ALOGD("Loop is not optimizable - retry codegen");
             }
             /* Reset the compiler resource pool */
             dvmCompilerArenaReset();
@@ -936,13 +936,13 @@ bool dvmCompileTrace(JitTraceDescription *desc, int numMaxInsts,
         dvmCompilerAssembleLIR(&cUnit, info);
         cUnit.assemblerRetries++;
         if (cUnit.printMe && cUnit.assemblerStatus != kSuccess)
-            LOGD("Assembler abort #%d on %d",cUnit.assemblerRetries,
+            ALOGD("Assembler abort #%d on %d",cUnit.assemblerRetries,
                   cUnit.assemblerStatus);
     } while (cUnit.assemblerStatus == kRetryAll);
 
     if (cUnit.printMe) {
         dvmCompilerCodegenDump(&cUnit);
-        LOGD("End %s%s, %d Dalvik instructions",
+        ALOGD("End %s%s, %d Dalvik instructions",
              desc->method->clazz->descriptor, desc->method->name,
              cUnit.numInsts);
     }
@@ -1225,7 +1225,7 @@ bool dvmCompileMethod(CompilationUnit *cUnit, const Method *method,
     }
 
     if (numBlocks != cUnit->numBlocks) {
-        LOGE("Expect %d vs %d basic blocks\n", numBlocks, cUnit->numBlocks);
+        ALOGE("Expect %d vs %d basic blocks\n", numBlocks, cUnit->numBlocks);
         dvmCompilerAbort(cUnit);
     }
 
@@ -1277,7 +1277,7 @@ bool dvmCompileMethod(CompilationUnit *cUnit, const Method *method,
     }
 
     if (cUnit->numBlocks != numBlocks + numInvokeTargets) {
-        LOGE("Expect %d vs %d total blocks\n", numBlocks + numInvokeTargets,
+        ALOGE("Expect %d vs %d total blocks\n", numBlocks + numInvokeTargets,
              cUnit->numBlocks);
         dvmCompilerDumpCompilationUnit(cUnit);
         dvmCompilerAbort(cUnit);

@@ -102,9 +102,9 @@ void dvmHeapWorkerShutdown(void)
          * (e.g. an open temp file).
          */
         if (pthread_join(gDvm.heapWorkerHandle, &threadReturn) != 0)
-            LOGW("HeapWorker thread join failed\n");
+            ALOGW("HeapWorker thread join failed\n");
         else if (gDvm.verboseShutdown)
-            LOGD("HeapWorker thread has shut down\n");
+            ALOGD("HeapWorker thread has shut down\n");
 
         gDvm.heapWorkerReady = false;
     }
@@ -138,7 +138,7 @@ void dvmAssertHeapWorkerThreadRunning()
              * into how they're manipulating us.  So, we ignore the
              * watchdog and just reset the timer.
              */
-            LOGI("Debugger is attached -- suppressing HeapWorker watchdog\n");
+            ALOGI("Debugger is attached -- suppressing HeapWorker watchdog\n");
             gDvm.gcHeap->heapWorkerInterpStartTime = now;   /* reset timer */
         } else if (delta > HEAP_WORKER_WATCHDOG_TIMEOUT) {
             /*
@@ -158,7 +158,7 @@ void dvmAssertHeapWorkerThreadRunning()
                 priChangeFlags = dvmRaiseThreadPriorityIfNeeded(thread,
                         &threadPrio, &threadPolicy);
                 if (priChangeFlags != 0) {
-                    LOGI("HeapWorker watchdog expired, raising priority"
+                    ALOGI("HeapWorker watchdog expired, raising priority"
                          " and retrying\n");
                     gDvm.gcHeap->heapWorkerInterpStartTime = now;
                     return;
@@ -167,7 +167,7 @@ void dvmAssertHeapWorkerThreadRunning()
 
             char* desc = dexProtoCopyMethodDescriptor(
                     &gDvm.gcHeap->heapWorkerCurrentMethod->prototype);
-            LOGE("HeapWorker is wedged: %lldms spent inside %s.%s%s\n",
+            ALOGE("HeapWorker is wedged: %lldms spent inside %s.%s%s\n",
                     delta / 1000,
                     gDvm.gcHeap->heapWorkerCurrentObject->clazz->descriptor,
                     gDvm.gcHeap->heapWorkerCurrentMethod->name, desc);
@@ -182,7 +182,7 @@ void dvmAssertHeapWorkerThreadRunning()
         } else if (delta > HEAP_WORKER_WATCHDOG_TIMEOUT / 2) {
             char* desc = dexProtoCopyMethodDescriptor(
                     &gDvm.gcHeap->heapWorkerCurrentMethod->prototype);
-            LOGW("HeapWorker may be wedged: %lldms spent inside %s.%s%s\n",
+            ALOGW("HeapWorker may be wedged: %lldms spent inside %s.%s%s\n",
                     delta / 1000,
                     gDvm.gcHeap->heapWorkerCurrentObject->clazz->descriptor,
                     gDvm.gcHeap->heapWorkerCurrentMethod->name, desc);
@@ -237,9 +237,9 @@ static void callMethod(Thread *self, Object *obj, Method *method)
          */
         char tmpTag[16];
         sprintf(tmpTag, "HW%d", self->systemTid);
-        LOG(LOG_DEBUG, tmpTag, "Call %s\n", method->clazz->descriptor);
+        ALOG(LOG_DEBUG, tmpTag, "Call %s\n", method->clazz->descriptor);
         dvmCallMethod(self, method, obj, &unused);
-        LOG(LOG_DEBUG, tmpTag, " done\n");
+        ALOG(LOG_DEBUG, tmpTag, " done\n");
     } else {
         dvmCallMethod(self, method, obj, &unused);
     }
@@ -257,7 +257,7 @@ static void callMethod(Thread *self, Object *obj, Method *method)
      */
     if (dvmCheckException(self)) {
 #if DVM_SHOW_EXCEPTION >= 1
-        LOGI("Uncaught exception thrown by finalizer (will be discarded):\n");
+        ALOGI("Uncaught exception thrown by finalizer (will be discarded):\n");
         dvmLogExceptionStackTrace();
 #endif
         dvmClearException(self);
@@ -312,8 +312,8 @@ static void doHeapWork(Thread *self)
          */
         dvmReleaseTrackedAlloc(obj, self);
     }
-    LOGV("Called %d finalizers\n", numFinalizersCalled);
-    LOGV("Enqueued %d references\n", numReferencesEnqueued);
+    ALOGV("Called %d finalizers\n", numFinalizersCalled);
+    ALOGV("Enqueued %d references\n", numReferencesEnqueued);
 }
 
 /*
@@ -326,7 +326,7 @@ static void* heapWorkerThreadStart(void* arg)
 
     UNUSED_PARAMETER(arg);
 
-    LOGV("HeapWorker thread started (threadid=%d)\n", self->threadId);
+    ALOGV("HeapWorker thread started (threadid=%d)\n", self->threadId);
 
     /* tell the main thread that we're ready */
     lockMutex(&gDvm.heapWorkerLock);
@@ -430,7 +430,7 @@ static void* heapWorkerThreadStart(void* arg)
         }
         dvmLockMutex(&gDvm.heapWorkerLock);
         dvmUnlockHeap();
-        LOGV("HeapWorker is awake\n");
+        ALOGV("HeapWorker is awake\n");
 
         /* Process any events in the queue.
          */
@@ -439,7 +439,7 @@ static void* heapWorkerThreadStart(void* arg)
     dvmUnlockMutex(&gDvm.heapWorkerLock);
 
     if (gDvm.verboseShutdown)
-        LOGD("HeapWorker thread shutting down\n");
+        ALOGD("HeapWorker thread shutting down\n");
     return NULL;
 }
 

@@ -75,7 +75,7 @@ static void checkCallResultCommon(const u4* args, JValue* pResult,
     const char* objType = objClazz->descriptor;
     if (strcmp(declType, objType) == 0) {
         /* names match; ignore class loader issues and allow it */
-        LOGV("Check %s.%s: %s io %s (FAST-OK)\n",
+        ALOGV("Check %s.%s: %s io %s (FAST-OK)\n",
             method->clazz->descriptor, method->name, objType, declType);
     } else {
         /*
@@ -93,22 +93,22 @@ static void checkCallResultCommon(const u4* args, JValue* pResult,
 
         declClazz = dvmFindClassNoInit(declType, method->clazz->classLoader);
         if (declClazz == NULL) {
-            LOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
+            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
                 declType, objType);
-            LOGW("             failed in %s.%s ('%s' not found)\n",
+            ALOGW("             failed in %s.%s ('%s' not found)\n",
                 method->clazz->descriptor, method->name, declType);
             abortMaybe();
             return;
         }
         if (!dvmInstanceof(objClazz, declClazz)) {
-            LOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
+            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
                 declType, objType);
-            LOGW("             failed in %s.%s\n",
+            ALOGW("             failed in %s.%s\n",
                 method->clazz->descriptor, method->name);
             abortMaybe();
             return;
         } else {
-            LOGV("Check %s.%s: %s io %s (SLOW-OK)\n",
+            ALOGV("Check %s.%s: %s io %s (SLOW-OK)\n",
                 method->clazz->descriptor, method->name, objType, declType);
         }
     }
@@ -273,7 +273,7 @@ void dvmCheckCallJNIMethod_staticNoRef(const u4* args, JValue* pResult,
                 methodName = meth->name;                                    \
             }                                                               \
             /* use +6 to drop the leading "Check_" */                       \
-            LOGI("JNI: %s (from %s.%s)",                                    \
+            ALOGI("JNI: %s (from %s.%s)",                                    \
                 (__FUNCTION__)+6, classDescriptor, methodName);             \
         }                                                                   \
     } while(false)
@@ -286,7 +286,7 @@ void dvmCheckCallJNIMethod_staticNoRef(const u4* args, JValue* pResult,
 static void showLocation(const Method* meth, const char* func)
 {
     char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-    LOGW("             in %s.%s %s (%s)\n",
+    ALOGW("             in %s.%s %s (%s)\n",
         meth->clazz->descriptor, meth->name, desc, func + 6);
     free(desc);
 }
@@ -334,16 +334,16 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
      * to receive.
      */
     if (threadEnv == NULL) {
-        LOGE("JNI ERROR: non-VM thread making JNI calls\n");
+        ALOGE("JNI ERROR: non-VM thread making JNI calls\n");
         // don't set printWarn -- it'll try to call showLocation()
         dvmAbort();
     } else if ((JNIEnvExt*) env != threadEnv) {
         if (dvmThreadSelf()->threadId != threadEnv->envThreadId) {
-            LOGE("JNI: threadEnv != thread->env?\n");
+            ALOGE("JNI: threadEnv != thread->env?\n");
             dvmAbort();
         }
 
-        LOGW("JNI WARNING: threadid=%d using env from threadid=%d\n",
+        ALOGW("JNI WARNING: threadid=%d using env from threadid=%d\n",
             threadEnv->envThreadId, ((JNIEnvExt*)env)->envThreadId);
         printWarn = true;
 
@@ -352,7 +352,7 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
         //    "invalid use of JNI env ptr");
     } else if (((JNIEnvExt*) env)->self != dvmThreadSelf()) {
         /* correct JNIEnv*; make sure the "self" pointer is correct */
-        LOGE("JNI ERROR: env->self != thread-self (%p vs. %p)\n",
+        ALOGE("JNI ERROR: env->self != thread-self (%p vs. %p)\n",
             ((JNIEnvExt*) env)->self, dvmThreadSelf());
         dvmAbort();
     }
@@ -365,7 +365,7 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
         break;
     case kFlag_CritBad:     // not okay to call
         if (threadEnv->critical) {
-            LOGW("JNI WARNING: threadid=%d using JNI after critical get\n",
+            ALOGW("JNI WARNING: threadid=%d using JNI after critical get\n",
                 threadEnv->envThreadId);
             printWarn = true;
         }
@@ -377,7 +377,7 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
     case kFlag_CritRelease: // this is a "release" call
         threadEnv->critical--;
         if (threadEnv->critical < 0) {
-            LOGW("JNI WARNING: threadid=%d called too many crit releases\n",
+            ALOGW("JNI WARNING: threadid=%d called too many crit releases\n",
                 threadEnv->envThreadId);
             printWarn = true;
         }
@@ -390,7 +390,7 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
      * Check for raised exceptions.
      */
     if ((flags & kFlag_ExcepOkay) == 0 && dvmCheckException(dvmThreadSelf())) {
-        LOGW("JNI WARNING: JNI method called with exception raised\n");
+        ALOGW("JNI WARNING: JNI method called with exception raised\n");
         printWarn = true;
         printException = true;
     }
@@ -398,7 +398,7 @@ static void checkThread(JNIEnv* env, int flags, const char* func)
     if (printWarn)
         showLocation(dvmGetCurrentJNIMethod(), func);
     if (printException) {
-        LOGW("Pending exception is:\n");
+        ALOGW("Pending exception is:\n");
         dvmLogExceptionStackTrace();
     }
     if (printWarn)
@@ -423,7 +423,7 @@ static void checkFieldType(JNIEnv* env, jobject jobj, jfieldID fieldID,
     bool printWarn = false;
 
     if (fieldID == NULL) {
-        LOGE("JNI ERROR: null field ID\n");
+        ALOGE("JNI ERROR: null field ID\n");
         abortMaybe();
     }
 
@@ -438,21 +438,21 @@ static void checkFieldType(JNIEnv* env, jobject jobj, jfieldID fieldID,
             assert(objClass != NULL);
 
             if (!dvmInstanceof(objClass, fieldClass)) {
-                LOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
+                ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
                     field->name, field->signature, objClass->descriptor);
                 printWarn = true;
             }
         }
     } else if (field->signature[0] != PRIM_TYPE_TO_LETTER[prim]) {
-        LOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
+        ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
             field->name, field->signature, primNames[prim]);
         printWarn = true;
     } else if (isStatic && !dvmIsStaticField(field)) {
         if (isStatic)
-            LOGW("JNI WARNING: accessing non-static field %s as static\n",
+            ALOGW("JNI WARNING: accessing non-static field %s as static\n",
                 field->name);
         else
-            LOGW("JNI WARNING: accessing static field %s as non-static\n",
+            ALOGW("JNI WARNING: accessing static field %s as non-static\n",
                 field->name);
         printWarn = true;
     }
@@ -486,13 +486,13 @@ static void checkObject0(JNIEnv* env, jobject jobj, const char* func)
     }
 
     if (dvmGetJNIRefType(env, jobj) == JNIInvalidRefType) {
-        LOGW("JNI WARNING: %p is not a valid JNI reference\n", jobj);
+        ALOGW("JNI WARNING: %p is not a valid JNI reference\n", jobj);
         printWarn = true;
     } else {
         Object* obj = dvmDecodeIndirectRef(env, jobj);
 
         if (obj == NULL || !dvmIsValidObject(obj)) {
-            LOGW("JNI WARNING: native code passing in bad object %p %p (%s)\n",
+            ALOGW("JNI WARNING: native code passing in bad object %p %p (%s)\n",
                 jobj, obj, func);
             printWarn = true;
         }
@@ -536,13 +536,13 @@ static void checkClass(JNIEnv* env, jclass jclazz, const char* func)
     Object* obj = dvmDecodeIndirectRef(env, jclazz);
 
     if (obj == NULL) {
-        LOGW("JNI WARNING: received null jclass\n");
+        ALOGW("JNI WARNING: received null jclass\n");
         printWarn = true;
     } else if (!dvmIsValidObject(obj)) {
-        LOGW("JNI WARNING: jclass points to invalid object %p\n", obj);
+        ALOGW("JNI WARNING: jclass points to invalid object %p\n", obj);
         printWarn = true;
     } else if (obj->clazz != gDvm.classJavaLangClass) {
-        LOGW("JNI WARNING: jclass arg is not a Class reference "
+        ALOGW("JNI WARNING: jclass arg is not a Class reference "
              "(%p is instance of %s)\n",
             jclazz, obj->clazz->descriptor);
         printWarn = true;
@@ -568,7 +568,7 @@ static void checkString(JNIEnv* env, jstring jstr, const char* func)
     Object* obj = dvmDecodeIndirectRef(env, jstr);
 
     if (obj == NULL) {
-        LOGW("JNI WARNING: received null jstring (%s)\n", func);
+        ALOGW("JNI WARNING: received null jstring (%s)\n", func);
         printWarn = true;
     } else if (obj->clazz != gDvm.classJavaLangString) {
         /*
@@ -578,10 +578,10 @@ static void checkString(JNIEnv* env, jstring jstr, const char* func)
          * we're doing it again over in checkObject().
          */
         if (dvmIsValidObject(obj))
-            LOGW("JNI WARNING: jstring %p points to non-string object (%s)\n",
+            ALOGW("JNI WARNING: jstring %p points to non-string object (%s)\n",
                 jstr, func);
         else
-            LOGW("JNI WARNING: jstring %p is bogus (%s)\n", jstr, func);
+            ALOGW("JNI WARNING: jstring %p is bogus (%s)\n", jstr, func);
         printWarn = true;
     }
     JNI_EXIT();
@@ -602,7 +602,7 @@ static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
 
     if (bytes == NULL) {
         if (!nullOk) {
-            LOGW("JNI WARNING: unexpectedly null UTF string\n");
+            ALOGW("JNI WARNING: unexpectedly null UTF string\n");
             goto fail;
         }
 
@@ -634,14 +634,14 @@ static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
                  * Note: 1111 is valid for normal UTF-8, but not the
                  * modified UTF-8 used here.
                  */
-                LOGW("JNI WARNING: illegal start byte 0x%x\n", utf8);
+                ALOGW("JNI WARNING: illegal start byte 0x%x\n", utf8);
                 goto fail;
             }
             case 0x0e: {
                 // Bit pattern 1110, so there are two additional bytes.
                 utf8 = *(bytes++);
                 if ((utf8 & 0xc0) != 0x80) {
-                    LOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
+                    ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
                     goto fail;
                 }
                 // Fall through to take care of the final byte.
@@ -651,7 +651,7 @@ static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
                 // Bit pattern 110x, so there is one additional byte.
                 utf8 = *(bytes++);
                 if ((utf8 & 0xc0) != 0x80) {
-                    LOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
+                    ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
                     goto fail;
                 }
                 break;
@@ -662,7 +662,7 @@ static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
     return;
 
 fail:
-    LOGW("             string: '%s'\n", origBytes);
+    ALOGW("             string: '%s'\n", origBytes);
     showLocation(dvmGetCurrentJNIMethod(), func);
     abortMaybe();
 }
@@ -699,8 +699,8 @@ static void checkClassName(JNIEnv* env, const char* className, const char* func)
     return;
 
 fail:
-    LOGW("JNI WARNING: illegal class name '%s' (%s)\n", className, func);
-    LOGW("             (should be formed like 'java/lang/String')\n");
+    ALOGW("JNI WARNING: illegal class name '%s' (%s)\n", className, func);
+    ALOGW("             (should be formed like 'java/lang/String')\n");
     abortMaybe();
 }
 
@@ -717,14 +717,14 @@ static void checkArray(JNIEnv* env, jarray jarr, const char* func)
     Object* obj = dvmDecodeIndirectRef(env, jarr);
 
     if (obj == NULL) {
-        LOGW("JNI WARNING: received null array (%s)\n", func);
+        ALOGW("JNI WARNING: received null array (%s)\n", func);
         printWarn = true;
     } else if (obj->clazz->descriptor[0] != '[') {
         if (dvmIsValidObject(obj))
-            LOGW("JNI WARNING: jarray %p points to non-array object (%s)\n",
+            ALOGW("JNI WARNING: jarray %p points to non-array object (%s)\n",
                 jarr, obj->clazz->descriptor);
         else
-            LOGW("JNI WARNING: jarray %p is bogus\n", jarr);
+            ALOGW("JNI WARNING: jarray %p is bogus\n", jarr);
         printWarn = true;
     }
 
@@ -743,7 +743,7 @@ static void checkArray(JNIEnv* env, jarray jarr, const char* func)
 static void checkReleaseMode(JNIEnv* env, jint mode, const char* func)
 {
     if (mode != 0 && mode != JNI_COMMIT && mode != JNI_ABORT) {
-        LOGW("JNI WARNING: bad value for mode (%d) (%s)\n", mode, func);
+        ALOGW("JNI WARNING: bad value for mode (%d) (%s)\n", mode, func);
         abortMaybe();
     }
 }
@@ -754,7 +754,7 @@ static void checkReleaseMode(JNIEnv* env, jint mode, const char* func)
 static void checkLengthPositive(JNIEnv* env, jsize length, const char* func)
 {
     if (length < 0) {
-        LOGW("JNI WARNING: negative length for array allocation (%s)\n", func);
+        ALOGW("JNI WARNING: negative length for array allocation (%s)\n", func);
         abortMaybe();
     }
 }
@@ -765,7 +765,7 @@ static void checkLengthPositive(JNIEnv* env, jsize length, const char* func)
 static void checkNonNull(JNIEnv* env, const void* ptr, const char* func)
 {
     if (ptr == NULL) {
-        LOGW("JNI WARNING: invalid null pointer (%s)\n", func);
+        ALOGW("JNI WARNING: invalid null pointer (%s)\n", func);
         abortMaybe();
     }
 }
@@ -782,19 +782,19 @@ static void checkSig(JNIEnv* env, jmethodID methodID, char expectedSigByte,
     bool printWarn = false;
 
     if (expectedSigByte != meth->shorty[0]) {
-        LOGW("JNI WARNING: expected return type '%c'\n", expectedSigByte);
+        ALOGW("JNI WARNING: expected return type '%c'\n", expectedSigByte);
         printWarn = true;
     } else if (isStatic && !dvmIsStaticMethod(meth)) {
         if (isStatic)
-            LOGW("JNI WARNING: calling non-static method with static call\n");
+            ALOGW("JNI WARNING: calling non-static method with static call\n");
         else
-            LOGW("JNI WARNING: calling static method with non-static call\n");
+            ALOGW("JNI WARNING: calling static method with non-static call\n");
         printWarn = true;
     }
 
     if (printWarn) {
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        LOGW("             calling %s.%s %s\n",
+        ALOGW("             calling %s.%s %s\n",
             meth->clazz->descriptor, meth->name, desc);
         free(desc);
         showLocation(dvmGetCurrentJNIMethod(), func);
@@ -814,9 +814,9 @@ static void checkStaticFieldID(JNIEnv* env, jclass jclazz, jfieldID fieldID)
     if ((StaticField*) fieldID < base ||
         (StaticField*) fieldID >= base + fieldCount)
     {
-        LOGW("JNI WARNING: static fieldID %p not valid for class %s\n",
+        ALOGW("JNI WARNING: static fieldID %p not valid for class %s\n",
             fieldID, clazz->descriptor);
-        LOGW("             base=%p count=%d\n", base, fieldCount);
+        ALOGW("             base=%p count=%d\n", base, fieldCount);
         abortMaybe();
     }
 }
@@ -830,7 +830,7 @@ static void checkInstanceFieldID(JNIEnv* env, jobject jobj, jfieldID fieldID,
     JNI_ENTER();
 
     if (jobj == NULL) {
-        LOGW("JNI WARNING: invalid null object (%s)\n", func);
+        ALOGW("JNI WARNING: invalid null object (%s)\n", func);
         abortMaybe();
         goto bail;
     }
@@ -852,7 +852,7 @@ static void checkInstanceFieldID(JNIEnv* env, jobject jobj, jfieldID fieldID,
         clazz = clazz->super;
     }
 
-    LOGW("JNI WARNING: inst fieldID %p not valid for class %s\n",
+    ALOGW("JNI WARNING: inst fieldID %p not valid for class %s\n",
         fieldID, obj->clazz->descriptor);
     abortMaybe();
 
@@ -876,7 +876,7 @@ static void checkVirtualMethod(JNIEnv* env, jobject jobj, jmethodID methodID,
     const Method* meth = (const Method*) methodID;
 
     if (!dvmInstanceof(obj->clazz, meth->clazz)) {
-        LOGW("JNI WARNING: can't call %s.%s on instance of %s\n",
+        ALOGW("JNI WARNING: can't call %s.%s on instance of %s\n",
             meth->clazz->descriptor, meth->name, obj->clazz->descriptor);
         abortMaybe();
     }
@@ -902,7 +902,7 @@ static void checkStaticMethod(JNIEnv* env, jclass jclazz, jmethodID methodID,
     const Method* meth = (const Method*) methodID;
 
     if (!dvmInstanceof(clazz, meth->clazz)) {
-        LOGW("JNI WARNING: can't call static %s.%s on class %s\n",
+        ALOGW("JNI WARNING: can't call static %s.%s on class %s\n",
             meth->clazz->descriptor, meth->name, clazz->descriptor);
         // no abort
     }
@@ -933,7 +933,7 @@ static void checkMethodArgsV(JNIEnv* env, jmethodID methodID, va_list args,
     const Method* meth = (const Method*) methodID;
     const char* desc = meth->shorty;
 
-    LOGV("V-checking %s.%s:%s...\n", meth->clazz->descriptor, meth->name, desc);
+    ALOGV("V-checking %s.%s:%s...\n", meth->clazz->descriptor, meth->name, desc);
 
     while (*++desc != '\0') {       /* pre-incr to skip return type */
         switch (*desc) {
@@ -972,7 +972,7 @@ static void checkMethodArgsA(JNIEnv* env, jmethodID methodID, jvalue* args,
     const char* desc = meth->shorty;
     int idx = 0;
 
-    LOGV("A-checking %s.%s:%s...\n", meth->clazz->descriptor, meth->name, desc);
+    ALOGV("A-checking %s.%s:%s...\n", meth->clazz->descriptor, meth->name, desc);
 
     while (*++desc != '\0') {       /* pre-incr to skip return type */
         if (*desc == 'L') {
@@ -1030,7 +1030,7 @@ static void* createGuardedCopy(const void* buf, size_t len, bool modOkay)
 
     newBuf = (u1*)malloc(newLen);
     if (newBuf == NULL) {
-        LOGE("createGuardedCopy failed on alloc of %d bytes\n", newLen);
+        ALOGE("createGuardedCopy failed on alloc of %d bytes\n", newLen);
         dvmAbort();
     }
 
@@ -1083,7 +1083,7 @@ static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
     if (memcmp(&pExtra->magic, &kMagicCmp, 4) != 0) {
         u1 buf[4];
         memcpy(buf, &pExtra->magic, 4);
-        LOGE("JNI: guard magic does not match (found 0x%02x%02x%02x%02x) "
+        ALOGE("JNI: guard magic does not match (found 0x%02x%02x%02x%02x) "
              "-- incorrect data pointer %p?\n",
             buf[3], buf[2], buf[1], buf[0], dataBuf); /* assume little endian */
         return false;
@@ -1096,7 +1096,7 @@ static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
     for (i = kGuardExtra / 2; i < (int) (kGuardLen / 2 - kGuardExtra) / 2; i++)
     {
         if (pat[i] != kGuardPattern) {
-            LOGE("JNI: guard pattern(1) disturbed at %p + %d\n",
+            ALOGE("JNI: guard pattern(1) disturbed at %p + %d\n",
                 fullBuf, i*2);
             return false;
         }
@@ -1107,7 +1107,7 @@ static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
         /* odd byte; expected value depends on endian-ness of host */
         const u2 patSample = kGuardPattern;
         if (fullBuf[offset] != ((const u1*) &patSample)[1]) {
-            LOGE("JNI: guard pattern disturbed in odd byte after %p "
+            ALOGE("JNI: guard pattern disturbed in odd byte after %p "
                  "(+%d) 0x%02x 0x%02x\n",
                 fullBuf, offset, fullBuf[offset], ((const u1*) &patSample)[1]);
             return false;
@@ -1119,7 +1119,7 @@ static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
     pat = (u2*) (fullBuf + offset);
     for (i = 0; i < kGuardLen / 4; i++) {
         if (pat[i] != kGuardPattern) {
-            LOGE("JNI: guard pattern(2) disturbed at %p + %d\n",
+            ALOGE("JNI: guard pattern(2) disturbed at %p + %d\n",
                 fullBuf, offset + i*2);
             return false;
         }
@@ -1134,7 +1134,7 @@ static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
         uLong adler = adler32(0L, Z_NULL, 0);
         adler = adler32(adler, dataBuf, len);
         if (pExtra->adler != adler) {
-            LOGE("JNI: buffer modified (0x%08lx vs 0x%08lx) at addr %p\n",
+            ALOGE("JNI: buffer modified (0x%08lx vs 0x%08lx) at addr %p\n",
                 pExtra->adler, adler, dataBuf);
             return false;
         }
@@ -1228,7 +1228,7 @@ static void* releaseGuardedPACopy(JNIEnv* env, jarray jarr, void* dataBuf,
     u1* result;
 
     if (!checkGuardedCopy(dataBuf, true)) {
-        LOGE("JNI: failed guarded copy check in releaseGuardedPACopy\n");
+        ALOGE("JNI: failed guarded copy check in releaseGuardedPACopy\n");
         abortMaybe();
         return NULL;
     }
@@ -1246,7 +1246,7 @@ static void* releaseGuardedPACopy(JNIEnv* env, jarray jarr, void* dataBuf,
         copyBack = true;
         break;
     default:
-        LOGE("JNI: bad release mode %d\n", mode);
+        ALOGE("JNI: bad release mode %d\n", mode);
         dvmAbort();
         return NULL;
     }
@@ -1461,7 +1461,7 @@ static void Check_DeleteGlobalRef(JNIEnv* env, jobject globalRef)
     if (globalRef != NULL &&
         dvmGetJNIRefType(env, globalRef) != JNIGlobalRefType)
     {
-        LOGW("JNI WARNING: DeleteGlobalRef on non-global %p (type=%d)\n",
+        ALOGW("JNI WARNING: DeleteGlobalRef on non-global %p (type=%d)\n",
             globalRef, dvmGetJNIRefType(env, globalRef));
         abortMaybe();
     } else
@@ -1490,7 +1490,7 @@ static void Check_DeleteLocalRef(JNIEnv* env, jobject localRef)
     if (localRef != NULL &&
         dvmGetJNIRefType(env, localRef) != JNILocalRefType)
     {
-        LOGW("JNI WARNING: DeleteLocalRef on non-local %p (type=%d)\n",
+        ALOGW("JNI WARNING: DeleteLocalRef on non-local %p (type=%d)\n",
             localRef, dvmGetJNIRefType(env, localRef));
         abortMaybe();
     } else
@@ -1980,7 +1980,7 @@ static void Check_ReleaseStringChars(JNIEnv* env, jstring string,
     CHECK_NON_NULL(env, chars);
     if (((JNIEnvExt*)env)->forceDataCopy) {
         if (!checkGuardedCopy(chars, false)) {
-            LOGE("JNI: failed guarded copy check in ReleaseStringChars\n");
+            ALOGE("JNI: failed guarded copy check in ReleaseStringChars\n");
             abortMaybe();
             return;
         }
@@ -2037,7 +2037,7 @@ static void Check_ReleaseStringUTFChars(JNIEnv* env, jstring string,
     if (((JNIEnvExt*)env)->forceDataCopy) {
         //int len = dvmStringUtf8ByteLen(string) + 1;
         if (!checkGuardedCopy(utf, false)) {
-            LOGE("JNI: failed guarded copy check in ReleaseStringUTFChars\n");
+            ALOGE("JNI: failed guarded copy check in ReleaseStringUTFChars\n");
             abortMaybe();
             return;
         }
@@ -2303,7 +2303,7 @@ static void Check_ReleaseStringCritical(JNIEnv* env, jstring string,
     CHECK_NON_NULL(env, carray);
     if (((JNIEnvExt*)env)->forceDataCopy) {
         if (!checkGuardedCopy(carray, false)) {
-            LOGE("JNI: failed guarded copy check in ReleaseStringCritical\n");
+            ALOGE("JNI: failed guarded copy check in ReleaseStringCritical\n");
             abortMaybe();
             return;
         }
@@ -2356,7 +2356,7 @@ static jobject Check_NewDirectByteBuffer(JNIEnv* env, void* address,
     CHECK_ENTER(env, kFlag_Default);
     jobject result;
     if (address == NULL || capacity < 0) {
-        LOGW("JNI WARNING: invalid values for address (%p) or capacity (%ld)\n",
+        ALOGW("JNI WARNING: invalid values for address (%p) or capacity (%ld)\n",
             address, (long) capacity);
         abortMaybe();
         return NULL;

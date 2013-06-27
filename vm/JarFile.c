@@ -71,7 +71,7 @@ static int openAlternateSuffix(const char *fileName, const char *suffix,
         *pCachedName = buf;
         return fd;
     }
-    LOGV("Couldn't open %s: %s\n", buf, strerror(errno));
+    ALOGV("Couldn't open %s: %s\n", buf, strerror(errno));
 bail:
     free(buf);
     return -1;
@@ -114,7 +114,7 @@ DexCacheStatus dvmDexCacheStatus(const char *fileName)
          * See if there's an up-to-date copy of the optimized dex
          * in the cache, but don't create one if there isn't.
          */
-        LOGV("dvmDexCacheStatus: Checking cache for %s\n", fileName);
+        ALOGV("dvmDexCacheStatus: Checking cache for %s\n", fileName);
         cachedName = dexOptGenerateCacheFileName(fileName, kDexInJarName);
         if (cachedName == NULL)
             return -1;
@@ -123,7 +123,7 @@ DexCacheStatus dvmDexCacheStatus(const char *fileName)
                 dexGetZipEntryModTime(&archive, entry),
                 dexGetZipEntryCrc32(&archive, entry),
                 /*isBootstrap=*/false, &newFile, /*createIfMissing=*/false);
-        LOGV("dvmOpenCachedDexFile returned fd %d\n", fd);
+        ALOGV("dvmOpenCachedDexFile returned fd %d\n", fd);
         if (fd < 0) {
             result = DEX_CACHE_STALE;
             goto bail;
@@ -134,7 +134,7 @@ DexCacheStatus dvmDexCacheStatus(const char *fileName)
          */
         if (!dvmUnlockCachedDexFile(fd)) {
             /* uh oh -- this process needs to exit or we'll wedge the system */
-            LOGE("Unable to unlock DEX file\n");
+            ALOGE("Unable to unlock DEX file\n");
             goto bail;
         }
 
@@ -148,20 +148,20 @@ DexCacheStatus dvmDexCacheStatus(const char *fileName)
          */
         fd = openAlternateSuffix(fileName, "odex", O_RDONLY, &cachedName);
         if (fd < 0) {
-            LOGI("Zip is good, but no %s inside, and no .odex "
+            ALOGI("Zip is good, but no %s inside, and no .odex "
                     "file in the same directory\n", kDexInJarName);
             result = DEX_CACHE_BAD_ARCHIVE;
             goto bail;
         }
 
-        LOGV("Using alternate file (odex) for %s ...\n", fileName);
+        ALOGV("Using alternate file (odex) for %s ...\n", fileName);
         if (!dvmCheckOptHeaderAndDependencies(fd, false, 0, 0, true, true)) {
-            LOGE("%s odex has stale dependencies\n", fileName);
-            LOGE("odex source not available -- failing\n");
+            ALOGE("%s odex has stale dependencies\n", fileName);
+            ALOGE("odex source not available -- failing\n");
             result = DEX_CACHE_STALE_ODEX;
             goto bail;
         } else {
-            LOGV("%s odex has good dependencies\n", fileName);
+            ALOGV("%s odex has good dependencies\n", fileName);
         }
     }
     result = DEX_CACHE_OK;
@@ -210,15 +210,15 @@ int dvmJarFileOpen(const char* fileName, const char* odexOutputName,
      */
     fd = openAlternateSuffix(fileName, "odex", O_RDONLY, &cachedName);
     if (fd >= 0) {
-        LOGV("Using alternate file (odex) for %s ...\n", fileName);
+        ALOGV("Using alternate file (odex) for %s ...\n", fileName);
         if (!dvmCheckOptHeaderAndDependencies(fd, false, 0, 0, true, true)) {
-            LOGE("%s odex has stale dependencies\n", fileName);
+            ALOGE("%s odex has stale dependencies\n", fileName);
             free(cachedName);
             close(fd);
             fd = -1;
             goto tryArchive;
         } else {
-            LOGV("%s odex has good dependencies\n", fileName);
+            ALOGV("%s odex has good dependencies\n", fileName);
             //TODO: make sure that the .odex actually corresponds
             //      to the classes.dex inside the archive (if present).
             //      For typical use there will be no classes.dex.
@@ -254,14 +254,14 @@ tryArchive:
             } else {
                 cachedName = strdup(odexOutputName);
             }
-            LOGV("dvmDexCacheStatus: Checking cache for %s (%s)\n",
+            ALOGV("dvmDexCacheStatus: Checking cache for %s (%s)\n",
                 fileName, cachedName);
             fd = dvmOpenCachedDexFile(fileName, cachedName,
                     dexGetZipEntryModTime(&archive, entry),
                     dexGetZipEntryCrc32(&archive, entry),
                     isBootstrap, &newFile, /*createIfMissing=*/true);
             if (fd < 0) {
-                LOGI("Unable to open or create cache for %s (%s)\n",
+                ALOGI("Unable to open or create cache for %s (%s)\n",
                     fileName, cachedName);
                 goto bail;
             }
@@ -296,19 +296,19 @@ tryArchive:
                 }
 
                 if (!result) {
-                    LOGE("Unable to extract+optimize DEX from '%s'\n",
+                    ALOGE("Unable to extract+optimize DEX from '%s'\n",
                         fileName);
                     goto bail;
                 }
 
                 endWhen = dvmGetRelativeTimeUsec();
-                LOGD("DEX prep '%s': unzip in %dms, rewrite %dms\n",
+                ALOGD("DEX prep '%s': unzip in %dms, rewrite %dms\n",
                     fileName,
                     (int) (extractWhen - startWhen) / 1000,
                     (int) (endWhen - extractWhen) / 1000);
             }
         } else {
-            LOGI("Zip is good, but no %s inside, and no valid .odex "
+            ALOGI("Zip is good, but no %s inside, and no valid .odex "
                     "file in the same directory\n", kDexInJarName);
             goto bail;
         }
@@ -319,7 +319,7 @@ tryArchive:
      * doesn't have to be seeked anywhere in particular.
      */
     if (dvmDexFileOpenFromFd(fd, &pDvmDex) != 0) {
-        LOGI("Unable to map %s in %s\n", kDexInJarName, fileName);
+        ALOGI("Unable to map %s in %s\n", kDexInJarName, fileName);
         goto bail;
     }
 
@@ -327,13 +327,13 @@ tryArchive:
         /* unlock the fd */
         if (!dvmUnlockCachedDexFile(fd)) {
             /* uh oh -- this process needs to exit or we'll wedge the system */
-            LOGE("Unable to unlock DEX file\n");
+            ALOGE("Unable to unlock DEX file\n");
             goto bail;
         }
         locked = false;
     }
 
-    LOGV("Successfully opened '%s' in '%s'\n", kDexInJarName, fileName);
+    ALOGV("Successfully opened '%s' in '%s'\n", kDexInJarName, fileName);
 
     *ppJarFile = (JarFile*) calloc(1, sizeof(JarFile));
     (*ppJarFile)->archive = archive;

@@ -69,7 +69,7 @@ static ArrayObject* convertStringArray(char** strings, size_t count)
         dvmFindArrayClass("[Ljava/lang/String;", NULL);
     if (stringArrayClass == NULL) {
         /* shouldn't happen */
-        LOGE("Unable to find [Ljava/lang/String;\n");
+        ALOGE("Unable to find [Ljava/lang/String;\n");
         dvmAbort();
     }
 
@@ -77,7 +77,7 @@ static ArrayObject* convertStringArray(char** strings, size_t count)
         dvmAllocArrayByClass(stringArrayClass, count, ALLOC_DEFAULT);
     if (stringArray == NULL) {
         /* probably OOM */
-        LOGD("Failed allocating array of %d strings\n", count);
+        ALOGD("Failed allocating array of %d strings\n", count);
         assert(dvmCheckException(self));
         return NULL;
     }
@@ -129,7 +129,7 @@ static void Dalvik_dalvik_system_VMDebug_getVmFeatureList(const u4* args,
 
     assert(idx <= MAX_FEATURE_COUNT);
 
-    LOGV("+++ sending up %d features\n", idx);
+    ALOGV("+++ sending up %d features\n", idx);
     ArrayObject* arrayObj = convertStringArray(features, idx);
     RETURN_PTR(arrayObj);       /* will be null on OOM */
 }
@@ -451,7 +451,7 @@ static void Dalvik_dalvik_system_VMDebug_setAllocationLimit(const u4* args,
     int oldLimit = self->allocLimit;
 
     if (newLimit < -1) {
-        LOGE("WARNING: bad limit request (%d)\n", newLimit);
+        ALOGE("WARNING: bad limit request (%d)\n", newLimit);
         newLimit = -1;
     }
     self->allocLimit = newLimit;
@@ -477,7 +477,7 @@ static void Dalvik_dalvik_system_VMDebug_setGlobalAllocationLimit(const u4* args
     int oldLimit = gDvm.allocationLimit;
 
     if (newLimit < -1 || newLimit > 0) {
-        LOGE("WARNING: bad limit request (%d)\n", newLimit);
+        ALOGE("WARNING: bad limit request (%d)\n", newLimit);
         newLimit = -1;
     }
     // TODO: should use an atomic swap here
@@ -771,14 +771,14 @@ static void Dalvik_dalvik_system_VMDebug_cacheRegisterMap(const u4* args,
     }
     *methodDescr++ = '\0';
 
-    //LOGD("GOT: %s %s %s\n", classAndMethodDesc, methodName, methodDescr);
+    //ALOGD("GOT: %s %s %s\n", classAndMethodDesc, methodName, methodDescr);
 
     /*
      * Find the class, but only if it's already loaded.
      */
     clazz = dvmLookupClass(classAndMethodDesc, NULL, false);
     if (clazz == NULL) {
-        LOGD("Class %s not found in bootstrap loader\n", classAndMethodDesc);
+        ALOGD("Class %s not found in bootstrap loader\n", classAndMethodDesc);
         goto bail;
     }
 
@@ -814,15 +814,15 @@ static void Dalvik_dalvik_system_VMDebug_cacheRegisterMap(const u4* args,
         const RegisterMap* pMap;
         pMap = dvmGetExpandedRegisterMap(method);
         if (pMap == NULL) {
-            LOGV("No map for %s.%s %s\n",
+            ALOGV("No map for %s.%s %s\n",
                 classAndMethodDesc, methodName, methodDescr);
         } else {
-            LOGV("Found map %s.%s %s\n",
+            ALOGV("Found map %s.%s %s\n",
                 classAndMethodDesc, methodName, methodDescr);
             result = true;
         }
     } else {
-        LOGV("Unable to find %s.%s %s\n",
+        ALOGV("Unable to find %s.%s %s\n",
             classAndMethodDesc, methodName, methodDescr);
     }
 
@@ -840,11 +840,11 @@ static void Dalvik_dalvik_system_VMDebug_dumpReferenceTables(const u4* args,
     UNUSED_PARAMETER(args);
     UNUSED_PARAMETER(pResult);
 
-    LOGI("--- reference table dump ---\n");
+    ALOGI("--- reference table dump ---\n");
     dvmDumpJniReferenceTables();
     // could dump thread's internalLocalRefTable, probably not useful
     // ditto for thread's jniMonitorRefTable
-    LOGI("---\n");
+    ALOGI("---\n");
     RETURN_VOID();
 }
 
@@ -863,7 +863,7 @@ static void Dalvik_dalvik_system_VMDebug_crash(const u4* args,
     UNUSED_PARAMETER(args);
     UNUSED_PARAMETER(pResult);
 
-    LOGW("Crashing VM on request\n");
+    ALOGW("Crashing VM on request\n");
     dvmDumpThread(dvmThreadSelf(), false);
     dvmAbort();
 }
@@ -879,7 +879,7 @@ static void Dalvik_dalvik_system_VMDebug_infopoint(const u4* args,
 {
     gDvm.nativeDebuggerActive = true;
 
-    LOGD("VMDebug infopoint %d hit", args[0]);
+    ALOGD("VMDebug infopoint %d hit", args[0]);
 
     gDvm.nativeDebuggerActive = false;
     RETURN_VOID();

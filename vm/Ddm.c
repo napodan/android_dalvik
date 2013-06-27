@@ -54,13 +54,13 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     ddmServerClass =
         dvmFindClass("Lorg/apache/harmony/dalvik/ddmc/DdmServer;", NULL);
     if (ddmServerClass == NULL) {
-        LOGW("Unable to find org.apache.harmony.dalvik.ddmc.DdmServer\n");
+        ALOGW("Unable to find org.apache.harmony.dalvik.ddmc.DdmServer\n");
         goto bail;
     }
     dispatch = dvmFindDirectMethodByDescriptor(ddmServerClass, "dispatch",
                     "(I[BII)Lorg/apache/harmony/dalvik/ddmc/Chunk;");
     if (dispatch == NULL) {
-        LOGW("Unable to find DdmServer.dispatch\n");
+        ALOGW("Unable to find DdmServer.dispatch\n");
         goto bail;
     }
 
@@ -71,7 +71,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     ClassObject* chunkClass;
     chunkClass = dvmFindClass("Lorg/apache/harmony/dalvik/ddmc/Chunk;", NULL);
     if (chunkClass == NULL) {
-        LOGW("Unable to find org.apache.harmony.dalvik.ddmc.Chunk\n");
+        ALOGW("Unable to find org.apache.harmony.dalvik.ddmc.Chunk\n");
         goto bail;
     }
     chunkTypeOff = dvmFindFieldOffset(chunkClass, "type", "I");
@@ -81,7 +81,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     if (chunkTypeOff < 0 || chunkDataOff < 0 ||
         chunkOffsetOff < 0 || chunkLengthOff < 0)
     {
-        LOGW("Unable to find all chunk fields\n");
+        ALOGW("Unable to find all chunk fields\n");
         goto bail;
     }
 
@@ -91,7 +91,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
      */
     dataArray = dvmAllocPrimitiveArray('B', dataLen, ALLOC_DEFAULT);
     if (dataArray == NULL) {
-        LOGW("array alloc failed (%d)\n", dataLen);
+        ALOGW("array alloc failed (%d)\n", dataLen);
         dvmClearException(self);
         goto bail;
     }
@@ -105,7 +105,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     length = get4BE((u1*)dataArray->contents + 4);
     offset = kChunkHdrLen;
     if (offset+length > (unsigned int) dataLen) {
-        LOGW("WARNING: bad chunk found (len=%u pktLen=%d)\n", length, dataLen);
+        ALOGW("WARNING: bad chunk found (len=%u pktLen=%d)\n", length, dataLen);
         goto bail;
     }
 
@@ -116,7 +116,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     dvmCallMethod(self, dispatch, NULL, &callRes, type, dataArray, offset,
         length);
     if (dvmCheckException(self)) {
-        LOGI("Exception thrown by dispatcher for 0x%08x\n", type);
+        ALOGI("Exception thrown by dispatcher for 0x%08x\n", type);
         dvmLogExceptionStackTrace();
         dvmClearException(self);
         goto bail;
@@ -146,13 +146,13 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     offset = dvmGetFieldInt(chunk, chunkOffsetOff);
     length = dvmGetFieldInt(chunk, chunkLengthOff);
 
-    LOGV("DDM reply: type=0x%08x data=%p offset=%d length=%d\n",
+    ALOGV("DDM reply: type=0x%08x data=%p offset=%d length=%d\n",
         type, replyData, offset, length);
 
     if (length == 0 || replyData == NULL)
         goto bail;
     if (offset + length > replyData->length) {
-        LOGW("WARNING: chunk off=%d len=%d exceeds reply array len %d\n",
+        ALOGW("WARNING: chunk off=%d len=%d exceeds reply array len %d\n",
             offset, length, replyData->length);
         goto bail;
     }
@@ -160,7 +160,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     u1* reply;
     reply = (u1*) malloc(length + kChunkHdrLen);
     if (reply == NULL) {
-        LOGW("malloc %d failed\n", length+kChunkHdrLen);
+        ALOGW("malloc %d failed\n", length+kChunkHdrLen);
         goto bail;
     }
     set4BE(reply + 0, type);
@@ -171,7 +171,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     *pReplyLen = length + kChunkHdrLen;
     result = true;
 
-    LOGV("dvmHandleDdm returning type=%.4s buf=%p len=%d\n",
+    ALOGV("dvmHandleDdm returning type=%.4s buf=%p len=%d\n",
         (char*) reply, reply, length);
 
 bail:
@@ -194,26 +194,26 @@ static void broadcast(int event)
     ddmServerClass =
         dvmFindClass("Lorg/apache/harmony/dalvik/ddmc/DdmServer;", NULL);
     if (ddmServerClass == NULL) {
-        LOGW("Unable to find org.apache.harmony.dalvik.ddmc.DdmServer\n");
+        ALOGW("Unable to find org.apache.harmony.dalvik.ddmc.DdmServer\n");
         goto bail;
     }
     bcast = dvmFindDirectMethodByDescriptor(ddmServerClass, "broadcast", "(I)V");
     if (bcast == NULL) {
-        LOGW("Unable to find DdmServer.broadcast\n");
+        ALOGW("Unable to find DdmServer.broadcast\n");
         goto bail;
     }
 
     Thread* self = dvmThreadSelf();
 
     if (self->status != THREAD_RUNNING) {
-        LOGE("ERROR: DDM broadcast with thread status=%d\n", self->status);
+        ALOGE("ERROR: DDM broadcast with thread status=%d\n", self->status);
         /* try anyway? */
     }
 
     JValue unused;
     dvmCallMethod(self, bcast, NULL, &unused, event);
     if (dvmCheckException(self)) {
-        LOGI("Exception thrown by broadcast(%d)\n", event);
+        ALOGI("Exception thrown by broadcast(%d)\n", event);
         dvmLogExceptionStackTrace();
         dvmClearException(self);
         goto bail;
@@ -232,7 +232,7 @@ void dvmDdmConnected(void)
 {
     // TODO: any init
 
-    LOGV("Broadcasting DDM connect\n");
+    ALOGV("Broadcasting DDM connect\n");
     broadcast(CONNECTED);
 }
 
@@ -243,7 +243,7 @@ void dvmDdmConnected(void)
  */
 void dvmDdmDisconnected(void)
 {
-    LOGV("Broadcasting DDM disconnect\n");
+    ALOGV("Broadcasting DDM disconnect\n");
     broadcast(DISCONNECTED);
 
     gDvm.ddmThreadNotification = false;
@@ -266,7 +266,7 @@ void dvmDdmSetThreadNotification(bool enable)
     if (enable) {
         Thread* thread;
         for (thread = gDvm.threadList; thread != NULL; thread = thread->next) {
-            //LOGW("notify %d\n", thread->threadId);
+            //ALOGW("notify %d\n", thread->threadId);
             dvmDdmSendThreadNotification(thread, true);
         }
     }
@@ -408,7 +408,7 @@ static bool getThreadStats(pid_t pid, pid_t tid, unsigned long* pUtime,
     sprintf(nameBuf, "/proc/%d/task/%d/stat", (int) pid, (int) tid);
     fd = open(nameBuf, O_RDONLY);
     if (fd < 0) {
-        LOGV("Unable to open '%s': %s\n", nameBuf, strerror(errno));
+        ALOGV("Unable to open '%s': %s\n", nameBuf, strerror(errno));
         return false;
     }
 
@@ -417,7 +417,7 @@ static bool getThreadStats(pid_t pid, pid_t tid, unsigned long* pUtime,
     cc = read(fd, lineBuf, sizeof(lineBuf)-1);
     if (cc <= 0) {
         const char* msg = (cc == 0) ? "unexpected EOF" : strerror(errno);
-        LOGI("Unable to read '%s': %s\n", nameBuf, msg);
+        ALOGI("Unable to read '%s': %s\n", nameBuf, msg);
         close(fd);
         return false;
     }
@@ -439,14 +439,14 @@ static bool getThreadStats(pid_t pid, pid_t tid, unsigned long* pUtime,
     char* endp;
     *pUtime = strtoul(cp, &endp, 10);
     if (endp == cp)
-        LOGI("Warning: strtoul failed on utime ('%.30s...')\n", cp);
+        ALOGI("Warning: strtoul failed on utime ('%.30s...')\n", cp);
 
     cp += strcspn(cp, kWhitespace);
     cp += strspn(cp, kWhitespace);
 
     *pStime = strtoul(cp, &endp, 10);
     if (endp == cp)
-        LOGI("Warning: strtoul failed on stime ('%.30s...')\n", cp);
+        ALOGI("Warning: strtoul failed on stime ('%.30s...')\n", cp);
 
     close(fd);
     return true;
@@ -557,7 +557,7 @@ ArrayObject* dvmDdmGetStackTraceById(u4 threadId)
             break;
     }
     if (thread == NULL) {
-        LOGI("dvmDdmGetStackTraceById: threadid=%d not found\n", threadId);
+        ALOGI("dvmDdmGetStackTraceById: threadid=%d not found\n", threadId);
         dvmUnlockThreadList();
         return NULL;
     }

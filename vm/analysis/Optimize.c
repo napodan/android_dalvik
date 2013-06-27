@@ -72,7 +72,7 @@ InlineSub* dvmCreateInlineSubsTable(void)
     for (i = 0; i < count; i++) {
         clazz = dvmFindClassNoInit(ops[i].classDescriptor, NULL);
         if (clazz == NULL) {
-            LOGV("DexOpt: can't inline for class '%s': not found\n",
+            ALOGV("DexOpt: can't inline for class '%s': not found\n",
                 ops[i].classDescriptor);
             dvmClearOptException(dvmThreadSelf());
         } else {
@@ -86,12 +86,12 @@ InlineSub* dvmCreateInlineSubsTable(void)
                 method = dvmFindVirtualMethodByDescriptor(clazz, ops[i].methodName,
                         ops[i].methodSignature);
             if (method == NULL) {
-                LOGW("DexOpt: can't inline %s.%s %s: method not found\n",
+                ALOGW("DexOpt: can't inline %s.%s %s: method not found\n",
                     ops[i].classDescriptor, ops[i].methodName,
                     ops[i].methodSignature);
             } else {
                 if (!dvmIsFinalClass(clazz) && !dvmIsFinalMethod(method)) {
-                    LOGW("DexOpt: WARNING: inline op on non-final class/method "
+                    ALOGW("DexOpt: WARNING: inline op on non-final class/method "
                          "%s.%s\n",
                         clazz->descriptor, method->name);
                     /* fail? */
@@ -99,7 +99,7 @@ InlineSub* dvmCreateInlineSubsTable(void)
                 if (dvmIsSynchronizedMethod(method) ||
                     dvmIsDeclaredSynchronizedMethod(method))
                 {
-                    LOGW("DexOpt: WARNING: inline op on synchronized method "
+                    ALOGW("DexOpt: WARNING: inline op on synchronized method "
                          "%s.%s\n",
                         clazz->descriptor, method->name);
                     /* fail? */
@@ -109,7 +109,7 @@ InlineSub* dvmCreateInlineSubsTable(void)
                 table[tableIndex].inlineIdx = i;
                 tableIndex++;
 
-                LOGV("DexOpt: will inline %d: %s.%s %s\n", i,
+                ALOGV("DexOpt: will inline %d: %s.%s %s\n", i,
                     ops[i].classDescriptor, ops[i].methodName,
                     ops[i].methodSignature);
             }
@@ -118,7 +118,7 @@ InlineSub* dvmCreateInlineSubsTable(void)
 
     /* mark end of table */
     table[tableIndex].method = NULL;
-    LOGV("DexOpt: inline table has %d entries\n", tableIndex);
+    ALOGV("DexOpt: inline table has %d entries\n", tableIndex);
 
     return table;
 }
@@ -174,7 +174,7 @@ static void optimizeMethod(Method* method, bool essentialOnly)
 
     if (!gDvm.optimizing && !essentialOnly) {
         /* unexpected; will force copy-on-write of a lot of pages */
-        LOGD("NOTE: doing full bytecode optimization outside dexopt\n");
+        ALOGD("NOTE: doing full bytecode optimization outside dexopt\n");
     }
 
     if (dvmIsNativeMethod(method) || dvmIsAbstractMethod(method))
@@ -415,7 +415,7 @@ ClassObject* dvmOptResolveClass(ClassObject* referrer, u4 classIdx,
         }
         if (resClass == NULL) {
             /* not found, exception should be raised */
-            LOGV("DexOpt: class %d (%s) not found\n",
+            ALOGV("DexOpt: class %d (%s) not found\n",
                 classIdx,
                 dexStringByTypeIdx(pDvmDex->pDexFile, classIdx));
             if (pFailure != NULL) {
@@ -447,7 +447,7 @@ ClassObject* dvmOptResolveClass(ClassObject* referrer, u4 classIdx,
 
     /* multiple definitions? */
     if (IS_CLASS_FLAG_SET(resClass, CLASS_MULTIPLE_DEFS)) {
-        LOGI("DexOpt: not resolving ambiguous class '%s'\n",
+        ALOGI("DexOpt: not resolving ambiguous class '%s'\n",
             resClass->descriptor);
         if (pFailure != NULL)
             *pFailure = VERIFY_ERROR_NO_CLASS;
@@ -459,7 +459,7 @@ ClassObject* dvmOptResolveClass(ClassObject* referrer, u4 classIdx,
     bool allowed = dvmCheckClassAccess(referrer, resClass);
     untweakLoader(referrer, resClass);
     if (!allowed) {
-        LOGW("DexOpt: resolve class illegal access: %s -> %s\n",
+        ALOGW("DexOpt: resolve class illegal access: %s -> %s\n",
             referrer->descriptor, resClass->descriptor);
         if (pFailure != NULL)
             *pFailure = VERIFY_ERROR_ACCESS_CLASS;
@@ -502,7 +502,7 @@ InstField* dvmOptResolveInstField(ClassObject* referrer, u4 ifieldIdx,
             dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx),
             dexStringByTypeIdx(pDvmDex->pDexFile, pFieldId->typeIdx));
         if (resField == NULL) {
-            LOGD("DexOpt: couldn't find field %s.%s\n",
+            ALOGD("DexOpt: couldn't find field %s.%s\n",
                 resClass->descriptor,
                 dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx));
             if (pFailure != NULL)
@@ -510,7 +510,7 @@ InstField* dvmOptResolveInstField(ClassObject* referrer, u4 ifieldIdx,
             return NULL;
         }
         if (dvmIsStaticField(&resField->field)) {
-            LOGD("DexOpt: wanted instance, got static for field %s.%s\n",
+            ALOGD("DexOpt: wanted instance, got static for field %s.%s\n",
                 resClass->descriptor,
                 dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx));
             if (pFailure != NULL)
@@ -529,7 +529,7 @@ InstField* dvmOptResolveInstField(ClassObject* referrer, u4 ifieldIdx,
     bool allowed = dvmCheckFieldAccess(referrer, (Field*)resField);
     untweakLoader(referrer, resField->field.clazz);
     if (!allowed) {
-        LOGI("DexOpt: access denied from %s to field %s.%s\n",
+        ALOGI("DexOpt: access denied from %s to field %s.%s\n",
             referrer->descriptor, resField->field.clazz->descriptor,
             resField->field.name);
         if (pFailure != NULL)
@@ -575,13 +575,13 @@ StaticField* dvmOptResolveStaticField(ClassObject* referrer, u4 sfieldIdx,
                     dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx),
                     dexStringByTypeIdx(pDvmDex->pDexFile, pFieldId->typeIdx));
         if (resField == NULL) {
-            LOGD("DexOpt: couldn't find static field\n");
+            ALOGD("DexOpt: couldn't find static field\n");
             if (pFailure != NULL)
                 *pFailure = VERIFY_ERROR_NO_FIELD;
             return NULL;
         }
         if (!dvmIsStaticField(&resField->field)) {
-            LOGD("DexOpt: wanted static, got instance for field %s.%s\n",
+            ALOGD("DexOpt: wanted static, got instance for field %s.%s\n",
                 resClass->descriptor,
                 dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx));
             if (pFailure != NULL)
@@ -605,7 +605,7 @@ StaticField* dvmOptResolveStaticField(ClassObject* referrer, u4 sfieldIdx,
     bool allowed = dvmCheckFieldAccess(referrer, (Field*)resField);
     untweakLoader(referrer, resField->field.clazz);
     if (!allowed) {
-        LOGI("DexOpt: access denied from %s to field %s.%s\n",
+        ALOGI("DexOpt: access denied from %s to field %s.%s\n",
             referrer->descriptor, resField->field.clazz->descriptor,
             resField->field.name);
         if (pFailure != NULL)
@@ -642,7 +642,7 @@ static bool rewriteInstField(Method* method, u2* insns, OpCode quickOpc,
 
     instField = dvmOptResolveInstField(clazz, fieldIdx, NULL);
     if (instField == NULL) {
-        LOGI("DexOpt: unable to optimize instance field ref "
+        ALOGI("DexOpt: unable to optimize instance field ref "
              "0x%04x at 0x%02x in %s.%s\n",
             fieldIdx, (int) (insns - method->insns), clazz->descriptor,
             method->name);
@@ -650,22 +650,22 @@ static bool rewriteInstField(Method* method, u2* insns, OpCode quickOpc,
     }
 
     if (instField->byteOffset >= 65536) {
-        LOGI("DexOpt: field offset exceeds 64K (%d)\n", instField->byteOffset);
+        ALOGI("DexOpt: field offset exceeds 64K (%d)\n", instField->byteOffset);
         return false;
     }
 
     if (volatileOpc != OP_NOP && dvmIsVolatileField(&instField->field)) {
         updateCode(method, insns, (insns[0] & 0xff00) | (u2) volatileOpc);
-        LOGV("DexOpt: rewrote ifield access %s.%s --> volatile\n",
+        ALOGV("DexOpt: rewrote ifield access %s.%s --> volatile\n",
             instField->field.clazz->descriptor, instField->field.name);
     } else if (quickOpc != OP_NOP) {
         updateCode(method, insns, (insns[0] & 0xff00) | (u2) quickOpc);
         updateCode(method, insns+1, (u2) instField->byteOffset);
-        LOGV("DexOpt: rewrote ifield access %s.%s --> %d\n",
+        ALOGV("DexOpt: rewrote ifield access %s.%s --> %d\n",
             instField->field.clazz->descriptor, instField->field.name,
             instField->byteOffset);
     } else {
-        LOGV("DexOpt: no rewrite of ifield access %s.%s\n",
+        ALOGV("DexOpt: no rewrite of ifield access %s.%s\n",
             instField->field.clazz->descriptor, instField->field.name);
     }
 
@@ -692,7 +692,7 @@ static bool rewriteStaticField(Method* method, u2* insns, OpCode volatileOpc)
 
     staticField = dvmOptResolveStaticField(clazz, fieldIdx, NULL);
     if (staticField == NULL) {
-        LOGI("DexOpt: unable to optimize static field ref "
+        ALOGI("DexOpt: unable to optimize static field ref "
              "0x%04x at 0x%02x in %s.%s\n",
             fieldIdx, (int) (insns - method->insns), clazz->descriptor,
             method->name);
@@ -701,7 +701,7 @@ static bool rewriteStaticField(Method* method, u2* insns, OpCode volatileOpc)
 
     if (dvmIsVolatileField(&staticField->field)) {
         updateCode(method, insns, (insns[0] & 0xff00) | (u2) volatileOpc);
-        LOGV("DexOpt: rewrote sfield access %s.%s --> volatile\n",
+        ALOGV("DexOpt: rewrote sfield access %s.%s --> volatile\n",
             staticField->field.clazz->descriptor, staticField->field.name);
     }
 
@@ -741,14 +741,14 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
              * Can't find the class that the method is a part of, or don't
              * have permission to access the class.
              */
-            LOGV("DexOpt: can't find called method's class (?.%s)\n",
+            ALOGV("DexOpt: can't find called method's class (?.%s)\n",
                 dexStringById(pDvmDex->pDexFile, pMethodId->nameIdx));
             if (pFailure != NULL) { assert(!VERIFY_OK(*pFailure)); }
             return NULL;
         }
         if (dvmIsInterfaceClass(resClass)) {
             /* method is part of an interface; this is wrong method for that */
-            LOGW("DexOpt: method is in an interface\n");
+            ALOGW("DexOpt: method is in an interface\n");
             if (pFailure != NULL)
                 *pFailure = VERIFY_ERROR_GENERIC;
             return NULL;
@@ -772,7 +772,7 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
         }
 
         if (resMethod == NULL) {
-            LOGV("DexOpt: couldn't find method '%s'\n",
+            ALOGV("DexOpt: couldn't find method '%s'\n",
                 dexStringById(pDvmDex->pDexFile, pMethodId->nameIdx));
             if (pFailure != NULL)
                 *pFailure = VERIFY_ERROR_NO_METHOD;
@@ -780,7 +780,7 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
         }
         if (methodType == METHOD_STATIC) {
             if (!dvmIsStaticMethod(resMethod)) {
-                LOGD("DexOpt: wanted static, got instance for method %s.%s\n",
+                ALOGD("DexOpt: wanted static, got instance for method %s.%s\n",
                     resClass->descriptor, resMethod->name);
                 if (pFailure != NULL)
                     *pFailure = VERIFY_ERROR_CLASS_CHANGE;
@@ -788,7 +788,7 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
             }
         } else if (methodType == METHOD_VIRTUAL) {
             if (dvmIsStaticMethod(resMethod)) {
-                LOGD("DexOpt: wanted instance, got static for method %s.%s\n",
+                ALOGD("DexOpt: wanted instance, got static for method %s.%s\n",
                     resClass->descriptor, resMethod->name);
                 if (pFailure != NULL)
                     *pFailure = VERIFY_ERROR_CLASS_CHANGE;
@@ -798,7 +798,7 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
 
         /* see if this is a pure-abstract method */
         if (dvmIsAbstractMethod(resMethod) && !dvmIsAbstractClass(resClass)) {
-            LOGW("DexOpt: pure-abstract method '%s' in %s\n",
+            ALOGW("DexOpt: pure-abstract method '%s' in %s\n",
                 dexStringById(pDvmDex->pDexFile, pMethodId->nameIdx),
                 resClass->descriptor);
             if (pFailure != NULL)
@@ -826,9 +826,9 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
     bool allowed = dvmCheckMethodAccess(referrer, resMethod);
     untweakLoader(referrer, resMethod->clazz);
     if (!allowed) {
-        IF_LOGI() {
+        IF_ALOGI() {
             char* desc = dexProtoCopyMethodDescriptor(&resMethod->prototype);
-            LOGI("DexOpt: illegal method access (call %s.%s %s from %s)\n",
+            ALOGI("DexOpt: illegal method access (call %s.%s %s from %s)\n",
                 resMethod->clazz->descriptor, resMethod->name, desc,
                 referrer->descriptor);
             free(desc);
@@ -857,7 +857,7 @@ static bool rewriteVirtualInvoke(Method* method, u2* insns, OpCode newOpc)
 
     baseMethod = dvmOptResolveMethod(clazz, methodIdx, METHOD_VIRTUAL, NULL);
     if (baseMethod == NULL) {
-        LOGD("DexOpt: unable to optimize virt call 0x%04x at 0x%02x in %s.%s\n",
+        ALOGD("DexOpt: unable to optimize virt call 0x%04x at 0x%02x in %s.%s\n",
             methodIdx,
             (int) (insns - method->insns), clazz->descriptor,
             method->name);
@@ -876,7 +876,7 @@ static bool rewriteVirtualInvoke(Method* method, u2* insns, OpCode newOpc)
     updateCode(method, insns, (insns[0] & 0xff00) | (u2) newOpc);
     updateCode(method, insns+1, baseMethod->methodIndex);
 
-    //LOGI("DexOpt: rewrote call to %s.%s --> %s.%s\n",
+    //ALOGI("DexOpt: rewrote call to %s.%s --> %s.%s\n",
     //    method->clazz->descriptor, method->name,
     //    baseMethod->clazz->descriptor, baseMethod->name);
 
@@ -901,7 +901,7 @@ static bool rewriteEmptyDirectInvoke(Method* method, u2* insns)
 
     calledMethod = dvmOptResolveMethod(clazz, methodIdx, METHOD_DIRECT, NULL);
     if (calledMethod == NULL) {
-        LOGD("DexOpt: unable to opt direct call 0x%04x at 0x%02x in %s.%s\n",
+        ALOGD("DexOpt: unable to opt direct call 0x%04x at 0x%02x in %s.%s\n",
             methodIdx,
             (int) (insns - method->insns), clazz->descriptor,
             method->name);
@@ -921,7 +921,7 @@ static bool rewriteEmptyDirectInvoke(Method* method, u2* insns)
         updateCode(method, insns,
             (insns[0] & 0xff00) | (u2) OP_INVOKE_DIRECT_EMPTY);
 
-        //LOGI("DexOpt: marked-empty call to %s.%s --> %s.%s\n",
+        //ALOGI("DexOpt: marked-empty call to %s.%s --> %s.%s\n",
         //    method->clazz->descriptor, method->name,
         //    calledMethod->clazz->descriptor, calledMethod->name);
     }
@@ -960,7 +960,7 @@ Method* dvmOptResolveInterfaceMethod(ClassObject* referrer, u4 methodIdx)
         }
         if (!dvmIsInterfaceClass(resClass)) {
             /* whoops */
-            LOGI("Interface method not part of interface class\n");
+            ALOGI("Interface method not part of interface class\n");
             return NULL;
         }
 
@@ -994,7 +994,7 @@ Method* dvmOptResolveInterfaceMethod(ClassObject* referrer, u4 methodIdx)
         /* we're expecting this to be abstract */
         if (!dvmIsAbstractMethod(resMethod)) {
             char* desc = dexProtoCopyMethodDescriptor(&resMethod->prototype);
-            LOGW("Found non-abstract interface method %s.%s %s\n",
+            ALOGW("Found non-abstract interface method %s.%s %s\n",
                 resMethod->clazz->descriptor, resMethod->name, desc);
             free(desc);
             return NULL;
@@ -1032,14 +1032,14 @@ static bool rewriteExecuteInline(Method* method, u2* insns,
 
     calledMethod = dvmOptResolveMethod(clazz, methodIdx, methodType, NULL);
     if (calledMethod == NULL) {
-        LOGV("+++ DexOpt inline: can't find %d\n", methodIdx);
+        ALOGV("+++ DexOpt inline: can't find %d\n", methodIdx);
         return false;
     }
 
     while (inlineSubs->method != NULL) {
         /*
         if (extra) {
-            LOGI("comparing %p vs %p %s.%s %s\n",
+            ALOGI("comparing %p vs %p %s.%s %s\n",
                 inlineSubs->method, calledMethod,
                 inlineSubs->method->clazz->descriptor,
                 inlineSubs->method->name,
@@ -1054,7 +1054,7 @@ static bool rewriteExecuteInline(Method* method, u2* insns,
                 (insns[0] & 0xff00) | (u2) OP_EXECUTE_INLINE);
             updateCode(method, insns+1, (u2) inlineSubs->inlineIdx);
 
-            //LOGI("DexOpt: execute-inline %s.%s --> %s.%s\n",
+            //ALOGI("DexOpt: execute-inline %s.%s --> %s.%s\n",
             //    method->clazz->descriptor, method->name,
             //    calledMethod->clazz->descriptor, calledMethod->name);
             return true;
@@ -1082,7 +1082,7 @@ static bool rewriteExecuteInlineRange(Method* method, u2* insns,
 
     calledMethod = dvmOptResolveMethod(clazz, methodIdx, methodType, NULL);
     if (calledMethod == NULL) {
-        LOGV("+++ DexOpt inline/range: can't find %d\n", methodIdx);
+        ALOGV("+++ DexOpt inline/range: can't find %d\n", methodIdx);
         return false;
     }
 
@@ -1095,7 +1095,7 @@ static bool rewriteExecuteInlineRange(Method* method, u2* insns,
                 (insns[0] & 0xff00) | (u2) OP_EXECUTE_INLINE_RANGE);
             updateCode(method, insns+1, (u2) inlineSubs->inlineIdx);
 
-            //LOGI("DexOpt: execute-inline/range %s.%s --> %s.%s\n",
+            //ALOGI("DexOpt: execute-inline/range %s.%s --> %s.%s\n",
             //    method->clazz->descriptor, method->name,
             //    calledMethod->clazz->descriptor, calledMethod->name);
             return true;

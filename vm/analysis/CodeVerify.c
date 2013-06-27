@@ -236,7 +236,7 @@ static void checkMergeTab(void)
     for (i = 0; i < kRegTypeMAX; i++) {
         for (j = i; j < kRegTypeMAX; j++) {
             if (gDvmMergeTab[i][j] != gDvmMergeTab[j][i]) {
-                LOGE("Symmetry violation: %d,%d vs %d,%d\n", i, j, j, i);
+                ALOGE("Symmetry violation: %d,%d vs %d,%d\n", i, j, j, i);
                 dvmAbort();
             }
         }
@@ -571,13 +571,13 @@ static ClassObject* lookupClassByDescriptor(const Method* meth,
      * allows the verifier to process the class successfully.
      */
 
-    //LOGI("Looking up '%s'\n", typeStr);
+    //ALOGI("Looking up '%s'\n", typeStr);
     ClassObject* clazz;
     clazz = dvmFindClassNoInit(pDescriptor, meth->clazz->classLoader);
     if (clazz == NULL) {
         dvmClearOptException(dvmThreadSelf());
         if (strchr(pDescriptor, '$') != NULL) {
-            LOGV("VFY: unable to find class referenced in signature (%s)\n",
+            ALOGV("VFY: unable to find class referenced in signature (%s)\n",
                 pDescriptor);
         } else {
             LOG_VFY("VFY: unable to find class referenced in signature (%s)\n",
@@ -1078,7 +1078,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
             //char* curMethodDesc =
             //    dexProtoCopyMethodDescriptor(&meth->prototype);
 
-            LOGI("Could not find method %s.%s, referenced from method %s.%s\n",
+            ALOGI("Could not find method %s.%s, referenced from method %s.%s\n",
                 dotMissingClass, methodName/*, methodDesc*/,
                 dotMethClass, meth->name/*, curMethodDesc*/);
 
@@ -1345,7 +1345,7 @@ static ClassObject* getFieldClass(const Method* meth, const Field* field)
 
     if (fieldClass == NULL) {
         dvmClearOptException(dvmThreadSelf());
-        LOGV("VFY: unable to find class '%s' for field %s.%s, trying Object\n",
+        ALOGV("VFY: unable to find class '%s' for field %s.%s, trying Object\n",
             field->signature, meth->clazz->descriptor, field->name);
         fieldClass = gDvm.classJavaLangObject;
     } else {
@@ -1468,7 +1468,7 @@ bail:
 static void setRegisterType(RegType* insnRegs, const int insnRegCount,
     u4 vdst, RegType newType, VerifyError* pFailure)
 {
-    //LOGD("set-reg v%u = %d\n", vdst, newType);
+    //ALOGD("set-reg v%u = %d\n", vdst, newType);
     switch (newType) {
     case kRegTypeUnknown:
     case kRegTypeBoolean:
@@ -1557,7 +1557,7 @@ static void verifyRegisterType(const RegType* insnRegs, const int insnRegCount,
 
     RegType srcType = insnRegs[vsrc];
 
-    //LOGD("check-reg v%u = %d\n", vsrc, checkType);
+    //ALOGD("check-reg v%u = %d\n", vsrc, checkType);
     switch (checkType) {
     case kRegTypeFloat:
     case kRegTypeBoolean:
@@ -1686,7 +1686,7 @@ static void markRefsAsInitialized(RegType* insnRegs, int insnRegCount,
 
     clazz = dvmGetUninitInstance(uninitMap, regTypeToUninitIndex(uninitType));
     if (clazz == NULL) {
-        LOGE("VFY: unable to find type=0x%x (idx=%d)\n",
+        ALOGE("VFY: unable to find type=0x%x (idx=%d)\n",
             uninitType, regTypeToUninitIndex(uninitType));
         *pFailure = VERIFY_ERROR_GENERIC;
         return;
@@ -1700,7 +1700,7 @@ static void markRefsAsInitialized(RegType* insnRegs, int insnRegCount,
             changed++;
         }
     }
-    //LOGD("VFY: marked %d registers as initialized\n", changed);
+    //ALOGD("VFY: marked %d registers as initialized\n", changed);
     assert(changed > 0);
 
     return;
@@ -1727,7 +1727,7 @@ static void markUninitRefsAsInvalid(RegType* insnRegs, int insnRegCount,
     }
 
     //if (changed)
-    //    LOGD("VFY: marked %d uninitialized registers as invalid\n", changed);
+    //    ALOGD("VFY: marked %d uninitialized registers as invalid\n", changed);
 }
 
 /*
@@ -2436,8 +2436,8 @@ static void updateRegisters(const Method* meth, InsnFlags* insnFlags,
 
 #if 0
     if (!dvmInsnIsBranchTarget(insnFlags, nextInsn)) {
-        LOGE("insnFlags[0x%x]=0x%08x\n", nextInsn, insnFlags[nextInsn]);
-        LOGE(" In %s.%s %s\n",
+        ALOGE("insnFlags[0x%x]=0x%08x\n", nextInsn, insnFlags[nextInsn]);
+        ALOGE(" In %s.%s %s\n",
             meth->clazz->descriptor, meth->name, meth->descriptor);
         assert(false);
     }
@@ -2469,7 +2469,7 @@ static void updateRegisters(const Method* meth, InsnFlags* insnFlags,
         }
 
         if (gDebugVerbose) {
-            //LOGI(" RESULT (changed=%d)\n", changed);
+            //ALOGI(" RESULT (changed=%d)\n", changed);
             //dumpRegTypes(meth, insnFlags, targetRegs, 0, "rslt", NULL, 0);
         }
 
@@ -2889,7 +2889,7 @@ static bool initRegisterTable(const Method* meth, const InsnFlags* insnFlags,
         }
     }
 
-    //LOGD("Tracking registers for %d, total %d of %d(%d) (%d%%)\n",
+    //ALOGD("Tracking registers for %d, total %d of %d(%d) (%d%%)\n",
     //    TRACK_REGS_FOR, interestingCount, insnCount, insnsSize,
     //    (interestingCount*100) / insnCount);
 
@@ -2922,7 +2922,7 @@ static void verifyFilledNewArrayRegs(const Method* meth,
     } else {
         expectedType = primitiveTypeToRegType(elemType);
     }
-    //LOGI("filled-new-array: %s -> %d\n", resClass->descriptor, expectedType);
+    //ALOGI("filled-new-array: %s -> %d\n", resClass->descriptor, expectedType);
 
     /*
      * Verify each register.  If "argCount" is bad, verifyRegisterType()
@@ -2974,9 +2974,9 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
     bool result = false;
 
     if (gDvm.optimizing)
-        LOGD("Weird: RFI during dexopt?");
+        ALOGD("Weird: RFI during dexopt?");
 
-    //LOGD("  was 0x%04x\n", oldInsn);
+    //ALOGD("  was 0x%04x\n", oldInsn);
     u2* newInsns = (u2*) meth->insns + insnIdx;
 
     /*
@@ -3058,7 +3058,7 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
         break;
     default:
         /* whoops */
-        LOGE("ERROR: stomped a %d-unit instruction with a verifier error\n",
+        ALOGE("ERROR: stomped a %d-unit instruction with a verifier error\n",
             width);
         dvmAbort();
     }
@@ -3245,12 +3245,12 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
     dvmInsnSetChanged(insnFlags, 0, true);
 
     if (doVerboseLogging(meth)) {
-        IF_LOGI() {
+        IF_ALOGI() {
             char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-            LOGI("Now verifying: %s.%s %s (ins=%d regs=%d)\n",
+            ALOGI("Now verifying: %s.%s %s (ins=%d regs=%d)\n",
                 meth->clazz->descriptor, meth->name, desc,
                 meth->insSize, meth->registersSize);
-            LOGI(" ------ [0    4    8    12   16   20   24   28   32   36\n");
+            ALOGI(" ------ [0    4    8    12   16   20   24   28   32   36\n");
             free(desc);
         }
         debugVerbose = true;
@@ -3334,12 +3334,12 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
 #endif
         }
 
-        //LOGI("process %s.%s %s %d\n",
+        //ALOGI("process %s.%s %s %d\n",
         //    meth->clazz->descriptor, meth->name, meth->descriptor, insnIdx);
         if (!verifyInstruction(meth, insnFlags, regTable, workRegs, insnIdx,
                 uninitMap, &startGuess))
         {
-            //LOGD("+++ %s bailing at %d\n", meth->name, insnIdx);
+            //ALOGD("+++ %s bailing at %d\n", meth->name, insnIdx);
             goto bail;
         }
 
@@ -3357,7 +3357,7 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
             if (regWidth > 4) {
                 regWidth = ((regWidth + 3) / 4) * 4;
                 if (false) {
-                    LOGW("WOW: %d regs -> %d  %s.%s\n",
+                    ALOGW("WOW: %d regs -> %d  %s.%s\n",
                         meth->registersSize, regWidth,
                         meth->clazz->descriptor, meth->name);
                     //x = true;
@@ -3420,10 +3420,10 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
                 if (deadStart < 0)
                     deadStart = insnIdx;
             } else if (deadStart >= 0) {
-                IF_LOGD() {
+                IF_ALOGD() {
                     char* desc =
                         dexProtoCopyMethodDescriptor(&meth->prototype);
-                    LOGD("VFY: dead code 0x%04x-%04x in %s.%s %s\n",
+                    ALOGD("VFY: dead code 0x%04x-%04x in %s.%s %s\n",
                         deadStart, insnIdx-1,
                         meth->clazz->descriptor, meth->name, desc);
                     free(desc);
@@ -3433,9 +3433,9 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
             }
         }
         if (deadStart >= 0) {
-            IF_LOGD() {
+            IF_ALOGD() {
                 char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-                LOGD("VFY: dead code 0x%04x-%04x in %s.%s %s\n",
+                ALOGD("VFY: dead code 0x%04x-%04x in %s.%s %s\n",
                     deadStart, insnIdx-1,
                     meth->clazz->descriptor, meth->name, desc);
                 free(desc);
@@ -5482,7 +5482,7 @@ sput_1nr_common:
             goto bail;
         } else {
             /* replace opcode and continue on */
-            LOGD("VFY: replacing opcode 0x%02x at 0x%04x\n",
+            ALOGD("VFY: replacing opcode 0x%02x at 0x%04x\n",
                 decInsn.opCode, insnIdx);
             if (!replaceFailingInstruction(meth, insnFlags, insnIdx, failure)) {
                 LOG_VFY_METH(meth, "VFY:  rejecting opcode 0x%02x at 0x%04x\n",
@@ -5675,7 +5675,7 @@ static void logLocalsCb(void *cnxt, u2 reg, u4 startAddress, u4 endAddress,
 
     if (addr >= (int) startAddress && addr < (int) endAddress)
     {
-        LOGI("        %2d: '%s' %s\n", reg, name, descriptor);
+        ALOGI("        %2d: '%s' %s\n", reg, name, descriptor);
     }
 }
 
@@ -5745,9 +5745,9 @@ static void dumpRegTypes(const Method* meth, const InsnFlags* insnFlags,
     }
 
     if (addr == 0 && addrName != NULL)
-        LOGI("%c%s %s\n", branchTarget ? '>' : ' ', addrName, regChars);
+        ALOGI("%c%s %s\n", branchTarget ? '>' : ' ', addrName, regChars);
     else
-        LOGI("%c0x%04x %s\n", branchTarget ? '>' : ' ', addr, regChars);
+        ALOGI("%c0x%04x %s\n", branchTarget ? '>' : ' ', addr, regChars);
 
     if (displayFlags & DRT_SHOW_REF_TYPES) {
         for (i = 0; i < regCount + kExtraRegs; i++) {
@@ -5758,12 +5758,12 @@ static void dumpRegTypes(const Method* meth, const InsnFlags* insnFlags,
                 clazz = regTypeReferenceToClass(addrRegs[i], uninitMap);
                 assert(dvmValidateObject((Object*)clazz));
                 if (i < regCount) {
-                    LOGI("        %2d: 0x%08x %s%s\n",
+                    ALOGI("        %2d: 0x%08x %s%s\n",
                         i, addrRegs[i],
                         regTypeIsUninitReference(addrRegs[i]) ? "[U]" : "",
                         clazz->descriptor);
                 } else {
-                    LOGI("        RS: 0x%08x %s%s\n",
+                    ALOGI("        RS: 0x%08x %s%s\n",
                         addrRegs[i],
                         regTypeIsUninitReference(addrRegs[i]) ? "[U]" : "",
                         clazz->descriptor);
