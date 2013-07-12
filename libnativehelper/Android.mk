@@ -69,7 +69,7 @@ ifeq ($(WITH_HOST_DALVIK),true)
 
     LOCAL_SRC_FILES := $(src_files)
     LOCAL_C_INCLUDES := $(c_includes)
-    LOCAL_WHOLE_STATIC_LIBRARIES := $(static_libraries:%=%-host)
+    LOCAL_WHOLE_STATIC_LIBRARIES := $(static_libraries)
 
     ifeq ($(HOST_OS)-$(HOST_ARCH),darwin-x86)
         # OSX has a lot of libraries built in, which we don't have to
