@@ -1576,6 +1576,7 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
     newRechainCount = PREDICTED_CHAIN_COUNTER_AVOID;
     goto done;
 #else
+    PredictedChainingCell newCell;
     if (dvmIsNativeMethod(method)) {
         UNPROTECT_CODE_CACHE(cell, sizeof(*cell));
 
@@ -1604,8 +1605,6 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
         goto done;
     }
 
-    PredictedChainingCell newCell;
-
     if (cell->clazz == NULL) {
         newRechainCount = interpState->icRechainCount;
     }
@@ -1616,6 +1615,7 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
     newCell.branch = assembleChainingBranch(branchOffset, true);
     newCell.clazz = clazz;
     newCell.method = method;
+    newCell.stagedClazz = NULL;
 
     /*
      * Enter the work order to the queue and the chaining cell will be patched
