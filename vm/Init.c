@@ -1353,6 +1353,21 @@ fail:
     return 1;
 }
 
+static void loadJniLibrary(const char* name) {
+    char* fileName = NULL;
+    char* reason = NULL;
+    char szTemp[256];
+
+    strcpy(szTemp, name);
+
+    fileName = dvmCreateSystemLibraryName(szTemp);
+
+    if (!dvmLoadNativeCode(fileName, NULL, &reason)) {
+        ALOGE("dvmLoadNativeCode failed for \"%s\": %s", name, reason);
+        dvmAbort();
+    }
+}
+
 /*
  * Register java.* natives from our class libraries.  We need to do
  * this after we're ready for JNI registration calls, but before we
@@ -1375,10 +1390,13 @@ static bool registerSystemNatives(JNIEnv* pEnv)
     /* must set this before allowing JNI-based method registration */
     self->status = THREAD_NATIVE;
 
-    if ((registerJniHelp(pEnv) != -1 && registerCoreLibrariesJni(pEnv) != -1) < 0) {
-        ALOGW("jniRegisterSystemMethods failed\n");
+    loadJniLibrary("nativehelper");
+
+    if ((registerCoreLibrariesJni(pEnv) != -1) < 0 ) {
+        ALOGW("registerCoreLibrariesJni failed\n");
         return false;
     }
+
 
     /* back to run mode */
     self->status = THREAD_RUNNING;
