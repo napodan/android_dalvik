@@ -38,6 +38,8 @@
  * Register VM-agnostic native methods for system classes.
  */
 extern int jniRegisterSystemMethods(JNIEnv* env);
+extern int registerCoreLibrariesJni(JNIEnv* env);
+extern int registerJniHelp(JNIEnv* env);
 
 /* fwd */
 static bool registerSystemNatives(JNIEnv* pEnv);
@@ -1373,7 +1375,7 @@ static bool registerSystemNatives(JNIEnv* pEnv)
     /* must set this before allowing JNI-based method registration */
     self->status = THREAD_NATIVE;
 
-    if (jniRegisterSystemMethods(pEnv) < 0) {
+    if ((registerJniHelp(pEnv) != -1 && registerCoreLibrariesJni(pEnv) != -1) < 0) {
         ALOGW("jniRegisterSystemMethods failed\n");
         return false;
     }
