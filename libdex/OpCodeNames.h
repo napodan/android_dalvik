@@ -20,8 +20,15 @@
 #ifndef _LIBDEX_OPCODENAMES
 #define _LIBDEX_OPCODENAMES
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "OpCode.h"
 
 const char* dexGetOpcodeName(OpCode op);
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_LIBDEX_OPCODENAMES*/

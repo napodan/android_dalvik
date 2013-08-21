@@ -33,6 +33,10 @@
 #ifndef _LIBDEX_DEXFILE
 #define _LIBDEX_DEXFILE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "vm/Common.h"      // basic type defs, e.g. u1/u2/u4/u8, and LOG
 #include "libdex/SysUtil.h"
 
@@ -1052,5 +1056,10 @@ bool dexIsClassDescriptor(const char* s);
  * is true if dexIsValidTypeDescriptor() returns true and the descriptor
  * is for anything but "void". */
 bool dexIsFieldDescriptor(const char* s);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_LIBDEX_DEXFILE*/

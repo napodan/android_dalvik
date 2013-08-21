@@ -21,6 +21,11 @@
 #ifndef _LIBDEX_DEXCLASS
 #define _LIBDEX_DEXCLASS
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include "DexFile.h"
 #include "Leb128.h"
 
@@ -158,5 +163,9 @@ DEX_INLINE void dexReadClassDataMethod(const u1** pData, DexMethod* pMethod,
     pMethod->methodIdx = index;
     *lastIndex = index;
 }
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

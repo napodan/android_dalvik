@@ -21,6 +21,11 @@
 #ifndef _LIBDEX_DEXPROTO
 #define _LIBDEX_DEXPROTO
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include "DexFile.h"
 
 /*
@@ -211,6 +216,11 @@ u4 dexParameterIteratorNextIndex(DexParameterIterator* pIterator);
 const char* dexParameterIteratorNextDescriptor(
         DexParameterIterator* pIterator);
 
+
+
+#ifdef __cplusplus
+};
+#endif
 
 
 #endif /*_LIBDEX_DEXPROTO*/

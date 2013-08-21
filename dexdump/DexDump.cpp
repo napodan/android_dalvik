@@ -52,13 +52,13 @@ static const char* gProgName = "dexdump";
 static InstructionWidth* gInstrWidth;
 static InstructionFormat* gInstrFormat;
 
-typedef enum OutputFormat {
+enum OutputFormat {
     OUTPUT_PLAIN = 0,               /* default */
     OUTPUT_XML,                     /* fancy */
-} OutputFormat;
+};
 
 /* command-line options */
-struct {
+struct Options {
     bool checksumOnly;
     bool disassemble;
     bool showFileHeaders;
@@ -69,14 +69,16 @@ struct {
     const char* tempFileName;
     bool exportsOnly;
     bool verbose;
-} gOptions;
+};
+
+struct Options gOptions;
 
 /* basic info about a field or method */
-typedef struct FieldMethodInfo {
+struct FieldMethodInfo {
     const char* classDescriptor;
     const char* name;
     const char* signature;
-} FieldMethodInfo;
+};
 
 /*
  * Get 2 little-endian bytes.
@@ -150,7 +152,7 @@ static char* descriptorToDot(const char* str)
         }
     }
 
-    newStr = malloc(targetLen + arrayDepth * 2 +1);
+    newStr = (char*)malloc(targetLen + arrayDepth * 2 +1);
 
     /* copy class name over */
     int i;
@@ -239,10 +241,10 @@ static int countOnes(u4 val)
 /*
  * Flag for use with createAccessFlagStr().
  */
-typedef enum AccessFor {
+enum AccessFor {
     kAccessForClass = 0, kAccessForMethod = 1, kAccessForField = 2,
     kAccessForMAX
-} AccessFor;
+};
 
 /*
  * Create a new string with human-readable access flags.
@@ -849,8 +851,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         }
         break;
     case kFmt22cs:       // [opt] op vA, vB, field offset CCCC
-        printf(" v%d, v%d, [obj+%04x]",
-            pDecInsn->vA, pDecInsn->vB, pDecInsn->vC);
+        printf(" v%d, v%d, [obj+%04x]", pDecInsn->vA, pDecInsn->vB, pDecInsn->vC);
         break;
     case kFmt30t:
         printf(" #%08x", pDecInsn->vA);
@@ -975,10 +976,6 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         break;
     case kFmt3inline:    // [opt] inline invoke
         {
-#if 0
-            const InlineOperation* inlineOpsTable = dvmGetInlineOpsTable();
-            u4 tableLen = dvmGetInlineOpsTableLength();
-#endif
 
             fputs(" {", stdout);
             for (i = 0; i < (int) pDecInsn->vA; i++) {
@@ -987,19 +984,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
                 else
                     printf(", v%d", pDecInsn->arg[i]);
             }
-#if 0
-            if (pDecInsn->vB < tableLen) {
-                printf("}, %s.%s:%s // inline #%04x",
-                    inlineOpsTable[pDecInsn->vB].classDescriptor,
-                    inlineOpsTable[pDecInsn->vB].methodName,
-                    inlineOpsTable[pDecInsn->vB].methodSignature,
-                    pDecInsn->vB);
-            } else {
-#endif
                 printf("}, [%04x] // inline #%04x", pDecInsn->vB, pDecInsn->vB);
-#if 0
-            }
-#endif
         }
         break;
     case kFmt51l:        // op vAA, #+BBBBBBBBBBBBBBBB
@@ -1020,7 +1005,6 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         printf(" ???");
         break;
     }
-
 
     putchar('\n');
 
@@ -1065,11 +1049,11 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             int width = get2LE((const u1*)(insns+1));
             int size = get2LE((const u1*)(insns+2)) |
                        (get2LE((const u1*)(insns+3))<<16);
-            // The plus 1 is to round up for odd size and width
+            // The plus 1 is to round up for odd size and width.
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
-            opCode = instr & 0xff;
-            insnWidth = dexGetInstrWidthAbs(gInstrWidth, opCode);
+            OpCode opcode = dexOpcodeFromCodeUnit(instr);
+            insnWidth = dexGetInstrWidthAbs(gInstrWidth, opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,
                     "GLITCH: zero-width instruction at idx=0x%04x\n", insnIdx);
@@ -1618,7 +1602,7 @@ bail:
  */
 void dumpRegisterMaps(DexFile* pDexFile)
 {
-    const u1* pClassPool = pDexFile->pRegisterMapPool;
+    const u1* pClassPool = (const u1*)pDexFile->pRegisterMapPool;
     const u4* classOffsets;
     const u1* ptr;
     u4 numClasses;
@@ -1752,15 +1736,16 @@ int process(const char* fileName)
     if (gOptions.verbose)
         printf("Processing '%s'...\n", fileName);
 
-    if (dexOpenAndMap(fileName, gOptions.tempFileName, &map, false) != 0)
-        goto bail;
+    if (dexOpenAndMap(fileName, gOptions.tempFileName, &map, false) != 0) {
+        return result;
+    }
     mapped = true;
 
     int flags = kDexParseVerifyChecksum;
     if (gOptions.ignoreBadChecksum)
         flags |= kDexParseContinueOnError;
 
-    pDexFile = dexFileParse(map.addr, map.length, flags);
+    pDexFile = dexFileParse((u1*)map.addr, map.length, flags);
     if (pDexFile == NULL) {
         fprintf(stderr, "ERROR: DEX parse failed\n");
         goto bail;
