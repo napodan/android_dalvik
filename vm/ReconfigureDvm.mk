@@ -26,19 +26,10 @@ LOCAL_SHARED_LIBRARIES += \
 	libdl \
 	liblog \
 	libnativehelper \
-	libz \
-    libcrypto  \
-    libicui18n \
-    libicuuc   \
-    libsqlite \
-    libssl libexpat libutils 
+	libselinux \
+	libz
 
-
-
-LOCAL_STATIC_LIBRARIES += libdex \
-    libjavacore \
-    libfdlibm
-
+LOCAL_STATIC_LIBRARIES += libdex
 
 LOCAL_C_INCLUDES += external/stlport/stlport bionic/ bionic/libstdc++/include
 LOCAL_SHARED_LIBRARIES += libstlport

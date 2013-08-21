@@ -1390,13 +1390,8 @@ static bool registerSystemNatives(JNIEnv* pEnv)
     /* must set this before allowing JNI-based method registration */
     self->status = THREAD_NATIVE;
 
+    loadJniLibrary("javacore");
     loadJniLibrary("nativehelper");
-
-    if ((registerCoreLibrariesJni(pEnv) != -1) < 0 ) {
-        ALOGW("registerCoreLibrariesJni failed\n");
-        return false;
-    }
-
 
     /* back to run mode */
     self->status = THREAD_RUNNING;
