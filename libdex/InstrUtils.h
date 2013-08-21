@@ -20,6 +20,11 @@
 #ifndef _LIBDEX_INSTRUTILS
 #define _LIBDEX_INSTRUTILS
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include "DexFile.h"
 #include "OpCode.h"
 
@@ -35,7 +40,9 @@
  *  - the switch inside dexDecodeInstruction() in InstrUtils.c
  *  - the switch inside dumpInstruction() in DexDump.c
  */
+#ifndef __cplusplus
 typedef unsigned char InstructionFormat;
+#endif
 enum InstructionFormat {
     kFmtUnknown = 0,
     kFmt10x,        // op
@@ -72,17 +79,6 @@ enum InstructionFormat {
     kFmt51l,        // op vAA, #+BBBBBBBBBBBBBBBB
 };
 
-/*
- * Holds the contents of a decoded instruction.
- */
-typedef struct DecodedInstruction {
-    u4      vA;
-    u4      vB;
-    u8      vB_wide;        /* for kFmt51l */
-    u4      vC;
-    u4      arg[5];         /* vC/D/E/F/G in invoke or filled-new-array */
-    OpCode  opCode;
-} DecodedInstruction;
 
 /*
  * Instruction width, a value in the range -3 to 5.
@@ -93,7 +89,9 @@ typedef signed char InstructionWidth;
  * Instruction flags, used by the verifier and JIT to determine where
  * control can flow to next.  Expected to fit in 8 bits.
  */
+#ifndef __cplusplus
 typedef unsigned char InstructionFlags;
+#endif
 enum InstructionFlags {
     kInstrCanBranch     = 1,        // conditional or unconditional branch
     kInstrCanContinue   = 1 << 1,   // flow can continue to next statement
@@ -111,23 +109,22 @@ enum InstructionFlags {
  */
 InstructionWidth* dexCreateInstrWidthTable(void);
 
-#if 0       // no longer used
 /*
- * Returns the width of the specified instruction, or 0 if not defined.
- * Optimized instructions use negative values.
+ * Holds the contents of a decoded instruction.
  */
-DEX_INLINE int dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode)
-{
-   // assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-    return widths[opCode];
-}
-#endif
+typedef struct DecodedInstruction {
+    u4      vA;
+    u4      vB;
+    u8      vB_wide;        /* for kFmt51l */
+    u4      vC;
+    u4      arg[5];         /* vC/D/E/F/G in invoke or filled-new-array */
+    OpCode  opCode;
+} DecodedInstruction;
 
 /*
  * Return the width of the specified instruction, or 0 if not defined.
  */
-DEX_INLINE size_t dexGetInstrWidthAbs(const InstructionWidth* widths,
-    OpCode opCode)
+DEX_INLINE size_t dexGetInstrWidthAbs(const InstructionWidth* widths, OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
 
@@ -182,5 +179,9 @@ DEX_INLINE InstructionFormat dexGetInstrFormat(const InstructionFormat* fmts,
  */
 void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
     DecodedInstruction* pDec);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_LIBDEX_INSTRUTILS*/

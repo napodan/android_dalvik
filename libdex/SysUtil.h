@@ -20,6 +20,10 @@
 #ifndef _LIBDEX_SYSUTIL
 #define _LIBDEX_SYSUTIL
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/types.h>
 
 /*
@@ -112,5 +116,9 @@ void sysReleaseShmem(MemMapping* pMap);
  * Returns 0 on success, or an errno value on failure.
  */
 int sysWriteFully(int fd, const void* buf, size_t count, const char* logMsg);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_SYSUTIL*/
