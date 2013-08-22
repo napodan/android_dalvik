@@ -21,6 +21,10 @@
 #ifndef _LIBDEX_DEXCATCH
 #define _LIBDEX_DEXCATCH
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "DexFile.h"
 #include "Leb128.h"
 
@@ -158,5 +162,9 @@ DEX_INLINE bool dexFindCatchHandler(DexCatchIterator *pIterator,
         return true;
     }
 }
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

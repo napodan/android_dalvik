@@ -21,6 +21,10 @@
 #ifndef _LIBDEX_LEB128
 #define _LIBDEX_LEB128
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "DexFile.h"
 
 /*
@@ -160,5 +164,9 @@ DEX_INLINE int unsignedLeb128Size(u4 data)
 
     return count;
 }
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

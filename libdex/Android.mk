@@ -15,18 +15,18 @@
 LOCAL_PATH:= $(call my-dir)
 
 dex_src_files := \
-	CmdUtils.c \
-	DexCatch.c \
-	DexClass.c \
-	DexDataMap.c \
-	DexFile.c \
-	DexInlines.c \
-	DexOptData.c \
-	DexProto.c \
+	CmdUtils.cpp \
+	DexCatch.cpp \
+	DexClass.cpp \
+	DexDataMap.cpp \
+	DexFile.cpp \
+	DexInlines.cpp \
+	DexOptData.cpp \
+	DexProto.cpp \
 	DexSwapVerify.c \
 	InstrUtils.c \
-	Leb128.c \
-	OpCodeNames.c \
+	Leb128.cpp \
+	OpCodeNames.cpp \
 	OptInvocation.c \
 	sha1.c \
 	SysUtil.c \
@@ -46,6 +46,7 @@ dex_include_files := \
 ifneq ($(SDK_ONLY),true)  # SDK_only doesn't need device version
 
 include $(CLEAR_VARS)
+#LOCAL_CFLAGS += -UNDEBUG -DDEBUG=1
 LOCAL_SRC_FILES := $(dex_src_files)
 LOCAL_C_INCLUDES += $(dex_include_files)
 LOCAL_MODULE_TAGS := optional
