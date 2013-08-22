@@ -33,7 +33,7 @@
  * Make sure that the given cache can hold a string of the given length,
  * including the final '\0' byte.
  */
-static void dexStringCacheAlloc(DexStringCache* pCache, size_t length) {
+void dexStringCacheAlloc(DexStringCache* pCache, size_t length) {
     if (pCache->allocatedSize != 0) {
         if (pCache->allocatedSize >= length) {
             return;
@@ -45,7 +45,7 @@ static void dexStringCacheAlloc(DexStringCache* pCache, size_t length) {
         pCache->value = pCache->buffer;
         pCache->allocatedSize = 0;
     } else {
-        pCache->value = malloc(length);
+        pCache->value = (char*) malloc(length);
         pCache->allocatedSize = length;
     }
 }
@@ -122,19 +122,14 @@ static inline const DexProtoId* getProtoId(const DexProto* pProto) {
     return dexGetProtoId(pProto->dexFile, pProto->protoIdx);
 }
 
-/*
- * Get the short-form method descriptor for the given prototype. The
- * prototype must be protoIdx-based.
- */
+/* (documented in header file) */
 const char* dexProtoGetShorty(const DexProto* pProto) {
     const DexProtoId* protoId = getProtoId(pProto);
 
     return dexStringById(pProto->dexFile, protoId->shortyIdx);
 }
 
-/*
- * Get the full method descriptor for the given prototype.
- */
+/* (documented in header file) */
 const char* dexProtoGetMethodDescriptor(const DexProto* pProto,
         DexStringCache* pCache) {
     const DexFile* dexFile = pProto->dexFile;
@@ -169,10 +164,7 @@ const char* dexProtoGetMethodDescriptor(const DexProto* pProto,
     return pCache->value;
 }
 
-/*
- * Get a copy of the descriptor string associated with the given prototype.
- * The returned pointer must be free()ed by the caller.
- */
+/* (documented in header file) */
 char* dexProtoCopyMethodDescriptor(const DexProto* pProto) {
     DexStringCache cache;
 
@@ -181,11 +173,7 @@ char* dexProtoCopyMethodDescriptor(const DexProto* pProto) {
             dexProtoGetMethodDescriptor(pProto, &cache));
 }
 
-/*
- * Get the parameter descriptors for the given prototype. This is the
- * concatenation of all the descriptors for all the parameters, in
- * order, with no other adornment.
- */
+/* (documented in header file) */
 const char* dexProtoGetParameterDescriptors(const DexProto* pProto,
         DexStringCache* pCache) {
     DexParameterIterator iterator;
@@ -220,17 +208,13 @@ const char* dexProtoGetParameterDescriptors(const DexProto* pProto,
     return pCache->value;
 }
 
-/*
- * Get the type descriptor for the return type of the given prototype.
- */
+/* (documented in header file) */
 const char* dexProtoGetReturnType(const DexProto* pProto) {
     const DexProtoId* protoId = getProtoId(pProto);
     return dexStringByTypeIdx(pProto->dexFile, protoId->returnTypeIdx);
 }
 
-/*
- * Get the parameter count of the given prototype.
- */
+/* (documented in header file) */
 size_t dexProtoGetParameterCount(const DexProto* pProto) {
     const DexProtoId* protoId = getProtoId(pProto);
     const DexTypeList* typeList =
@@ -238,12 +222,7 @@ size_t dexProtoGetParameterCount(const DexProto* pProto) {
     return (typeList == NULL) ? 0 : typeList->size;
 }
 
-/*
- * Compute the number of parameter words (u4 units) required by the
- * given prototype. For example, if the method takes (int, long) and
- * returns double, this would return 3 (one for the int, two for the
- * long, and the return type isn't relevant).
- */
+/* (documented in header file) */
 int dexProtoComputeArgsSize(const DexProto* pProto) {
     const char* shorty = dexProtoGetShorty(pProto);
     int count = 0;
@@ -335,24 +314,12 @@ static int protoCompare(const DexProto* pProto1, const DexProto* pProto2,
     }
 }
 
-/*
- * Compare the two prototypes. The two prototypes are compared
- * with the return type as the major order, then the first arguments,
- * then second, etc. If two prototypes are identical except that one
- * has extra arguments, then the shorter argument is considered the
- * earlier one in sort order (similar to strcmp()).
- */
+/* (documented in header file) */
 int dexProtoCompare(const DexProto* pProto1, const DexProto* pProto2) {
     return protoCompare(pProto1, pProto2, true);
 }
 
-/*
- * Compare the two prototypes. The two prototypes are compared
- * with the first argument as the major order, then second, etc. If two
- * prototypes are identical except that one has extra arguments, then the
- * shorter argument is considered the earlier one in sort order (similar
- * to strcmp()).
- */
+/* (documented in header file) */
 int dexProtoCompareParameters(const DexProto* pProto1, const DexProto* pProto2){
     return protoCompare(pProto1, pProto2, false);
 }

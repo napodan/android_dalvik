@@ -41,7 +41,7 @@ DexDataMap* dexDataMapAlloc(u4 maxCount) {
       return NULL;
     }
 
-    map = malloc(size);
+    map = (DexDataMap*) malloc(size);
 
     if (map == NULL) {
         return NULL;
@@ -77,7 +77,7 @@ void dexDataMapAdd(DexDataMap* map, u4 offset, u2 type) {
 
     if ((map->count != 0) &&
             (map->offsets[map->count - 1] >= offset)) {
-        ALOGE("Out-of-order data map offset: 0x%x then 0x%x\n",
+        ALOGE("Out-of-order data map offset: %#x then %#x",
                 map->offsets[map->count - 1], offset);
         return;
     }
@@ -130,10 +130,10 @@ bool dexDataMapVerify(DexDataMap* map, u4 offset, u2 type) {
     }
 
     if (found < 0) {
-        ALOGE("No data map entry found @ 0x%x; expected %x\n",
+        ALOGE("No data map entry found @ %#x; expected %x",
                 offset, type);
     } else {
-        ALOGE("Unexpected data map entry @ 0x%x: expected %x, found %x\n",
+        ALOGE("Unexpected data map entry @ %#x: expected %x, found %x",
                 offset, type, found);
     }
 

@@ -21,6 +21,10 @@
 #ifndef _LIBDEX_DEXDATAMAP
 #define _LIBDEX_DEXDATAMAP
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "DexFile.h"
 
 typedef struct DexDataMap {
@@ -69,5 +73,9 @@ DEX_INLINE bool dexDataMapVerify0Ok(DexDataMap* map, u4 offset, u2 type) {
 
     return dexDataMapVerify(map, offset, type);
 }
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_LIBDEX_DEXDATAMAP*/
