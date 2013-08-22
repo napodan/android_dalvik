@@ -23,13 +23,13 @@ dex_src_files := \
 	DexInlines.cpp \
 	DexOptData.cpp \
 	DexProto.cpp \
-	DexSwapVerify.c \
+	DexSwapVerify.cpp \
 	InstrUtils.c \
 	Leb128.cpp \
 	OpCodeNames.cpp \
 	OptInvocation.cpp \
 	sha1.cpp \
-	SysUtil.c \
+	SysUtil.cpp \
 	ZipArchive.cpp
 
 dex_include_files := \
