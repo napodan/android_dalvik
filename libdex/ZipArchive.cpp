@@ -29,6 +29,9 @@
 
 #include <JNIHelp.h>        // TEMP_FAILURE_RETRY may or may not be in unistd
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
 
 /*
  * Zip file constants.
@@ -77,7 +80,7 @@ static int entryToIndex(const ZipArchive* pArchive, const ZipEntry entry)
     if (ent < 0 || ent >= pArchive->mHashTableSize ||
         pArchive->mHashTable[ent].name == NULL)
     {
-        ALOGW("Zip: invalid ZipEntry %p (%ld)\n", entry, ent);
+        ALOGW("Zip: invalid ZipEntry %p (%ld)", entry, ent);
         return -1;
     }
     return ent;
@@ -138,55 +141,19 @@ static u4 get4LE(unsigned char const* pSrc)
     return result;
 }
 
-/*
- * Find the zip Central Directory and memory-map it.
- *
- * On success, returns 0 after populating fields from the EOCD area:
- *   mDirectoryOffset
- *   mDirectoryMap
- *   mNumEntries
- */
-static int mapCentralDirectory(int fd, const char* debugFileName,
-    ZipArchive* pArchive)
+static int mapCentralDirectory0(int fd, const char* debugFileName,
+        ZipArchive* pArchive, off_t fileLength, size_t readAmount, u1* scanBuf)
 {
-    u1* scanBuf = NULL;
-    int result = -1;
-
-    /*
-     * Get and test file length.
-     */
-    off_t fileLength = lseek(fd, 0, SEEK_END);
-    if (fileLength < kEOCDLen) {
-        ALOGV("Zip: length %ld is too small to be zip\n", (long) fileLength);
-        goto bail;
-    }
-
-    /*
-     * Perform the traditional EOCD snipe hunt.
-     *
-     * We're searching for the End of Central Directory magic number,
-     * which appears at the start of the EOCD block.  It's followed by
-     * 18 bytes of EOCD stuff and up to 64KB of archive comment.  We
-     * need to read the last part of the file into a buffer, dig through
-     * it to find the magic number, parse some values out, and use those
-     * to determine the extent of the CD.
-     *
-     * We start by pulling in the last part of the file.
-     */
-    size_t readAmount = kMaxEOCDSearch;
-    if (readAmount > (size_t) fileLength)
-        readAmount = fileLength;
     off_t searchStart = fileLength - readAmount;
 
-    scanBuf = (u1*) malloc(readAmount);
     if (lseek(fd, searchStart, SEEK_SET) != searchStart) {
-        ALOGW("Zip: seek %ld failed: %s\n", (long) searchStart, strerror(errno));
-        goto bail;
+        ALOGW("Zip: seek %ld failed: %s", (long) searchStart, strerror(errno));
+        return -1;
     }
     ssize_t actual = TEMP_FAILURE_RETRY(read(fd, scanBuf, readAmount));
     if (actual != (ssize_t) readAmount) {
-        ALOGW("Zip: read %zd failed: %s\n", readAmount, strerror(errno));
-        goto bail;
+        ALOGW("Zip: read %zd failed: %s", readAmount, strerror(errno));
+        return -1;
     }
 
     /*
@@ -198,13 +165,13 @@ static int mapCentralDirectory(int fd, const char* debugFileName,
     int i;
     for (i = readAmount - kEOCDLen; i >= 0; i--) {
         if (scanBuf[i] == 0x50 && get4LE(&scanBuf[i]) == kEOCDSignature) {
-            ALOGV("+++ Found EOCD at buf+%d\n", i);
+            ALOGV("+++ Found EOCD at buf+%d", i);
             break;
         }
     }
     if (i < 0) {
-        ALOGD("Zip: EOCD not found, %s is not zip\n", debugFileName);
-        goto bail;
+        ALOGD("Zip: EOCD not found, %s is not zip", debugFileName);
+        return -1;
     }
 
     off_t eocdOffset = searchStart + i;
@@ -221,16 +188,16 @@ static int mapCentralDirectory(int fd, const char* debugFileName,
     u4 dirOffset = get4LE(eocdPtr + kEOCDFileOffset);
 
     if ((long long) dirOffset + (long long) dirSize > (long long) eocdOffset) {
-        ALOGW("Zip: bad offsets (dir %ld, size %u, eocd %ld)\n",
+        ALOGW("Zip: bad offsets (dir %ld, size %u, eocd %ld)",
             (long) dirOffset, dirSize, (long) eocdOffset);
-        goto bail;
+        return -1;
     }
     if (numEntries == 0) {
-        ALOGW("Zip: empty archive?\n");
-        goto bail;
+        ALOGW("Zip: empty archive?");
+        return -1;
     }
 
-    ALOGV("+++ numEntries=%d dirSize=%d dirOffset=%d\n",
+    ALOGV("+++ numEntries=%d dirSize=%d dirOffset=%d",
         numEntries, dirSize, dirOffset);
 
     /*
@@ -240,16 +207,60 @@ static int mapCentralDirectory(int fd, const char* debugFileName,
     if (sysMapFileSegmentInShmem(fd, dirOffset, dirSize,
             &pArchive->mDirectoryMap) != 0)
     {
-        ALOGW("Zip: cd map failed\n");
-        goto bail;
+        ALOGW("Zip: cd map failed");
+        return -1;
     }
 
     pArchive->mNumEntries = numEntries;
     pArchive->mDirectoryOffset = dirOffset;
 
-    result = 0;
+    return 0;
+}
 
-bail:
+/*
+ * Find the zip Central Directory and memory-map it.
+ *
+ * On success, returns 0 after populating fields from the EOCD area:
+ *   mDirectoryOffset
+ *   mDirectoryMap
+ *   mNumEntries
+ */
+static int mapCentralDirectory(int fd, const char* debugFileName,
+    ZipArchive* pArchive)
+{
+    /*
+     * Get and test file length.
+     */
+    off_t fileLength = lseek(fd, 0, SEEK_END);
+    if (fileLength < kEOCDLen) {
+        ALOGV("Zip: length %ld is too small to be zip", (long) fileLength);
+        return -1;
+    }
+
+    /*
+     * Perform the traditional EOCD snipe hunt.
+     *
+     * We're searching for the End of Central Directory magic number,
+     * which appears at the start of the EOCD block.  It's followed by
+     * 18 bytes of EOCD stuff and up to 64KB of archive comment.  We
+     * need to read the last part of the file into a buffer, dig through
+     * it to find the magic number, parse some values out, and use those
+     * to determine the extent of the CD.
+     *
+     * We start by pulling in the last part of the file.
+     */
+    size_t readAmount = kMaxEOCDSearch;
+    if (fileLength < off_t(readAmount))
+        readAmount = fileLength;
+
+    u1* scanBuf = (u1*) malloc(readAmount);
+    if (scanBuf == NULL) {
+        return -1;
+    }
+
+    int result = mapCentralDirectory0(fd, debugFileName, pArchive,
+            fileLength, readAmount, scanBuf);
+
     free(scanBuf);
     return result;
 }
@@ -284,17 +295,17 @@ static int parseZipArchive(ZipArchive* pArchive)
     int i;
     for (i = 0; i < numEntries; i++) {
         if (get4LE(ptr) != kCDESignature) {
-            ALOGW("Zip: missed a central dir sig (at %d)\n", i);
+            ALOGW("Zip: missed a central dir sig (at %d)", i);
             goto bail;
         }
         if (ptr + kCDELen > cdPtr + cdLength) {
-            ALOGW("Zip: ran off the end (at %d)\n", i);
+            ALOGW("Zip: ran off the end (at %d)", i);
             goto bail;
         }
 
         long localHdrOffset = (long) get4LE(ptr + kCDELocalOffset);
         if (localHdrOffset >= pArchive->mDirectoryOffset) {
-            ALOGW("Zip: bad LFH offset %ld at entry %d\n", localHdrOffset, i);
+            ALOGW("Zip: bad LFH offset %ld at entry %d", localHdrOffset, i);
             goto bail;
         }
 
@@ -309,12 +320,12 @@ static int parseZipArchive(ZipArchive* pArchive)
 
         ptr += kCDELen + fileNameLen + extraLen + commentLen;
         if ((size_t)(ptr - cdPtr) > cdLength) {
-            ALOGW("Zip: bad CD advance (%d vs %zd) at entry %d\n",
+            ALOGW("Zip: bad CD advance (%d vs %zd) at entry %d",
                 (int) (ptr - cdPtr), cdLength, i);
             goto bail;
         }
     }
-    ALOGV("+++ zip good scan %d entries\n", numEntries);
+    ALOGV("+++ zip good scan %d entries", numEntries);
 
     result = 0;
 
@@ -337,17 +348,14 @@ int dexZipOpenArchive(const char* fileName, ZipArchive* pArchive)
 {
     int fd, err;
 
-    ALOGV("Opening as zip '%s' %p\n", fileName, pArchive);
+    ALOGV("Opening as zip '%s' %p", fileName, pArchive);
 
     memset(pArchive, 0, sizeof(ZipArchive));
 
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
     fd = open(fileName, O_RDONLY | O_BINARY, 0);
     if (fd < 0) {
         err = errno ? errno : -1;
-        ALOGV("Unable to open '%s': %s\n", fileName, strerror(err));
+        ALOGV("Unable to open '%s': %s", fileName, strerror(err));
         return err;
     }
 
@@ -370,7 +378,7 @@ int dexZipPrepArchive(int fd, const char* debugFileName, ZipArchive* pArchive)
         goto bail;
 
     if (parseZipArchive(pArchive) != 0) {
-        ALOGV("Zip: parsing '%s' failed\n", debugFileName);
+        ALOGV("Zip: parsing '%s' failed", debugFileName);
         goto bail;
     }
 
@@ -391,7 +399,7 @@ bail:
  */
 void dexZipCloseArchive(ZipArchive* pArchive)
 {
-    ALOGV("Closing archive %p\n", pArchive);
+    ALOGV("Closing archive %p", pArchive);
 
     if (pArchive->mFd >= 0)
         close(pArchive->mFd);
@@ -446,7 +454,7 @@ ZipEntry dexZipFindEntry(const ZipArchive* pArchive, const char* entryName)
 ZipEntry findEntryByIndex(ZipArchive* pArchive, int idx)
 {
     if (idx < 0 || idx >= pArchive->mNumEntries) {
-        ALOGW("Invalid index %d\n", idx);
+        ALOGW("Invalid index %d", idx);
         return NULL;
     }
 
@@ -523,24 +531,24 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
     if (pOffset != NULL) {
         long localHdrOffset = (long) get4LE(ptr + kCDELocalOffset);
         if (localHdrOffset + kLFHLen >= cdOffset) {
-            ALOGW("Zip: bad local hdr offset in zip\n");
+            ALOGW("Zip: bad local hdr offset in zip");
             return -1;
         }
 
         u1 lfhBuf[kLFHLen];
         if (lseek(pArchive->mFd, localHdrOffset, SEEK_SET) != localHdrOffset) {
-            ALOGW("Zip: failed seeking to lfh at offset %ld\n", localHdrOffset);
+            ALOGW("Zip: failed seeking to lfh at offset %ld", localHdrOffset);
             return -1;
         }
         ssize_t actual =
             TEMP_FAILURE_RETRY(read(pArchive->mFd, lfhBuf, sizeof(lfhBuf)));
         if (actual != sizeof(lfhBuf)) {
-            ALOGW("Zip: failed reading lfh from offset %ld\n", localHdrOffset);
+            ALOGW("Zip: failed reading lfh from offset %ld", localHdrOffset);
             return -1;
         }
 
         if (get4LE(lfhBuf) != kLFHSignature) {
-            ALOGW("Zip: didn't find signature at start of lfh, offset=%ld\n",
+            ALOGW("Zip: didn't find signature at start of lfh, offset=%ld",
                 localHdrOffset);
             return -1;
         }
@@ -548,13 +556,13 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
         off_t dataOffset = localHdrOffset + kLFHLen
             + get2LE(lfhBuf + kLFHNameLen) + get2LE(lfhBuf + kLFHExtraLen);
         if (dataOffset >= cdOffset) {
-            ALOGW("Zip: bad data offset %ld in zip\n", (long) dataOffset);
+            ALOGW("Zip: bad data offset %ld in zip", (long) dataOffset);
             return -1;
         }
 
         /* check lengths */
         if ((off_t)(dataOffset + compLen) > cdOffset) {
-            ALOGW("Zip: bad compressed length in zip (%ld + %zd > %ld)\n",
+            ALOGW("Zip: bad compressed length in zip (%ld + %zd > %ld)",
                 (long) dataOffset, compLen, (long) cdOffset);
             return -1;
         }
@@ -562,7 +570,7 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
         if (method == kCompressStored &&
             (off_t)(dataOffset + uncompLen) > cdOffset)
         {
-            ALOGW("Zip: bad uncompressed length in zip (%ld + %zd > %ld)\n",
+            ALOGW("Zip: bad uncompressed length in zip (%ld + %zd > %ld)",
                 (long) dataOffset, uncompLen, (long) cdOffset);
             return -1;
         }
@@ -576,7 +584,7 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
  * Uncompress "deflate" data from the archive's file to an open file
  * descriptor.
  */
-static int inflateToFile(int inFd, int outFd, size_t uncompLen, size_t compLen)
+static int inflateToFile(int outFd, int inFd, size_t uncompLen, size_t compLen)
 {
     int result = -1;
     const size_t kBufSize = 32768;
@@ -608,10 +616,10 @@ static int inflateToFile(int inFd, int outFd, size_t uncompLen, size_t compLen)
     zerr = inflateInit2(&zstream, -MAX_WBITS);
     if (zerr != Z_OK) {
         if (zerr == Z_VERSION_ERROR) {
-            ALOGE("Installed zlib is not compatible with linked version (%s)\n",
+            ALOGE("Installed zlib is not compatible with linked version (%s)",
                 ZLIB_VERSION);
         } else {
-            ALOGW("Call to inflateInit2 failed (zerr=%d)\n", zerr);
+            ALOGW("Call to inflateInit2 failed (zerr=%d)", zerr);
         }
         goto bail;
     }
@@ -626,7 +634,7 @@ static int inflateToFile(int inFd, int outFd, size_t uncompLen, size_t compLen)
 
             ssize_t actual = TEMP_FAILURE_RETRY(read(inFd, readBuf, getSize));
             if (actual != (ssize_t) getSize) {
-                ALOGW("Zip: inflate read failed (%d vs %zd)\n",
+                ALOGW("Zip: inflate read failed (%d vs %zd)",
                     (int)actual, getSize);
                 goto z_bail;
             }
@@ -640,7 +648,7 @@ static int inflateToFile(int inFd, int outFd, size_t uncompLen, size_t compLen)
         /* uncompress the data */
         zerr = inflate(&zstream, Z_NO_FLUSH);
         if (zerr != Z_OK && zerr != Z_STREAM_END) {
-            ALOGW("Zip: inflate zerr=%d (nIn=%p aIn=%u nOut=%p aOut=%u)\n",
+            ALOGW("Zip: inflate zerr=%d (nIn=%p aIn=%u nOut=%p aOut=%u)",
                 zerr, zstream.next_in, zstream.avail_in,
                 zstream.next_out, zstream.avail_out);
             goto z_bail;
@@ -663,7 +671,7 @@ static int inflateToFile(int inFd, int outFd, size_t uncompLen, size_t compLen)
 
     /* paranoia */
     if (zstream.total_out != uncompLen) {
-        ALOGW("Zip: size mismatch on inflated file (%ld vs %zd)\n",
+        ALOGW("Zip: size mismatch on inflated file (%ld vs %zd)",
             zstream.total_out, uncompLen);
         goto z_bail;
     }
@@ -717,7 +725,7 @@ int dexZipExtractEntryToFile(const ZipArchive* pArchive,
     int result = -1;
     int ent = entryToIndex(pArchive, entry);
     if (ent < 0) {
-        ALOGW("Zip: extract can't find entry %p\n", entry);
+        ALOGW("Zip: extract can't find entry %p", entry);
         goto bail;
     }
 
@@ -731,7 +739,7 @@ int dexZipExtractEntryToFile(const ZipArchive* pArchive,
         goto bail;
     }
     if (lseek(pArchive->mFd, dataOffset, SEEK_SET) != dataOffset) {
-        ALOGW("Zip: lseek to data at %ld failed\n", (long) dataOffset);
+        ALOGW("Zip: lseek to data at %ld failed", (long) dataOffset);
         goto bail;
     }
 
@@ -739,7 +747,7 @@ int dexZipExtractEntryToFile(const ZipArchive* pArchive,
         if (copyFileToFile(pArchive->mFd, fd, uncompLen) != 0)
             goto bail;
     } else {
-        if (inflateToFile(pArchive->mFd, fd, uncompLen, compLen) != 0)
+        if (inflateToFile(fd, pArchive->mFd, uncompLen, compLen) != 0)
             goto bail;
     }
 

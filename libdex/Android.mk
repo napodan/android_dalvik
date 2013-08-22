@@ -27,10 +27,10 @@ dex_src_files := \
 	InstrUtils.c \
 	Leb128.cpp \
 	OpCodeNames.cpp \
-	OptInvocation.c \
-	sha1.c \
+	OptInvocation.cpp \
+	sha1.cpp \
 	SysUtil.c \
-	ZipArchive.c
+	ZipArchive.cpp
 
 dex_include_files := \
 	dalvik \
