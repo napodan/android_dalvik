@@ -77,6 +77,25 @@ enum InstructionFormat {
     kFmt3rmi,       // [opt] inline invoke/range
 };
 
+/*
+ * Types of indexed reference that are associated with opcodes whose
+ * formats include such an indexed reference (e.g., 21c and 35c).
+ */
+#ifndef __cplusplus
+typedef unsigned char InstructionIndexType;
+#endif
+enum InstructionIndexType {
+    kIndexUnknown = 0,
+    kIndexNone,         // has no index
+    kIndexVaries,       // "It depends." Used for throw-verification-error
+    kIndexTypeRef,      // type reference index
+    kIndexStringRef,    // string reference index
+    kIndexMethodRef,    // method reference index
+    kIndexFieldRef,     // field reference index
+    kIndexInlineMethod, // inline method index (for inline linked methods)
+    kIndexVtableOffset, // vtable offset (for static linked methods)
+    kIndexFieldOffset   // field offset (for static linked fields)
+};
 
 /*
  * Instruction width implied by an opcode's format; a value in the
@@ -102,6 +121,22 @@ enum InstructionFlags {
     kInstrInvoke        = 1 << 5,   // a flavor of invoke
 };
 
+/*
+ * Struct that includes a pointer to each of the opcode information
+ * tables.
+ *
+ * Note: We use "u1*" here instead of the names of the enumerated
+ * types to guarantee that elements don't use much space. We hold out
+ * hope for a standard way to indicate the size of an enumerated type
+ * that works for both C and C++, but in the mean time, this will
+ * suffice.
+ */
+typedef struct InstructionInfoTables {
+    InstructionFormat*                formats;    /* InstructionFormat elements */
+    InstructionIndexType*                indexTypes; /* InstructionIndexType elements */
+    InstructionFlags*       flags;
+    InstructionWidth*  widths;
+} InstructionInfoTables;
 
 /*
  * Allocate and populate a 256-element array with instruction widths.  A
@@ -119,16 +154,18 @@ typedef struct DecodedInstruction {
     u4      vC;
     u4      arg[5];         /* vC/D/E/F/G in invoke or filled-new-array */
     OpCode  opCode;
+    InstructionIndexType indexType;
 } DecodedInstruction;
 
 /*
- * Return the width of the specified instruction, or 0 if not defined.
- */
+* Return the width of the specified instruction, or 0 if not defined.
+*/
 DEX_INLINE size_t dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
     return widths[opCode];
 }
+
 
 /*
  * Return the width of the specified instruction, or 0 if not defined.  Also
@@ -176,11 +213,38 @@ DEX_INLINE InstructionFormat dexGetInstrFormat(const InstructionFormat* fmts,
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
     return fmts[opCode];
 }
+ /*
+ * Allocate and populate an array with index types for all instructions.
+ * Used in conjunction with dexDecodeInstruction.
+ */
+InstructionIndexType* dexCreateInstrIndexTypeTable(void);
+
+/*
+ * Return the instruction index type for the specified opcode.
+ */
+DEX_INLINE InstructionIndexType dexGetInstrIndexType(
+    const InstructionIndexType* types, OpCode opCode)
+{
+    //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
+    return types[opCode];
+}
+
+/*
+ * Construct all of the instruction info tables, storing references to
+ * them into the given struct. This returns 0 on success or non-zero on
+ * failure. If this fails, then no net allocation will have occurred.
+ */
+int dexCreateInstructionInfoTables(InstructionInfoTables* info);
+
+/*
+ * Free up the tables referred to by the given instruction info struct.
+ */
+void dexFreeInstructionInfoTables(InstructionInfoTables* info);
 
 /*
  * Decode the instruction pointed to by "insns".
  */
-void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
+void dexDecodeInstruction(const InstructionInfoTables* info, const u2* insns,
     DecodedInstruction* pDec);
 
 #ifdef __cplusplus

@@ -49,8 +49,7 @@
 
 static const char* gProgName = "dexdump";
 
-static InstructionWidth* gInstrWidth;
-static InstructionFormat* gInstrFormat;
+static struct InstructionInfoTables gInstrInfo;
 
 enum OutputFormat {
     OUTPUT_PLAIN = 0,               /* default */
@@ -738,7 +737,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         printf("|%04x: %s", insnIdx, dexGetOpcodeName(pDecInsn->opCode));
     }
 
-    switch (dexGetInstrFormat(gInstrFormat, pDecInsn->opCode)) {
+    switch (dexGetInstrFormat(gInstrInfo.formats, pDecInsn->opCode)) {
     case kFmt10x:        // op
         break;
     case kFmt12x:        // op vA, vB
@@ -1051,7 +1050,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
             OpCode opcode = dexOpcodeFromCodeUnit(instr);
-            insnWidth = dexGetInstrWidth(gInstrWidth, opcode);
+            insnWidth = dexGetInstrWidth(gInstrInfo.widths, opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,
                     "GLITCH: zero-width instruction at idx=0x%04x\n", insnIdx);
@@ -1059,7 +1058,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             }
         }
 
-        dexDecodeInstruction(gInstrFormat, insns, &decInsn);
+        dexDecodeInstruction(&gInstrInfo, insns, &decInsn);
         dumpInstruction(pDexFile, pCode, insnIdx, insnWidth, &decInsn);
 
         insns += insnWidth;
@@ -1854,8 +1853,10 @@ int main(int argc, char* const argv[])
     }
 
     /* initialize some VM tables */
-    gInstrWidth = dexCreateInstrWidthTable();
-    gInstrFormat = dexCreateInstrFormatTable();
+    if (dexCreateInstructionInfoTables(&gInstrInfo)) {
+        fprintf(stderr, "Failed to construct instruction tables\n");
+        return 1;
+    }
 
     if (wantUsage) {
         usage();
@@ -1866,9 +1867,7 @@ int main(int argc, char* const argv[])
     while (optind < argc) {
         result |= process(argv[optind++]);
     }
-
-    free(gInstrWidth);
-    free(gInstrFormat);
+    dexFreeInstructionInfoTables(&gInstrInfo);
 
     return (result != 0);
 }

@@ -324,7 +324,7 @@ rewrite_static_field2:
             }
         }
 
-        width = dexGetInstrOrTableWidth(gDvm.instrWidth, insns);
+        width = dexGetInstrOrTableWidth(gDvm.instrInfo.widths, insns);
         assert(width > 0);
 
         insns += width;
