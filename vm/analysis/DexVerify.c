@@ -32,12 +32,7 @@ static bool verifyInstructions(VerifierData* vdata);
  */
 bool dvmVerificationStartup(void)
 {
-    gDvm.instrWidth = dexCreateInstrWidthTable();
-    gDvm.instrFormat = dexCreateInstrFormatTable();
-    gDvm.instrFlags = dexCreateInstrFlagsTable();
-    if (gDvm.instrWidth == NULL || gDvm.instrFormat == NULL ||
-        gDvm.instrFlags == NULL)
-    {
+    if (dexCreateInstructionInfoTables(&gDvm.instrInfo)) {
         ALOGE("Unable to create instruction tables\n");
         return false;
     }
@@ -50,9 +45,7 @@ bool dvmVerificationStartup(void)
  */
 void dvmVerificationShutdown(void)
 {
-    free(gDvm.instrWidth);
-    free(gDvm.instrFormat);
-    free(gDvm.instrFlags);
+    dexFreeInstructionInfoTables(&gDvm.instrInfo);
 }
 
 
@@ -285,7 +278,7 @@ static bool checkArrayData(const Method* meth, int curOffset)
 static void decodeInstruction(const Method* meth, int insnIdx,
     DecodedInstruction* pDecInsn)
 {
-    dexDecodeInstruction(gDvm.instrFormat, meth->insns + insnIdx, pDecInsn);
+    dexDecodeInstruction(&gDvm.instrInfo, meth->insns + insnIdx, pDecInsn);
 }
 
 
@@ -510,7 +503,7 @@ static bool verifyInstructions(VerifierData* vdata)
 
         int width = dvmInsnGetWidth(insnFlags, i);
         OpCode opcode = *insns & 0xff;
-        InstructionFlags opFlags = dexGetInstrFlags(gDvm.instrFlags, opcode);
+        InstructionFlags opFlags = dexGetInstrFlags(gDvm.instrInfo.flags, opcode);
 
         if ((opFlags & gcMask) != 0) {
             /*
