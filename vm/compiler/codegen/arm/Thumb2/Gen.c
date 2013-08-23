@@ -15,7 +15,7 @@
  */
 
 /*
- * This file contains codegen for the Thumb ISA and is intended to be
+ * This file contains codegen for the Thumb2 ISA and is intended to be
  * includes by:
  *
  *        Codegen-$(TARGET_ARCH_VARIANT).c
@@ -306,7 +306,7 @@ static void genMonitorExit(CompilationUnit *cUnit, MIR *mir)
 
 static void genMonitor(CompilationUnit *cUnit, MIR *mir)
 {
-    if (mir->dalvikInsn.opCode == OP_MONITOR_ENTER)
+    if (mir->dalvikInsn.opcode == OP_MONITOR_ENTER)
         genMonitorEnter(cUnit, mir);
     else
         genMonitorExit(cUnit, mir);

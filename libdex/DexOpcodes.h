@@ -28,6 +28,7 @@
 #define _LIBDEX_OPCODE
 
 #ifdef __cplusplus
+extern "C" {
 #include "DexFile.h"
 #endif /*__cplusplus*/
 /*
@@ -39,7 +40,7 @@
  * the compiler will complain about an unknown value.
  *
  * Opcode definitions and attributes:
- *  - update the OpCode enum below
+ *  - update the Opcode enum below
  *  - update the "goto table" definition macro, DEFINE_GOTO_TABLE(), below
  *  - update the instruction info table generators and (if you changed an
  *    instruction format) instruction decoder in InstrUtils.c
@@ -62,7 +63,7 @@
  *    - verify by running with verifier enabled (it's on by default)
  *
  * Tools:
- *  - update the OpCodeNames table in dexdump/OpCodeNames.c
+ *  - update the Opcode table in dexdump/Opcode.c
  *  - update dexdump/DexDump.c if an instruction format has changed
  *
  * Note: The Dalvik VM tests (in the tests subdirectory) provide a convenient
@@ -84,10 +85,10 @@
  */
 
 #ifdef __cplusplus
-enum OpCode {
+enum Opcode {
     // BEGIN(libdex-opcode-enum); GENERATED AUTOMATICALLY BY opcode-gen
 #else
-typedef enum OpCode {
+typedef enum Opcode {
 #endif /*__cplusplus*/
     OP_NOP                          = 0x00,
     OP_MOVE                         = 0x01,
@@ -349,7 +350,7 @@ typedef enum OpCode {
 #ifdef __cplusplus
 };
 #else
-} OpCode;
+} Opcode;
 #endif /*__cplusplus*/
 
 #define kNumDalvikInstructions 256
@@ -364,12 +365,8 @@ typedef enum OpCode {
 #define kArrayDataSignature     0x0300
 
 /*
- * Macro used to generate computed goto tables for the C interpreter.
- *
- * The labels here must match up with the labels in the interpreter
- * implementation.  There is no direct connection between these and the
- * numeric definitions above, but if the two get out of sync strange things
- * will happen.
+ * Macro used to generate a computed goto table for use in implementing
+ * an interpreter in C.
  */
 #define DEFINE_GOTO_TABLE(_name) \
     static const void* _name[kNumDalvikInstructions] = {                    \
@@ -656,7 +653,7 @@ typedef enum OpCode {
  * opcode space is inherently sparse, in that the opcode unit is 16
  * bits wide, but for most opcodes, eight of those bits are for data.
  */
-DEX_INLINE OpCode dexOpcodeFromCodeUnit(u2 codeUnit) {
+DEX_INLINE Opcode dexOpcodeFromCodeUnit(u2 codeUnit) {
     /*
      * This will want to become table-driven should the opcode layout
      * get more complicated.
@@ -666,12 +663,21 @@ DEX_INLINE OpCode dexOpcodeFromCodeUnit(u2 codeUnit) {
      */
     int lowByte = codeUnit & 0xff;
     if (lowByte != 0xff) {
-        return (OpCode) lowByte;
+        return (Opcode) lowByte;
     } else {
-        return (OpCode) ((codeUnit >> 8) | 0x100);
+        return (Opcode) ((codeUnit >> 8) | 0x100);
     }
 }
 
 #endif /* __cplusplus */
+
+/*
+ * Return the name of an opcode.
+ */
+const char* dexGetOpcodeName(Opcode op);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_LIBDEX_OPCODE*/
