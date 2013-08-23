@@ -1051,7 +1051,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
             OpCode opcode = dexOpcodeFromCodeUnit(instr);
-            insnWidth = dexGetInstrWidthAbs(gInstrWidth, opcode);
+            insnWidth = dexGetInstrWidth(gInstrWidth, opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,
                     "GLITCH: zero-width instruction at idx=0x%04x\n", insnIdx);

@@ -79,9 +79,12 @@ enum InstructionFormat {
 
 
 /*
- * Instruction width, a value in the range -3 to 5.
+ * Instruction width implied by an opcode's format; a value in the
+ * range 0 to 5. Note that there are special "pseudo-instructions"
+ * which are used to encode switch and data tables, and these don't
+ * have a fixed width. See dexGetWidthFromInstruction(), below.
  */
-typedef signed char InstructionWidth;
+typedef u1 InstructionWidth;
 
 /*
  * Instruction flags, used by the verifier and JIT to determine where
@@ -122,15 +125,10 @@ typedef struct DecodedInstruction {
 /*
  * Return the width of the specified instruction, or 0 if not defined.
  */
-DEX_INLINE size_t dexGetInstrWidthAbs(const InstructionWidth* widths, OpCode opCode)
+DEX_INLINE size_t dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-
-    int val = widths[opCode];
-    if (val < 0)
-        val = -val;
-    /* XXX - the no-compare trick may be a cycle slower on ARM */
-    return val;
+    return widths[opCode];
 }
 
 /*
@@ -138,7 +136,7 @@ DEX_INLINE size_t dexGetInstrWidthAbs(const InstructionWidth* widths, OpCode opC
  * works for special OP_NOP entries, including switch statement data tables
  * and array data.
  */
-size_t dexGetInstrOrTableWidthAbs(const InstructionWidth* widths,
+size_t dexGetInstrOrTableWidth(const InstructionWidth* widths,
     const u2* insns);
 
 

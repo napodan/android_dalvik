@@ -310,7 +310,7 @@ InstructionWidth* dexCreateInstrWidthTable(void)
         case OP_SGET_WIDE_VOLATILE:
         case OP_SPUT_WIDE_VOLATILE:
         case OP_THROW_VERIFICATION_ERROR:
-            width = -2;
+            width = 2;
             break;
         case OP_INVOKE_VIRTUAL_QUICK:
         case OP_INVOKE_VIRTUAL_QUICK_RANGE:
@@ -319,7 +319,7 @@ InstructionWidth* dexCreateInstrWidthTable(void)
         case OP_EXECUTE_INLINE:
         case OP_EXECUTE_INLINE_RANGE:
         case OP_INVOKE_DIRECT_EMPTY:
-            width = -3;
+            width = 3;
             break;
 
         /* these should never appear when scanning bytecode */
@@ -1235,7 +1235,7 @@ bail:
  * works for special OP_NOP entries, including switch statement data tables
  * and array data.
  */
-size_t dexGetInstrOrTableWidthAbs(const InstructionWidth* widths,
+size_t dexGetInstrOrTableWidth(const InstructionWidth* widths,
     const u2* insns)
 {
     size_t width;
@@ -1249,7 +1249,7 @@ size_t dexGetInstrOrTableWidthAbs(const InstructionWidth* widths,
         u4 len = insns[2] | (((u4)insns[3]) << 16);
         width = 4 + (elemWidth * len + 1) / 2;
     } else {
-        width = dexGetInstrWidthAbs(widths, INST_INST(insns[0]));
+        width = dexGetInstrWidth(widths, INST_INST(insns[0]));
     }
     return width;
 }
