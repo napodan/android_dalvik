@@ -159,10 +159,10 @@ typedef struct DecodedInstruction {
 /*
 * Return the width of the specified instruction, or 0 if not defined.
 */
-DEX_INLINE size_t dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode)
+DEX_INLINE size_t dexGetInstrWidth(OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-    return widths[opCode];
+    return gDexOpcodeInfo.widths[opCode];
 }
 
 /*
@@ -173,6 +173,15 @@ DEX_INLINE size_t dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode
 size_t dexGetInstrOrTableWidth(const u2* insns);
 
 /*
+ * Returns the flags for the specified opcode.
+ */
+DEX_INLINE int dexGetInstrFlags(OpCode opCode)
+{
+    //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
+    return gDexOpcodeInfo.flags[opCode];
+}
+
+/*
  * Returns true if the given flags represent a goto (unconditional branch).
  */
 DEX_INLINE bool dexIsGoto(int flags)
@@ -181,39 +190,22 @@ DEX_INLINE bool dexIsGoto(int flags)
 }
 
 /*
- * Returns the flags for the specified opcode.
- */
-DEX_INLINE int dexGetInstrFlags(const u1* flags, OpCode opCode)
-{
-    //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-    return flags[opCode];
-}
-
-/*
  * Return the instruction format for the specified opcode.
  */
-DEX_INLINE InstructionFormat dexGetInstrFormat(const InstructionFormat* fmts,
-    OpCode opCode)
+DEX_INLINE InstructionFormat dexGetInstrFormat(OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-    return fmts[opCode];
+    return gDexOpcodeInfo.formats[opCode];
 }
 
 /*
  * Return the instruction index type for the specified opcode.
  */
-DEX_INLINE InstructionIndexType dexGetInstrIndexType(
-    const InstructionIndexType* types, OpCode opCode)
+DEX_INLINE InstructionIndexType dexGetInstrIndexType(OpCode opCode)
 {
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
-    return types[opCode];
+    return gDexOpcodeInfo.indexTypes[opCode];
 }
-
-/*
- * Copy pointers to all of the instruction info tables into
- * the given struct.
- */
-void dexGetInstructionInfoTables(InstructionInfoTables* info);
 
 /*
  * Decode the instruction pointed to by "insns".

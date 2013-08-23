@@ -32,7 +32,6 @@ static bool verifyInstructions(VerifierData* vdata);
  */
 bool dvmVerificationStartup(void)
 {
-    dexGetInstructionInfoTables(&gDvm.instrInfo);
     return true;
 }
 
@@ -498,7 +497,7 @@ static bool verifyInstructions(VerifierData* vdata)
 
         int width = dvmInsnGetWidth(insnFlags, i);
         OpCode opcode = *insns & 0xff;
-        InstructionFlags opFlags = dexGetInstrFlags(gDvm.instrInfo.flags, opcode);
+        InstructionFlags opFlags = dexGetInstrFlags(opcode);
 
         if ((opFlags & gcMask) != 0) {
             /*

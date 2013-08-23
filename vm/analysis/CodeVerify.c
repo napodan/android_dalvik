@@ -3343,42 +3343,6 @@ static bool doCodeVerification(const Method* meth, InsnFlags* insnFlags,
             goto bail;
         }
 
-#if 0
-        {
-            static const int gcMask = kInstrCanBranch | kInstrCanSwitch |
-                                      kInstrCanThrow | kInstrCanReturn;
-            OpCode opCode = *(meth->insns + insnIdx) & 0xff;
-            int flags = dexGetInstrFlags(gDvm.instrFlags, opCode);
-
-            /* 8, 16, 32, or 32*n -bit regs */
-            int regWidth = (meth->registersSize + 7) / 8;
-            if (regWidth == 3)
-                regWidth = 4;
-            if (regWidth > 4) {
-                regWidth = ((regWidth + 3) / 4) * 4;
-                if (false) {
-                    ALOGW("WOW: %d regs -> %d  %s.%s\n",
-                        meth->registersSize, regWidth,
-                        meth->clazz->descriptor, meth->name);
-                    //x = true;
-                }
-            }
-
-            if ((flags & gcMask) != 0) {
-                /* this is a potential GC point */
-                gDvm__gcInstr++;
-
-                if (insnsSize < 256)
-                    gDvm__gcData += 1;
-                else
-                    gDvm__gcData += 2;
-                gDvm__gcData += regWidth;
-            }
-            gDvm__gcSimpleData += regWidth;
-
-            gDvm__totalInstr++;
-        }
-#endif
 
         /*
          * Clear "changed" and mark as visited.
@@ -3506,7 +3470,7 @@ static bool verifyInstruction(const Method* meth, InsnFlags* insnFlags,
 #endif
     dexDecodeInstruction(insns, &decInsn);
 
-    int nextFlags = dexGetInstrFlags(gDvm.instrInfo.flags, decInsn.opCode);
+    int nextFlags = dexGetInstrFlags(decInsn.opCode);
 
     /*
      * Make a copy of the previous register state.  If the instruction
