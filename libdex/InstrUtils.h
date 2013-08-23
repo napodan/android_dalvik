@@ -100,7 +100,6 @@ enum InstructionFlags {
     kInstrCanThrow      = 1 << 3,   // could cause an exception to be thrown
     kInstrCanReturn     = 1 << 4,   // returns, no additional statements
     kInstrInvoke        = 1 << 5,   // a flavor of invoke
-    kInstrUnconditional = 1 << 6,   // unconditional branch
 };
 
 
@@ -144,6 +143,14 @@ size_t dexGetInstrOrTableWidth(const InstructionWidth* widths,
  * Allocate and populate a 256-element array with instruction flags.
  */
 u1* dexCreateInstrFlagsTable(void);
+
+/*
+ * Returns true if the given flags represent a goto (unconditional branch).
+ */
+DEX_INLINE bool dexIsGoto(int flags)
+{
+    return (flags & (kInstrCanBranch | kInstrCanContinue)) == kInstrCanBranch;
+}
 
 /*
  * Returns the flags for the specified opcode.
