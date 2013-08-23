@@ -29,12 +29,14 @@
  * - no generic signatures on parameters, e.g. type="java.lang.Class&lt;?&gt;"
  * - class shows declared fields and methods; does not show inherited fields
  */
+
 #include "libdex/DexFile.h"
+
 #include "libdex/DexCatch.h"
 #include "libdex/DexClass.h"
+#include "libdex/DexOpcodes.h"
 #include "libdex/DexProto.h"
 #include "libdex/InstrUtils.h"
-#include "libdex/OpCodeNames.h"
 #include "libdex/SysUtil.h"
 #include "libdex/CmdUtils.h"
 
@@ -717,7 +719,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         }
     }
 
-    if (pDecInsn->opCode == OP_NOP) {
+    if (pDecInsn->opcode == OP_NOP) {
         u2 instr = get2LE((const u1*) &insns[insnIdx]);
         if (instr == kPackedSwitchSignature) {
             printf("|%04x: packed-switch-data (%d units)",
@@ -732,10 +734,10 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
             printf("|%04x: nop // spacer", insnIdx);
         }
     } else {
-        printf("|%04x: %s", insnIdx, dexGetOpcodeName(pDecInsn->opCode));
+        printf("|%04x: %s", insnIdx, dexGetOpcodeName(pDecInsn->opcode));
     }
 
-    switch (dexGetInstrFormat(pDecInsn->opCode)) {
+    switch (dexGetInstrFormat(pDecInsn->opcode)) {
     case kFmt10x:        // op
         break;
     case kFmt12x:        // op vA, vB
@@ -776,7 +778,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         break;
     case kFmt21h:        // op vAA, #+BBBB0000[00000000]
         // The printed format varies a bit based on the actual opcode.
-        if (pDecInsn->opCode == OP_CONST_HIGH16) {
+        if (pDecInsn->opcode == OP_CONST_HIGH16) {
             s4 value = pDecInsn->vB << 16;
             printf(" v%d, #int %d // #%x",
                 pDecInsn->vA, value, (u2)pDecInsn->vB);
@@ -787,12 +789,12 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         }
         break;
     case kFmt21c:        // op vAA, thing@BBBB
-        if (pDecInsn->opCode == OP_CONST_STRING) {
+        if (pDecInsn->opcode == OP_CONST_STRING) {
             printf(" v%d, \"%s\" // string@%04x", pDecInsn->vA,
                 dexStringById(pDexFile, pDecInsn->vB), pDecInsn->vB);
-        } else if (pDecInsn->opCode == OP_CHECK_CAST ||
-                   pDecInsn->opCode == OP_NEW_INSTANCE ||
-                   pDecInsn->opCode == OP_CONST_CLASS)
+        } else if (pDecInsn->opcode == OP_CHECK_CAST ||
+                   pDecInsn->opcode == OP_NEW_INSTANCE ||
+                   pDecInsn->opcode == OP_CONST_CLASS)
         {
             printf(" v%d, %s // class@%04x", pDecInsn->vA,
                 getClassDescriptor(pDexFile, pDecInsn->vB), pDecInsn->vB);
@@ -828,8 +830,8 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
             pDecInsn->vA, pDecInsn->vB, (s4)pDecInsn->vC, (u2)pDecInsn->vC);
         break;
     case kFmt22c:        // op vA, vB, thing@CCCC
-        if (pDecInsn->opCode == OP_INSTANCE_OF ||
-            pDecInsn->opCode == OP_NEW_ARRAY)
+        if (pDecInsn->opcode == OP_INSTANCE_OF ||
+            pDecInsn->opcode == OP_NEW_ARRAY)
         {
             printf(" v%d, v%d, %s // class@%04x",
                 pDecInsn->vA, pDecInsn->vB,
@@ -886,7 +888,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
                 else
                     printf(", v%d", pDecInsn->arg[i]);
             }
-            if (pDecInsn->opCode == OP_FILLED_NEW_ARRAY) {
+            if (pDecInsn->opcode == OP_FILLED_NEW_ARRAY) {
                 printf("}, %s // class@%04x",
                     getClassDescriptor(pDexFile, pDecInsn->vB), pDecInsn->vB);
             } else {
@@ -926,7 +928,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
                 else
                     printf(", v%d", pDecInsn->vC + i);
             }
-            if (pDecInsn->opCode == OP_FILLED_NEW_ARRAY_RANGE) {
+            if (pDecInsn->opcode == OP_FILLED_NEW_ARRAY_RANGE) {
                 printf("}, %s // class@%04x",
                     getClassDescriptor(pDexFile, pDecInsn->vB), pDecInsn->vB);
             } else {
@@ -1031,10 +1033,17 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
     insnIdx = 0;
     while (insnIdx < (int) pCode->insnsSize) {
         int insnWidth;
-        OpCode opCode;
         DecodedInstruction decInsn;
         u2 instr;
 
+        /*
+         * Note: This code parallels the function
+         * dexGetWidthFromInstruction() in InstrUtils.c, but this version
+         * can deal with data in either endianness.
+         *
+         * TODO: Figure out if this really matters, and possibly change
+         * this to just use dexGetWidthFromInstruction().
+         */
         instr = get2LE((const u1*)insns);
         if (instr == kPackedSwitchSignature) {
             insnWidth = 4 + get2LE((const u1*)(insns+1)) * 2;
@@ -1047,7 +1056,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             // The plus 1 is to round up for odd size and width.
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
-            OpCode opcode = dexOpcodeFromCodeUnit(instr);
+            Opcode opcode = dexOpcodeFromCodeUnit(instr);
             insnWidth = dexGetInstrWidth(opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,

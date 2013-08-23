@@ -37,10 +37,10 @@ struct InlineSub {
 
 /* fwd */
 static void optimizeMethod(Method* method, bool essentialOnly);
-static bool rewriteInstField(Method* method, u2* insns, OpCode quickOpc,
-    OpCode volatileOpc);
-static bool rewriteStaticField(Method* method, u2* insns, OpCode volatileOpc);
-static bool rewriteVirtualInvoke(Method* method, u2* insns, OpCode newOpc);
+static bool rewriteInstField(Method* method, u2* insns, Opcode quickOpc,
+    Opcode volatileOpc);
+static bool rewriteStaticField(Method* method, u2* insns, Opcode volatileOpc);
+static bool rewriteVirtualInvoke(Method* method, u2* insns, Opcode newOpc);
 static bool rewriteEmptyDirectInvoke(Method* method, u2* insns);
 static bool rewriteExecuteInline(Method* method, u2* insns,
     MethodType methodType);
@@ -185,7 +185,7 @@ static void optimizeMethod(Method* method, bool essentialOnly)
     insnsSize = dvmGetMethodInsnsSize(method);
 
     while (insnsSize > 0) {
-        OpCode quickOpc, volatileOpc = OP_NOP;
+        Opcode quickOpc, volatileOpc = OP_NOP;
         int width;
         bool notMatched = false;
 
@@ -633,8 +633,8 @@ StaticField* dvmOptResolveStaticField(ClassObject* referrer, u4 sfieldIdx,
  *
  * "method" is the referring method.
  */
-static bool rewriteInstField(Method* method, u2* insns, OpCode quickOpc,
-    OpCode volatileOpc)
+static bool rewriteInstField(Method* method, u2* insns, Opcode quickOpc,
+    Opcode volatileOpc)
 {
     ClassObject* clazz = method->clazz;
     u2 fieldIdx = insns[1];
@@ -682,7 +682,7 @@ static bool rewriteInstField(Method* method, u2* insns, OpCode quickOpc,
  *
  * "method" is the referring method.
  */
-static bool rewriteStaticField(Method* method, u2* insns, OpCode volatileOpc)
+static bool rewriteStaticField(Method* method, u2* insns, Opcode volatileOpc)
 {
     ClassObject* clazz = method->clazz;
     u2 fieldIdx = insns[1];
@@ -849,7 +849,7 @@ Method* dvmOptResolveMethod(ClassObject* referrer, u4 methodIdx,
  * We want to replace the method constant pool index BBBB with the
  * vtable index.
  */
-static bool rewriteVirtualInvoke(Method* method, u2* insns, OpCode newOpc)
+static bool rewriteVirtualInvoke(Method* method, u2* insns, Opcode newOpc)
 {
     ClassObject* clazz = method->clazz;
     Method* baseMethod;

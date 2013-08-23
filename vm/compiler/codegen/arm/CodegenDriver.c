@@ -86,7 +86,7 @@ static bool genArithOpFloatPortable(CompilationUnit *cUnit, MIR *mir,
     RegLocation rlResult;
     void* funct;
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_ADD_FLOAT_2ADDR:
         case OP_ADD_FLOAT:
             funct = (void*) __aeabi_fadd;
@@ -132,7 +132,7 @@ static bool genArithOpDoublePortable(CompilationUnit *cUnit, MIR *mir,
     RegLocation rlResult;
     void* funct;
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_ADD_DOUBLE_2ADDR:
         case OP_ADD_DOUBLE:
             funct = (void*) __aeabi_dadd;
@@ -173,9 +173,9 @@ static bool genArithOpDoublePortable(CompilationUnit *cUnit, MIR *mir,
 
 static bool genConversionPortable(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode opCode = mir->dalvikInsn.opCode;
+    Opcode opcode = mir->dalvikInsn.opcode;
 
-    switch (opCode) {
+    switch (opcode) {
         case OP_INT_TO_FLOAT:
             return genConversionCall(cUnit, mir, (void*)__aeabi_i2f, 1, 1);
         case OP_FLOAT_TO_INT:
@@ -203,11 +203,11 @@ static bool genConversionPortable(CompilationUnit *cUnit, MIR *mir)
 }
 
 #if defined(WITH_SELF_VERIFICATION)
-static void selfVerificationBranchInsert(LIR *currentLIR, ArmOpCode opCode,
+static void selfVerificationBranchInsert(LIR *currentLIR, ArmOpcode opcode,
                           int dest, int src1)
 {
      ArmLIR *insn = dvmCompilerNew(sizeof(ArmLIR), true);
-     insn->opCode = opCode;
+     insn->opcode = opcode;
      insn->operands[0] = dest;
      insn->operands[1] = src1;
      setupResourceMasks(insn);
@@ -217,7 +217,7 @@ static void selfVerificationBranchInsert(LIR *currentLIR, ArmOpCode opCode,
 static void selfVerificationBranchInsertPass(CompilationUnit *cUnit)
 {
     ArmLIR *thisLIR;
-    TemplateOpCode opCode = TEMPLATE_MEM_OP_DECODE;
+    TemplateOpcode opcode = TEMPLATE_MEM_OP_DECODE;
 
     for (thisLIR = (ArmLIR *) cUnit->firstLIRInsn;
          thisLIR != (ArmLIR *) cUnit->lastLIRInsn;
@@ -225,11 +225,11 @@ static void selfVerificationBranchInsertPass(CompilationUnit *cUnit)
         if (thisLIR->branchInsertSV) {
             /* Branch to mem op decode template */
             selfVerificationBranchInsert((LIR *) thisLIR, kThumbBlx1,
-                       (int) gDvmJit.codeCache + templateEntryOffsets[opCode],
-                       (int) gDvmJit.codeCache + templateEntryOffsets[opCode]);
+                       (int) gDvmJit.codeCache + templateEntryOffsets[opcode],
+                       (int) gDvmJit.codeCache + templateEntryOffsets[opcode]);
             selfVerificationBranchInsert((LIR *) thisLIR, kThumbBlx2,
-                       (int) gDvmJit.codeCache + templateEntryOffsets[opCode],
-                       (int) gDvmJit.codeCache + templateEntryOffsets[opCode]);
+                       (int) gDvmJit.codeCache + templateEntryOffsets[opcode],
+                       (int) gDvmJit.codeCache + templateEntryOffsets[opcode]);
         }
     }
 }
@@ -595,7 +595,7 @@ static bool genShiftOpLong(CompilationUnit *cUnit, MIR *mir,
 
     loadValueDirectWideFixed(cUnit, rlSrc1, r0, r1);
     loadValueDirect(cUnit, rlShift, r2);
-    switch( mir->dalvikInsn.opCode) {
+    switch( mir->dalvikInsn.opcode) {
         case OP_SHL_LONG:
         case OP_SHL_LONG_2ADDR:
             genDispatchToHandler(cUnit, TEMPLATE_SHL_LONG);
@@ -627,7 +627,7 @@ static bool genArithOpLong(CompilationUnit *cUnit, MIR *mir,
     void *callTgt;
     int retReg = r0;
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_NOT_LONG:
             rlSrc2 = loadValueWide(cUnit, rlSrc2, kCoreReg);
             rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kCoreReg, true);
@@ -727,7 +727,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
     RegLocation rlResult;
     bool shiftOp = false;
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_NEG_INT:
             op = kOpNeg;
             unary = true;
@@ -792,7 +792,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
             break;
         default:
             ALOGE("Invalid word arith op: 0x%x(%d)",
-                 mir->dalvikInsn.opCode, mir->dalvikInsn.opCode);
+                 mir->dalvikInsn.opcode, mir->dalvikInsn.opcode);
             dvmCompilerAbort(cUnit);
     }
     if (!callOut) {
@@ -839,7 +839,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
 
 static bool genArithOp(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode opCode = mir->dalvikInsn.opCode;
+    Opcode opcode = mir->dalvikInsn.opcode;
     RegLocation rlDest;
     RegLocation rlSrc1;
     RegLocation rlSrc2;
@@ -862,34 +862,34 @@ static bool genArithOp(CompilationUnit *cUnit, MIR *mir)
         rlDest = dvmCompilerGetDestWide(cUnit, mir, 0, 1);
     }
 
-    if ((opCode >= OP_ADD_LONG_2ADDR) && (opCode <= OP_XOR_LONG_2ADDR)) {
+    if ((opcode >= OP_ADD_LONG_2ADDR) && (opcode <= OP_XOR_LONG_2ADDR)) {
         return genArithOpLong(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_LONG) && (opCode <= OP_XOR_LONG)) {
+    if ((opcode >= OP_ADD_LONG) && (opcode <= OP_XOR_LONG)) {
         return genArithOpLong(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_SHL_LONG_2ADDR) && (opCode <= OP_USHR_LONG_2ADDR)) {
+    if ((opcode >= OP_SHL_LONG_2ADDR) && (opcode <= OP_USHR_LONG_2ADDR)) {
         return genShiftOpLong(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_SHL_LONG) && (opCode <= OP_USHR_LONG)) {
+    if ((opcode >= OP_SHL_LONG) && (opcode <= OP_USHR_LONG)) {
         return genShiftOpLong(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_INT_2ADDR) && (opCode <= OP_USHR_INT_2ADDR)) {
+    if ((opcode >= OP_ADD_INT_2ADDR) && (opcode <= OP_USHR_INT_2ADDR)) {
         return genArithOpInt(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_INT) && (opCode <= OP_USHR_INT)) {
+    if ((opcode >= OP_ADD_INT) && (opcode <= OP_USHR_INT)) {
         return genArithOpInt(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_FLOAT_2ADDR) && (opCode <= OP_REM_FLOAT_2ADDR)) {
+    if ((opcode >= OP_ADD_FLOAT_2ADDR) && (opcode <= OP_REM_FLOAT_2ADDR)) {
         return genArithOpFloat(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_FLOAT) && (opCode <= OP_REM_FLOAT)) {
+    if ((opcode >= OP_ADD_FLOAT) && (opcode <= OP_REM_FLOAT)) {
         return genArithOpFloat(cUnit, mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_DOUBLE_2ADDR) && (opCode <= OP_REM_DOUBLE_2ADDR)) {
+    if ((opcode >= OP_ADD_DOUBLE_2ADDR) && (opcode <= OP_REM_DOUBLE_2ADDR)) {
         return genArithOpDouble(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
-    if ((opCode >= OP_ADD_DOUBLE) && (opCode <= OP_REM_DOUBLE)) {
+    if ((opcode >= OP_ADD_DOUBLE) && (opcode <= OP_REM_DOUBLE)) {
         return genArithOpDouble(cUnit,mir, rlDest, rlSrc1, rlSrc2);
     }
     return true;
@@ -915,7 +915,7 @@ static void genReturnCommon(CompilationUnit *cUnit, MIR *mir)
     ArmLIR *branch = genUnconditionalBranch(cUnit, NULL);
     /* Set up the place holder to reconstruct this Dalvik PC */
     ArmLIR *pcrLabel = dvmCompilerNew(sizeof(ArmLIR), true);
-    pcrLabel->opCode = kArmPseudoPCReconstructionCell;
+    pcrLabel->opcode = kArmPseudoPCReconstructionCell;
     pcrLabel->operands[0] = dPC;
     pcrLabel->operands[1] = mir->offset;
     /* Insert the place holder to the growable list */
@@ -1152,7 +1152,7 @@ static void genInvokeVirtualCommon(CompilationUnit *cUnit, MIR *mir,
     if (pcrLabel == NULL) {
         int dPC = (int) (cUnit->method->insns + mir->offset);
         pcrLabel = dvmCompilerNew(sizeof(ArmLIR), true);
-        pcrLabel->opCode = kArmPseudoPCReconstructionCell;
+        pcrLabel->opcode = kArmPseudoPCReconstructionCell;
         pcrLabel->operands[0] = dPC;
         pcrLabel->operands[1] = mir->offset;
         /* Insert the place holder to the growable list */
@@ -1230,12 +1230,12 @@ static void genPuntToInterp(CompilationUnit *cUnit, unsigned int offset)
  */
 static void genInterpSingleStep(CompilationUnit *cUnit, MIR *mir)
 {
-    int flags = dexGetInstrFlags(mir->dalvikInsn.opCode);
+    int flags = dexGetInstrFlags(mir->dalvikInsn.opcode);
     int flagsToCheck = kInstrCanBranch | kInstrCanSwitch | kInstrCanReturn |
                        kInstrCanThrow;
 
     //If already optimized out, just ignore
-    if (mir->dalvikInsn.opCode == OP_NOP)
+    if (mir->dalvikInsn.opcode == OP_NOP)
         return;
 
     //Ugly, but necessary.  Flush all Dalvik regs so Interp can find them
@@ -1270,7 +1270,7 @@ static void genInterpSingleStep(CompilationUnit *cUnit, MIR *mir)
  */
 static void genMonitorPortable(CompilationUnit *cUnit, MIR *mir)
 {
-    bool isEnter = (mir->dalvikInsn.opCode == OP_MONITOR_ENTER);
+    bool isEnter = (mir->dalvikInsn.opcode == OP_MONITOR_ENTER);
     genExportPC(cUnit, mir);
     dvmCompilerFlushAllRegs(cUnit);   /* Send everything to home location */
     RegLocation rlSrc = dvmCompilerGetSrc(cUnit, mir, 0);
@@ -1320,12 +1320,12 @@ static bool handleFmt10t_Fmt20t_Fmt30t(CompilationUnit *cUnit, MIR *mir,
 
 static bool handleFmt10x(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
-    if ((dalvikOpCode >= OP_UNUSED_3E) && (dalvikOpCode <= OP_UNUSED_43)) {
-        ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
+    if ((dalvikOpcode >= OP_UNUSED_3E) && (dalvikOpcode <= OP_UNUSED_43)) {
+        ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpcode);
         return true;
     }
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_RETURN_VOID:
             genReturnCommon(cUnit,mir);
             break;
@@ -1334,7 +1334,7 @@ static bool handleFmt10x(CompilationUnit *cUnit, MIR *mir)
         case OP_UNUSED_7A:
         case OP_UNUSED_F1:
         case OP_UNUSED_FF:
-            ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpCode);
+            ALOGE("Codegen: got unused opcode 0x%x\n",dalvikOpcode);
             return true;
         case OP_NOP:
             break;
@@ -1354,7 +1354,7 @@ static bool handleFmt11n_Fmt31i(CompilationUnit *cUnit, MIR *mir)
         rlDest = dvmCompilerGetDest(cUnit, mir, 0);
     }
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_CONST:
         case OP_CONST_4: {
             rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kAnyReg, true);
@@ -1389,7 +1389,7 @@ static bool handleFmt21h(CompilationUnit *cUnit, MIR *mir)
     }
     rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kAnyReg, true);
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_CONST_HIGH16: {
             loadConstantNoClobber(cUnit, rlResult.lowReg,
                                   mir->dalvikInsn.vB << 16);
@@ -1421,7 +1421,7 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
     RegLocation rlDest;
     RegLocation rlSrc;
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case OP_CONST_STRING_JUMBO:
         case OP_CONST_STRING: {
             void *strPtr = (void*)
@@ -1474,8 +1474,8 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
                 dvmAbort();
             }
 
-            isVolatile = (mir->dalvikInsn.opCode == OP_SGET_VOLATILE) ||
-                         (mir->dalvikInsn.opCode == OP_SGET_OBJECT_VOLATILE) ||
+            isVolatile = (mir->dalvikInsn.opcode == OP_SGET_VOLATILE) ||
+                         (mir->dalvikInsn.opcode == OP_SGET_OBJECT_VOLATILE) ||
                          dvmIsVolatileField(fieldPtr);
 
             rlDest = dvmCompilerGetDest(cUnit, mir, 0);
@@ -1534,12 +1534,12 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
             void *fieldPtr = (void*)
               (method->clazz->pDvmDex->pResFields[mir->dalvikInsn.vB]);
 
-            isVolatile = (mir->dalvikInsn.opCode == OP_SPUT_VOLATILE) ||
-                         (mir->dalvikInsn.opCode == OP_SPUT_OBJECT_VOLATILE) ||
+            isVolatile = (mir->dalvikInsn.opcode == OP_SPUT_VOLATILE) ||
+                         (mir->dalvikInsn.opcode == OP_SPUT_OBJECT_VOLATILE) ||
                          dvmIsVolatileField(fieldPtr);
 
-            isSputObject = (mir->dalvikInsn.opCode == OP_SPUT_OBJECT) ||
-                           (mir->dalvikInsn.opCode == OP_SPUT_OBJECT_VOLATILE);
+            isSputObject = (mir->dalvikInsn.opcode == OP_SPUT_OBJECT) ||
+                           (mir->dalvikInsn.opcode == OP_SPUT_OBJECT_VOLATILE);
 
             if (fieldPtr == NULL) {
                 ALOGE("Unexpected null static field");
@@ -1713,9 +1713,9 @@ static bool handleFmt21c_Fmt31c(CompilationUnit *cUnit, MIR *mir)
  */
 static bool handleFmt11x(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     RegLocation rlResult;
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_MOVE_EXCEPTION: {
             int offset = offsetof(InterpState, self);
             int exOffset = offsetof(Thread, exception);
@@ -1788,12 +1788,12 @@ static bool handleFmt11x(CompilationUnit *cUnit, MIR *mir)
 
 static bool handleFmt12x(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode opCode = mir->dalvikInsn.opCode;
+    Opcode opcode = mir->dalvikInsn.opcode;
     RegLocation rlDest;
     RegLocation rlSrc;
     RegLocation rlResult;
 
-    if ( (opCode >= OP_ADD_INT_2ADDR) && (opCode <= OP_REM_DOUBLE_2ADDR)) {
+    if ( (opcode >= OP_ADD_INT_2ADDR) && (opcode <= OP_REM_DOUBLE_2ADDR)) {
         return genArithOp( cUnit, mir );
     }
 
@@ -1806,7 +1806,7 @@ static bool handleFmt12x(CompilationUnit *cUnit, MIR *mir)
     else
         rlDest = dvmCompilerGetDest(cUnit, mir, 0);
 
-    switch (opCode) {
+    switch (opcode) {
         case OP_DOUBLE_TO_INT:
         case OP_INT_TO_FLOAT:
         case OP_FLOAT_TO_INT:
@@ -1889,18 +1889,18 @@ static bool handleFmt12x(CompilationUnit *cUnit, MIR *mir)
 
 static bool handleFmt21s(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     RegLocation rlDest;
     RegLocation rlResult;
     int BBBB = mir->dalvikInsn.vB;
-    if (dalvikOpCode == OP_CONST_WIDE_16) {
+    if (dalvikOpcode == OP_CONST_WIDE_16) {
         rlDest = dvmCompilerGetDestWide(cUnit, mir, 0, 1);
         rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kCoreReg, true);
         loadConstantNoClobber(cUnit, rlResult.lowReg, BBBB);
         //TUNING: do high separately to avoid load dependency
         opRegRegImm(cUnit, kOpAsr, rlResult.highReg, rlResult.lowReg, 31);
         storeValueWide(cUnit, rlDest, rlResult);
-    } else if (dalvikOpCode == OP_CONST_16) {
+    } else if (dalvikOpcode == OP_CONST_16) {
         rlDest = dvmCompilerGetDest(cUnit, mir, 0);
         rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kAnyReg, true);
         loadConstantNoClobber(cUnit, rlResult.lowReg, BBBB);
@@ -1914,14 +1914,14 @@ static bool handleFmt21s(CompilationUnit *cUnit, MIR *mir)
 static bool handleFmt21t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
                          ArmLIR *labelList)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     ArmConditionCode cond;
     RegLocation rlSrc = dvmCompilerGetSrc(cUnit, mir, 0);
     rlSrc = loadValue(cUnit, rlSrc, kCoreReg);
     opRegImm(cUnit, kOpCmp, rlSrc.lowReg, 0);
 
 //TUNING: break this out to allow use of Thumb2 CB[N]Z
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_IF_EQZ:
             cond = kArmCondEq;
             break;
@@ -1942,7 +1942,7 @@ static bool handleFmt21t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             break;
         default:
             cond = 0;
-            ALOGE("Unexpected opcode (%d) for Fmt21t\n", dalvikOpCode);
+            ALOGE("Unexpected opcode (%d) for Fmt21t\n", dalvikOpcode);
             dvmCompilerAbort(cUnit);
     }
     genConditionalBranch(cUnit, cond, &labelList[bb->taken->id]);
@@ -1979,7 +1979,7 @@ static int lowestSetBit(unsigned int x) {
 
 // Returns true if it added instructions to 'cUnit' to divide 'rlSrc' by 'lit'
 // and store the result in 'rlDest'.
-static bool handleEasyDivide(CompilationUnit *cUnit, OpCode dalvikOpCode,
+static bool handleEasyDivide(CompilationUnit *cUnit, Opcode dalvikOpcode,
                              RegLocation rlSrc, RegLocation rlDest, int lit)
 {
     if (lit < 2 || !isPowerOfTwo(lit)) {
@@ -1990,7 +1990,7 @@ static bool handleEasyDivide(CompilationUnit *cUnit, OpCode dalvikOpCode,
         // Avoid special cases.
         return false;
     }
-    bool div = (dalvikOpCode == OP_DIV_INT_LIT8 || dalvikOpCode == OP_DIV_INT_LIT16);
+    bool div = (dalvikOpcode == OP_DIV_INT_LIT8 || dalvikOpcode == OP_DIV_INT_LIT16);
     rlSrc = loadValue(cUnit, rlSrc, kCoreReg);
     RegLocation rlResult = dvmCompilerEvalLoc(cUnit, rlDest, kCoreReg, true);
     if (div) {
@@ -2075,7 +2075,7 @@ static bool handleEasyMultiply(CompilationUnit *cUnit,
 
 static bool handleFmt22b_Fmt22s(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     RegLocation rlSrc = dvmCompilerGetSrc(cUnit, mir, 0);
     RegLocation rlDest = dvmCompilerGetDest(cUnit, mir, 0);
     RegLocation rlResult;
@@ -2084,7 +2084,7 @@ static bool handleFmt22b_Fmt22s(CompilationUnit *cUnit, MIR *mir)
     int shiftOp = false;
     bool isDiv = false;
 
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_RSUB_INT_LIT8:
         case OP_RSUB_INT: {
             int tReg;
@@ -2149,14 +2149,14 @@ static bool handleFmt22b_Fmt22s(CompilationUnit *cUnit, MIR *mir)
                 genInterpSingleStep(cUnit, mir);
                 return false;
             }
-            if (handleEasyDivide(cUnit, dalvikOpCode, rlSrc, rlDest, lit)) {
+            if (handleEasyDivide(cUnit, dalvikOpcode, rlSrc, rlDest, lit)) {
                 return false;
             }
             dvmCompilerFlushAllRegs(cUnit);   /* Everything to home location */
             loadValueDirectFixed(cUnit, rlSrc, r0);
             dvmCompilerClobber(cUnit, r0);
-            if ((dalvikOpCode == OP_DIV_INT_LIT8) ||
-                (dalvikOpCode == OP_DIV_INT_LIT16)) {
+            if ((dalvikOpcode == OP_DIV_INT_LIT8) ||
+                (dalvikOpcode == OP_DIV_INT_LIT16)) {
                 LOAD_FUNC_ADDR(cUnit, r2, (int)__aeabi_idiv);
                 isDiv = true;
             } else {
@@ -2190,10 +2190,10 @@ static bool handleFmt22b_Fmt22s(CompilationUnit *cUnit, MIR *mir)
 
 static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     int fieldOffset = -1;
     bool isVolatile = false;
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         /*
          * Wide volatiles currently handled via single step.
          * Add them here if generating in-line code.
@@ -2235,7 +2235,7 @@ static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
             break;
     }
 
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_NEW_ARRAY: {
             // Generates a call - use explicit registers
             RegLocation rlSrc = dvmCompilerGetSrc(cUnit, mir, 0);
@@ -2371,9 +2371,9 @@ static bool handleFmt22c(CompilationUnit *cUnit, MIR *mir)
 
 static bool handleFmt22cs(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     int fieldOffset =  mir->dalvikInsn.vC;
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_IGET_QUICK:
         case OP_IGET_OBJECT_QUICK:
             genIGet(cUnit, mir, kWord, fieldOffset, false);
@@ -2401,7 +2401,7 @@ static bool handleFmt22cs(CompilationUnit *cUnit, MIR *mir)
 static bool handleFmt22t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
                          ArmLIR *labelList)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
     ArmConditionCode cond;
     RegLocation rlSrc1 = dvmCompilerGetSrc(cUnit, mir, 0);
     RegLocation rlSrc2 = dvmCompilerGetSrc(cUnit, mir, 1);
@@ -2410,7 +2410,7 @@ static bool handleFmt22t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
     rlSrc2 = loadValue(cUnit, rlSrc2, kCoreReg);
     opRegReg(cUnit, kOpCmp, rlSrc1.lowReg, rlSrc2.lowReg);
 
-    switch (dalvikOpCode) {
+    switch (dalvikOpcode) {
         case OP_IF_EQ:
             cond = kArmCondEq;
             break;
@@ -2431,7 +2431,7 @@ static bool handleFmt22t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             break;
         default:
             cond = 0;
-            ALOGE("Unexpected opcode (%d) for Fmt22t\n", dalvikOpCode);
+            ALOGE("Unexpected opcode (%d) for Fmt22t\n", dalvikOpcode);
             dvmCompilerAbort(cUnit);
     }
     genConditionalBranch(cUnit, cond, &labelList[bb->taken->id]);
@@ -2442,9 +2442,9 @@ static bool handleFmt22t(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
 
 static bool handleFmt22x_Fmt32x(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode opCode = mir->dalvikInsn.opCode;
+    Opcode opcode = mir->dalvikInsn.opcode;
 
-    switch (opCode) {
+    switch (opcode) {
         case OP_MOVE_16:
         case OP_MOVE_OBJECT_16:
         case OP_MOVE_FROM16:
@@ -2467,12 +2467,12 @@ static bool handleFmt22x_Fmt32x(CompilationUnit *cUnit, MIR *mir)
 
 static bool handleFmt23x(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode opCode = mir->dalvikInsn.opCode;
+    Opcode opcode = mir->dalvikInsn.opcode;
     RegLocation rlSrc1;
     RegLocation rlSrc2;
     RegLocation rlDest;
 
-    if ( (opCode >= OP_ADD_INT) && (opCode <= OP_REM_DOUBLE)) {
+    if ( (opcode >= OP_ADD_INT) && (opcode <= OP_REM_DOUBLE)) {
         return genArithOp( cUnit, mir );
     }
 
@@ -2507,7 +2507,7 @@ static bool handleFmt23x(CompilationUnit *cUnit, MIR *mir)
     }
 
 
-    switch (opCode) {
+    switch (opcode) {
         case OP_CMPL_FLOAT:
         case OP_CMPG_FLOAT:
         case OP_CMPL_DOUBLE:
@@ -2690,8 +2690,8 @@ static s8 findSparseSwitchIndex(const u2* switchData, int testVal, int pc)
 
 static bool handleFmt31t(CompilationUnit *cUnit, MIR *mir)
 {
-    OpCode dalvikOpCode = mir->dalvikInsn.opCode;
-    switch (dalvikOpCode) {
+    Opcode dalvikOpcode = mir->dalvikInsn.opcode;
+    switch (dalvikOpcode) {
         case OP_FILL_ARRAY_DATA: {
             RegLocation rlSrc = dvmCompilerGetSrc(cUnit, mir, 0);
             // Making a call - use explicit registers
@@ -2725,7 +2725,7 @@ static bool handleFmt31t(CompilationUnit *cUnit, MIR *mir)
             dvmCompilerFlushAllRegs(cUnit);   /* Everything to home location */
             loadValueDirectFixed(cUnit, rlSrc, r1);
             dvmCompilerLockAllTemps(cUnit);
-            if (dalvikOpCode == OP_PACKED_SWITCH) {
+            if (dalvikOpcode == OP_PACKED_SWITCH) {
                 LOAD_FUNC_ADDR(cUnit, r4PC, (int)findPackedSwitchIndex);
             } else {
                 LOAD_FUNC_ADDR(cUnit, r4PC, (int)findSparseSwitchIndex);
@@ -2792,7 +2792,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
         retChainingCell = &labelList[bb->fallThrough->id];
 
     DecodedInstruction *dInsn = &mir->dalvikInsn;
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         /*
          * calleeMethod = this->clazz->vtable[
          *     method->clazz->pDvmDex->pResMethods[BBBB]->methodIndex
@@ -2814,7 +2814,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
                 genLandingPadForMispredictedCallee(cUnit, mir, bb, labelList);
             }
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_VIRTUAL)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_VIRTUAL)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -2837,7 +2837,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
                                      cUnit->method->clazz->pDvmDex->
                                        pResMethods[dInsn->vB]->methodIndex]);
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_SUPER)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_SUPER)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -2857,7 +2857,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             assert(calleeMethod ==
                    cUnit->method->clazz->pDvmDex->pResMethods[dInsn->vB]);
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_DIRECT)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_DIRECT)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -2877,7 +2877,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             assert(calleeMethod ==
                    cUnit->method->clazz->pDvmDex->pResMethods[dInsn->vB]);
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_STATIC)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_STATIC)
                 genProcessArgsNoRange(cUnit, mir, dInsn,
                                       NULL /* no null check */);
             else
@@ -2975,7 +2975,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
                 genLandingPadForMispredictedCallee(cUnit, mir, bb, labelList);
             }
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_INTERFACE)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_INTERFACE)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -3008,7 +3008,7 @@ static bool handleFmt35c_3rc(CompilationUnit *cUnit, MIR *mir, BasicBlock *bb,
             if (pcrLabel == NULL) {
                 int dPC = (int) (cUnit->method->insns + mir->offset);
                 pcrLabel = dvmCompilerNew(sizeof(ArmLIR), true);
-                pcrLabel->opCode = kArmPseudoPCReconstructionCell;
+                pcrLabel->opcode = kArmPseudoPCReconstructionCell;
                 pcrLabel->operands[0] = dPC;
                 pcrLabel->operands[1] = mir->offset;
                 /* Insert the place holder to the growable list */
@@ -3137,7 +3137,7 @@ static bool handleFmt35ms_3rms(CompilationUnit *cUnit, MIR *mir,
         return false;
 
     DecodedInstruction *dInsn = &mir->dalvikInsn;
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         /* calleeMethod = this->clazz->vtable[BBBB] */
         case OP_INVOKE_VIRTUAL_QUICK_RANGE:
         case OP_INVOKE_VIRTUAL_QUICK: {
@@ -3152,7 +3152,7 @@ static bool handleFmt35ms_3rms(CompilationUnit *cUnit, MIR *mir,
                 genLandingPadForMispredictedCallee(cUnit, mir, bb, labelList);
             }
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_VIRTUAL_QUICK)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_VIRTUAL_QUICK)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -3171,7 +3171,7 @@ static bool handleFmt35ms_3rms(CompilationUnit *cUnit, MIR *mir,
             assert(calleeMethod ==
                    cUnit->method->clazz->super->vtable[dInsn->vB]);
 
-            if (mir->dalvikInsn.opCode == OP_INVOKE_SUPER_QUICK)
+            if (mir->dalvikInsn.opcode == OP_INVOKE_SUPER_QUICK)
                 genProcessArgsNoRange(cUnit, mir, dInsn, &pcrLabel);
             else
                 genProcessArgsRange(cUnit, mir, dInsn, &pcrLabel);
@@ -3367,7 +3367,7 @@ static bool genInlinedLongDoubleConversion(CompilationUnit *cUnit, MIR *mir)
 static bool handleExecuteInline(CompilationUnit *cUnit, MIR *mir)
 {
     DecodedInstruction *dInsn = &mir->dalvikInsn;
-    switch( mir->dalvikInsn.opCode) {
+    switch( mir->dalvikInsn.opcode) {
         case OP_EXECUTE_INLINE_RANGE:
         case OP_EXECUTE_INLINE: {
             unsigned int i;
@@ -3832,13 +3832,13 @@ static void genValidationForPredictedInline(CompilationUnit *cUnit, MIR *mir)
 /* Extended MIR instructions like PHI */
 static void handleExtendedMIR(CompilationUnit *cUnit, MIR *mir)
 {
-    int opOffset = mir->dalvikInsn.opCode - kMirOpFirst;
+    int opOffset = mir->dalvikInsn.opcode - kMirOpFirst;
     char *msg = dvmCompilerNew(strlen(extendedMIROpNames[opOffset]) + 1,
                                false);
     strcpy(msg, extendedMIROpNames[opOffset]);
     newLIR1(cUnit, kArmPseudoExtended, (int) msg);
 
-    switch (mir->dalvikInsn.opCode) {
+    switch (mir->dalvikInsn.opcode) {
         case kMirOpPhi: {
             char *ssaString = dvmCompilerGetSSAString(cUnit, mir->ssaRep);
             newLIR1(cUnit, kArmPseudoSSARep, (int) ssaString);
@@ -3882,7 +3882,7 @@ static void setupLoopEntryBlock(CompilationUnit *cUnit, BasicBlock *entry,
 {
     /* Set up the place holder to reconstruct this Dalvik PC */
     ArmLIR *pcrLabel = dvmCompilerNew(sizeof(ArmLIR), true);
-    pcrLabel->opCode = kArmPseudoPCReconstructionCell;
+    pcrLabel->opcode = kArmPseudoPCReconstructionCell;
     pcrLabel->operands[0] =
         (int) (cUnit->method->insns + entry->startOffset);
     pcrLabel->operands[1] = entry->startOffset;
@@ -3894,13 +3894,13 @@ static void setupLoopEntryBlock(CompilationUnit *cUnit, BasicBlock *entry,
      * other branch to the PCR cell to punt.
      */
     ArmLIR *branchToBody = dvmCompilerNew(sizeof(ArmLIR), true);
-    branchToBody->opCode = kThumbBUncond;
+    branchToBody->opcode = kThumbBUncond;
     branchToBody->generic.target = (LIR *) bodyLabel;
     setupResourceMasks(branchToBody);
     cUnit->loopAnalysis->branchToBody = (LIR *) branchToBody;
 
     ArmLIR *branchToPCR = dvmCompilerNew(sizeof(ArmLIR), true);
-    branchToPCR->opCode = kThumbBUncond;
+    branchToPCR->opcode = kThumbBUncond;
     branchToPCR->generic.target = (LIR *) pcrLabel;
     setupResourceMasks(branchToPCR);
     cUnit->loopAnalysis->branchToPCR = (LIR *) branchToPCR;
@@ -3910,7 +3910,7 @@ static void setupLoopEntryBlock(CompilationUnit *cUnit, BasicBlock *entry,
 static bool selfVerificationPuntOps(MIR *mir)
 {
     DecodedInstruction *decInsn = &mir->dalvikInsn;
-    OpCode op = decInsn->opCode;
+    Opcode op = decInsn->opcode;
 
     /*
      * All opcodes that can throw exceptions and use the
@@ -3996,7 +3996,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
         }
 
         if (blockList[i]->blockType == kTraceEntryBlock) {
-            labelList[i].opCode = kArmPseudoEntryBlock;
+            labelList[i].opcode = kArmPseudoEntryBlock;
             if (blockList[i]->firstMIRInsn == NULL) {
                 continue;
             } else {
@@ -4004,10 +4004,10 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                                   &labelList[blockList[i]->fallThrough->id]);
             }
         } else if (blockList[i]->blockType == kTraceExitBlock) {
-            labelList[i].opCode = kArmPseudoExitBlock;
+            labelList[i].opcode = kArmPseudoExitBlock;
             goto gen_fallthrough;
         } else if (blockList[i]->blockType == kDalvikByteCode) {
-            labelList[i].opCode = kArmPseudoNormalBlockLabel;
+            labelList[i].opcode = kArmPseudoNormalBlockLabel;
             /* Reset the register state */
             dvmCompilerResetRegPool(cUnit);
             dvmCompilerClobberAllRegs(cUnit);
@@ -4015,13 +4015,13 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
         } else {
             switch (blockList[i]->blockType) {
                 case kChainingCellNormal:
-                    labelList[i].opCode = kArmPseudoChainingCellNormal;
+                    labelList[i].opcode = kArmPseudoChainingCellNormal;
                     /* handle the codegen later */
                     dvmInsertGrowableList(
                         &chainingListByType[kChainingCellNormal], (void *) i);
                     break;
                 case kChainingCellInvokeSingleton:
-                    labelList[i].opCode =
+                    labelList[i].opcode =
                         kArmPseudoChainingCellInvokeSingleton;
                     labelList[i].operands[0] =
                         (int) blockList[i]->containingMethod;
@@ -4031,7 +4031,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                         (void *) i);
                     break;
                 case kChainingCellInvokePredicted:
-                    labelList[i].opCode =
+                    labelList[i].opcode =
                         kArmPseudoChainingCellInvokePredicted;
                     /* handle the codegen later */
                     dvmInsertGrowableList(
@@ -4039,7 +4039,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                         (void *) i);
                     break;
                 case kChainingCellHot:
-                    labelList[i].opCode =
+                    labelList[i].opcode =
                         kArmPseudoChainingCellHot;
                     /* handle the codegen later */
                     dvmInsertGrowableList(
@@ -4048,13 +4048,13 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                     break;
                 case kPCReconstruction:
                     /* Make sure exception handling block is next */
-                    labelList[i].opCode =
+                    labelList[i].opcode =
                         kArmPseudoPCReconstructionBlockLabel;
                     assert (i == cUnit->numBlocks - 2);
                     handlePCReconstruction(cUnit, &labelList[i+1]);
                     break;
                 case kExceptionHandling:
-                    labelList[i].opCode = kArmPseudoEHBlockLabel;
+                    labelList[i].opcode = kArmPseudoEHBlockLabel;
                     if (cUnit->pcReconstructionList.numUsed) {
                         loadWordDisp(cUnit, rGLUE, offsetof(InterpState,
                                      jitToInterpEntries.dvmJitToInterpPunt),
@@ -4064,7 +4064,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                     break;
 #if defined(WITH_SELF_VERIFICATION) || defined(WITH_JIT_TUNING)
                 case kChainingCellBackwardBranch:
-                    labelList[i].opCode =
+                    labelList[i].opcode =
                         kArmPseudoChainingCellBackwardBranch;
                     /* handle the codegen later */
                     dvmInsertGrowableList(
@@ -4091,14 +4091,14 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                 dvmCompilerResetDefTracking(cUnit);
             }
 
-            if (mir->dalvikInsn.opCode >= kMirOpFirst) {
+            if (mir->dalvikInsn.opcode >= kMirOpFirst) {
                 handleExtendedMIR(cUnit, mir);
                 continue;
             }
 
 
-            OpCode dalvikOpCode = mir->dalvikInsn.opCode;
-            InstructionFormat dalvikFormat = dexGetInstrFormat(dalvikOpCode);
+            Opcode dalvikOpcode = mir->dalvikInsn.opcode;
+            InstructionFormat dalvikFormat = dexGetInstrFormat(dalvikOpcode);
             char *note;
             if (mir->OptimizationFlags & MIR_INLINED) {
                 note = " (I)";
@@ -4132,7 +4132,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                  * Debugging: screen the opcode first to see if it is in the
                  * do[-not]-compile list
                  */
-                bool singleStepMe = SINGLE_STEP_OP(dalvikOpCode);
+                bool singleStepMe = SINGLE_STEP_OP(dalvikOpcode);
 #if defined(WITH_SELF_VERIFICATION)
               if (singleStepMe == false) {
                   singleStepMe = selfVerificationPuntOps(mir);
@@ -4142,7 +4142,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                     notHandled = false;
                     genInterpSingleStep(cUnit, mir);
                 } else {
-                    opcodeCoverage[dalvikOpCode]++;
+                    opcodeCoverage[dalvikOpcode]++;
                     switch (dalvikFormat) {
                         case kFmt10t:
                         case kFmt20t:
@@ -4229,7 +4229,7 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
             if (notHandled) {
                 ALOGE("%#06x: Opcode 0x%x (%s) / Fmt %d not handled\n",
                      mir->offset,
-                     dalvikOpCode, dexGetOpcodeName(dalvikOpCode),
+                     dalvikOpcode, dexGetOpcodeName(dalvikOpcode),
                      dalvikFormat);
                 dvmCompilerAbort(cUnit);
                 break;
@@ -4427,9 +4427,9 @@ bool dvmCompilerArchInit()
     int i;
 
     for (i = 0; i < kArmLast; i++) {
-        if (EncodingMap[i].opCode != i) {
+        if (EncodingMap[i].opcode != i) {
             ALOGE("Encoding order for %s is wrong: expecting %d, seeing %d",
-                 EncodingMap[i].name, i, EncodingMap[i].opCode);
+                 EncodingMap[i].name, i, EncodingMap[i].opcode);
             dvmAbort();  // OK to dvmAbort - build error
         }
     }

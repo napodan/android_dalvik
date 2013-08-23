@@ -17,7 +17,7 @@
 /*
  * Table of Dalvik opcode names.
  */
-#include "OpCodeNames.h"
+#include "DexOpcodes.h"
 
 #include <assert.h>
 
@@ -326,7 +326,7 @@ static const char* gOpNames[256] = {
 /*
  * Return the name of an opcode.
  */
-const char* dexGetOpcodeName(OpCode op)
+const char* dexGetOpcodeName(Opcode op)
 {
     assert(op >= 0 && op < kNumDalvikInstructions);
     return gOpNames[op];

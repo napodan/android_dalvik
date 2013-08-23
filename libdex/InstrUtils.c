@@ -491,11 +491,11 @@ static inline u4 fetch_u4_impl(u4 offset, const u2* insns) {
 void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
 {
     u2 inst = *insns;
-    OpCode opCode = (OpCode) INST_INST(inst);
-    InstructionFormat format = dexGetInstrFormat(opCode);
+    Opcode opcode = (Opcode) INST_INST(inst);
+    InstructionFormat format = dexGetInstrFormat(opcode);
 
-    pDec->opCode = opCode;
-    pDec->indexType = dexGetInstrIndexType(opCode);
+    pDec->opcode = opcode;
+    pDec->indexType = dexGetInstrIndexType(opcode);
 
     switch (format) {
     case kFmt10x:       // op
@@ -653,7 +653,7 @@ void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
         pDec->vB_wide = FETCH_u4(1) | ((u8) FETCH_u4(3) << 32);
         break;
     default:
-        ALOGW("Can't decode unexpected format %d (op=%d)", format, opCode);
+        ALOGW("Can't decode unexpected format %d (op=%d)", format, opcode);
         assert(false);
         break;
     }
