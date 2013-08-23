@@ -905,7 +905,6 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         }
         break;
     case kFmt35ms:       // [opt] invoke-virtual+super
-    case kFmt35fs:       // [opt] invoke-interface
         {
             fputs(" {", stdout);
             for (i = 0; i < (int) pDecInsn->vA; i++) {
@@ -946,7 +945,6 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         }
         break;
     case kFmt3rms:       // [opt] invoke-virtual+super/range
-    case kFmt3rfs:       // [opt] invoke-interface/range
         {
             /*
              * This doesn't match the "dx" output when some of the args are
@@ -962,7 +960,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
             printf("}, [%04x] // vtable #%04x", pDecInsn->vB, pDecInsn->vB);
         }
         break;
-    case kFmt3rinline:   // [opt] execute-inline/range
+    case kFmt3rmi:   // [opt] execute-inline/range
         {
             fputs(" {", stdout);
             for (i = 0; i < (int) pDecInsn->vA; i++) {
@@ -974,7 +972,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
             printf("}, [%04x] // inline #%04x", pDecInsn->vB, pDecInsn->vB);
         }
         break;
-    case kFmt3inline:    // [opt] inline invoke
+    case kFmt35mi:    // [opt] inline invoke
         {
 
             fputs(" {", stdout);
@@ -999,7 +997,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
                 pDecInsn->vA, conv.d, pDecInsn->vB_wide);
         }
         break;
-    case kFmtUnknown:
+    case kFmt00x:        // unknown op or breakpoint
         break;
     default:
         printf(" ???");

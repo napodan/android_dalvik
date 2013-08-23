@@ -4128,103 +4128,103 @@ void dvmCompilerMIR2LIR(CompilationUnit *cUnit)
                 headLIR->defMask = ENCODE_ALL;
             }
 
-            bool notHandled;
-            /*
-             * Debugging: screen the opcode first to see if it is in the
-             * do[-not]-compile list
-             */
-            bool singleStepMe = SINGLE_STEP_OP(dalvikOpCode);
+                bool notHandled;
+                /*
+                 * Debugging: screen the opcode first to see if it is in the
+                 * do[-not]-compile list
+                 */
+                bool singleStepMe = SINGLE_STEP_OP(dalvikOpCode);
 #if defined(WITH_SELF_VERIFICATION)
-          if (singleStepMe == false) {
-              singleStepMe = selfVerificationPuntOps(mir);
-          }
+              if (singleStepMe == false) {
+                  singleStepMe = selfVerificationPuntOps(mir);
+              }
 #endif
-            if (singleStepMe || cUnit->allSingleStep) {
-                notHandled = false;
-                genInterpSingleStep(cUnit, mir);
-            } else {
-                opcodeCoverage[dalvikOpCode]++;
-                switch (dalvikFormat) {
-                    case kFmt10t:
-                    case kFmt20t:
-                    case kFmt30t:
-                        notHandled = handleFmt10t_Fmt20t_Fmt30t(cUnit,
-                                  mir, blockList[i], labelList);
-                        break;
-                    case kFmt10x:
-                        notHandled = handleFmt10x(cUnit, mir);
-                        break;
-                    case kFmt11n:
-                    case kFmt31i:
-                        notHandled = handleFmt11n_Fmt31i(cUnit, mir);
-                        break;
-                    case kFmt11x:
-                        notHandled = handleFmt11x(cUnit, mir);
-                        break;
-                    case kFmt12x:
-                        notHandled = handleFmt12x(cUnit, mir);
-                        break;
-                    case kFmt20bc:
-                        notHandled = handleFmt20bc(cUnit, mir);
-                        break;
-                    case kFmt21c:
-                    case kFmt31c:
-                        notHandled = handleFmt21c_Fmt31c(cUnit, mir);
-                        break;
-                    case kFmt21h:
-                        notHandled = handleFmt21h(cUnit, mir);
-                        break;
-                    case kFmt21s:
-                        notHandled = handleFmt21s(cUnit, mir);
-                        break;
-                    case kFmt21t:
-                        notHandled = handleFmt21t(cUnit, mir, blockList[i],
-                                                  labelList);
-                        break;
-                    case kFmt22b:
-                    case kFmt22s:
-                        notHandled = handleFmt22b_Fmt22s(cUnit, mir);
-                        break;
-                    case kFmt22c:
-                        notHandled = handleFmt22c(cUnit, mir);
-                        break;
-                    case kFmt22cs:
-                        notHandled = handleFmt22cs(cUnit, mir);
-                        break;
-                    case kFmt22t:
-                        notHandled = handleFmt22t(cUnit, mir, blockList[i],
-                                                  labelList);
-                        break;
-                    case kFmt22x:
-                    case kFmt32x:
-                        notHandled = handleFmt22x_Fmt32x(cUnit, mir);
-                        break;
-                    case kFmt23x:
-                        notHandled = handleFmt23x(cUnit, mir);
-                        break;
-                    case kFmt31t:
-                        notHandled = handleFmt31t(cUnit, mir);
-                        break;
-                    case kFmt3rc:
-                    case kFmt35c:
-                        notHandled = handleFmt35c_3rc(cUnit, mir, blockList[i],
+                if (singleStepMe || cUnit->allSingleStep) {
+                    notHandled = false;
+                    genInterpSingleStep(cUnit, mir);
+                } else {
+                    opcodeCoverage[dalvikOpCode]++;
+                    switch (dalvikFormat) {
+                        case kFmt10t:
+                        case kFmt20t:
+                        case kFmt30t:
+                            notHandled = handleFmt10t_Fmt20t_Fmt30t(cUnit,
+                                      mir, blockList[i], labelList);
+                            break;
+                        case kFmt10x:
+                            notHandled = handleFmt10x(cUnit, mir);
+                            break;
+                        case kFmt11n:
+                        case kFmt31i:
+                            notHandled = handleFmt11n_Fmt31i(cUnit, mir);
+                            break;
+                        case kFmt11x:
+                            notHandled = handleFmt11x(cUnit, mir);
+                            break;
+                        case kFmt12x:
+                            notHandled = handleFmt12x(cUnit, mir);
+                            break;
+                        case kFmt20bc:
+                            notHandled = handleFmt20bc(cUnit, mir);
+                            break;
+                        case kFmt21c:
+                        case kFmt31c:
+                            notHandled = handleFmt21c_Fmt31c(cUnit, mir);
+                            break;
+                        case kFmt21h:
+                            notHandled = handleFmt21h(cUnit, mir);
+                            break;
+                        case kFmt21s:
+                            notHandled = handleFmt21s(cUnit, mir);
+                            break;
+                        case kFmt21t:
+                            notHandled = handleFmt21t(cUnit, mir, blockList[i],
                                                       labelList);
-                        break;
-                    case kFmt3rms:
-                    case kFmt35ms:
-                        notHandled = handleFmt35ms_3rms(cUnit, mir,blockList[i],
-                                                        labelList);
-                        break;
-                    case kFmt3inline:
-                    case kFmt3rinline:
-                        notHandled = handleExecuteInline(cUnit, mir);
-                        break;
-                    case kFmt51l:
-                        notHandled = handleFmt51l(cUnit, mir);
-                        break;
-                    default:
-                        notHandled = true;
-                        break;
+                            break;
+                        case kFmt22b:
+                        case kFmt22s:
+                            notHandled = handleFmt22b_Fmt22s(cUnit, mir);
+                            break;
+                        case kFmt22c:
+                            notHandled = handleFmt22c(cUnit, mir);
+                            break;
+                        case kFmt22cs:
+                            notHandled = handleFmt22cs(cUnit, mir);
+                            break;
+                        case kFmt22t:
+                            notHandled = handleFmt22t(cUnit, mir, blockList[i],
+                                                      labelList);
+                            break;
+                        case kFmt22x:
+                        case kFmt32x:
+                            notHandled = handleFmt22x_Fmt32x(cUnit, mir);
+                            break;
+                        case kFmt23x:
+                            notHandled = handleFmt23x(cUnit, mir);
+                            break;
+                        case kFmt31t:
+                            notHandled = handleFmt31t(cUnit, mir);
+                            break;
+                        case kFmt3rc:
+                        case kFmt35c:
+                            notHandled = handleFmt35c_3rc(cUnit, mir, blockList[i],
+                                                          labelList);
+                            break;
+                        case kFmt3rms:
+                        case kFmt35ms:
+                            notHandled = handleFmt35ms_3rms(cUnit, mir,blockList[i],
+                                                            labelList);
+                            break;
+                        case kFmt35mi:
+                        case kFmt3rmi:
+                            notHandled = handleExecuteInline(cUnit, mir);
+                            break;
+                        case kFmt51l:
+                            notHandled = handleFmt51l(cUnit, mir);
+                            break;
+                        default:
+                            notHandled = true;
+                            break;
                 }
             }
             if (notHandled) {
