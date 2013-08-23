@@ -685,7 +685,7 @@ static void insertMoveResult(const u2 *lastPC, int len, int offset,
     interpState->trace[currTraceRun].frag.isCode = true;
     interpState->totalTraceLen++;
 
-    interpState->currRunLen = dexGetInstrOrTableWidthAbs(gDvm.instrWidth,
+    interpState->currRunLen = dexGetInstrOrTableWidth(gDvm.instrWidth,
                                                          moveResultPC);
 }
 
@@ -752,7 +752,7 @@ int dvmCheckJit(const u2* pc, Thread* self, InterpState* interpState,
             ALOGD("TraceGen: adding %s", dexGetOpcodeName(decInsn.opCode));
 #endif
             flags = dexGetInstrFlags(gDvm.instrFlags, decInsn.opCode);
-            len = dexGetInstrOrTableWidthAbs(gDvm.instrWidth, lastPC);
+            len = dexGetInstrOrTableWidth(gDvm.instrWidth, lastPC);
             offset = lastPC - interpState->method->insns;
             assert((unsigned) offset <
                    dvmGetMethodInsnsSize(interpState->method));
