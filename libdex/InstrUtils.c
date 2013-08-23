@@ -353,18 +353,18 @@ InstructionWidth* dexCreateInstrWidthTable(void)
 /*
  * Generate a table that holds instruction flags.
  */
-InstructionFlags* dexCreateInstrFlagsTable(void)
+u1* dexCreateInstrFlagsTable(void)
 {
-    InstructionFlags* instrFlags;
+    u1* instrFlags;
     int i;
 
-    instrFlags = malloc(sizeof(InstructionFlags) * kNumDalvikInstructions);
+    instrFlags = malloc(sizeof(u1) * kNumDalvikInstructions);
     if (instrFlags == NULL)
         return NULL;
 
     for (i = 0; i < kNumDalvikInstructions; i++) {
         OpCode opc = (OpCode) i;
-        InstructionFlags flags = 0;
+        u1 flags = 0;
 
         switch (opc) {
         /* these don't affect the PC and can't cause an exception */
@@ -693,7 +693,7 @@ InstructionFormat* dexCreateInstrFormatTable(void)
 
     for (i = 0; i < kNumDalvikInstructions; i++) {
         OpCode opc = (OpCode) i;
-        InstructionFormat fmt = kFmtUnknown;
+        InstructionFormat fmt = kFmt00x;
 
         switch (opc) {
         case OP_GOTO:
@@ -1002,10 +1002,10 @@ InstructionFormat* dexCreateInstrFormatTable(void)
             fmt = kFmt3rms;
             break;
         case OP_EXECUTE_INLINE:
-            fmt = kFmt3inline;
+            fmt = kFmt35mi;
             break;
         case OP_EXECUTE_INLINE_RANGE:
-            fmt = kFmt3rinline;
+            fmt = kFmt3rmi;
             break;
         case OP_INVOKE_DIRECT_EMPTY:
             fmt = kFmt35c;
@@ -1024,7 +1024,7 @@ InstructionFormat* dexCreateInstrFormatTable(void)
         case OP_BREAKPOINT:
         case OP_UNUSED_F1:
         case OP_UNUSED_FF:
-            fmt = kFmtUnknown;
+            fmt = kFmt00x;
             break;
 
         /*
@@ -1183,7 +1183,7 @@ void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
                 pDec->vC = pDec->arg[0];
         }
         break;
-    case kFmt3inline:   // [opt] inline invoke
+    case kFmt35mi:   // [opt] inline invoke
         {
             u2 regList;
             int i;
@@ -1205,18 +1205,12 @@ void dexDecodeInstruction(const InstructionFormat* fmts, const u2* insns,
                 pDec->vC = pDec->arg[0];
         }
         break;
-    case kFmt35fs:      // [opt] invoke-interface
-        assert(false);  // TODO
-        break;
     case kFmt3rc:       // op {vCCCC .. v(CCCC+AA-1)}, meth@BBBB
     case kFmt3rms:      // [opt] invoke-virtual+super/range
-    case kFmt3rinline:  // [opt] execute-inline/range
+    case kFmt3rmi:      // [opt] execute-inline/range
         pDec->vA = INST_AA(inst);
         pDec->vB = FETCH(1);
         pDec->vC = FETCH(2);
-        break;
-    case kFmt3rfs:      // [opt] invoke-interface/range
-        assert(false);  // TODO
         break;
     case kFmt51l:       // op vAA, #+BBBBBBBBBBBBBBBB
         pDec->vA = INST_AA(inst);
