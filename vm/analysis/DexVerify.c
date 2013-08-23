@@ -32,11 +32,7 @@ static bool verifyInstructions(VerifierData* vdata);
  */
 bool dvmVerificationStartup(void)
 {
-    if (dexCreateInstructionInfoTables(&gDvm.instrInfo)) {
-        ALOGE("Unable to create instruction tables\n");
-        return false;
-    }
-
+    dexGetInstructionInfoTables(&gDvm.instrInfo);
     return true;
 }
 
@@ -45,7 +41,6 @@ bool dvmVerificationStartup(void)
  */
 void dvmVerificationShutdown(void)
 {
-    dexFreeInstructionInfoTables(&gDvm.instrInfo);
 }
 
 
@@ -278,7 +273,7 @@ static bool checkArrayData(const Method* meth, int curOffset)
 static void decodeInstruction(const Method* meth, int insnIdx,
     DecodedInstruction* pDecInsn)
 {
-    dexDecodeInstruction(&gDvm.instrInfo, meth->insns + insnIdx, pDecInsn);
+    dexDecodeInstruction(meth->insns + insnIdx, pDecInsn);
 }
 
 

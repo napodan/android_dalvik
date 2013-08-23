@@ -139,10 +139,9 @@ typedef struct InstructionInfoTables {
 } InstructionInfoTables;
 
 /*
- * Allocate and populate a 256-element array with instruction widths.  A
- * width of zero means the entry does not exist.
+ * Global InstructionInfoTables struct.
  */
-InstructionWidth* dexCreateInstrWidthTable(void);
+extern InstructionInfoTables gDexOpcodeInfo;
 
 /*
  * Holds the contents of a decoded instruction.
@@ -166,20 +165,12 @@ DEX_INLINE size_t dexGetInstrWidth(const InstructionWidth* widths, OpCode opCode
     return widths[opCode];
 }
 
-
 /*
  * Return the width of the specified instruction, or 0 if not defined.  Also
  * works for special OP_NOP entries, including switch statement data tables
  * and array data.
  */
-size_t dexGetInstrOrTableWidth(const InstructionWidth* widths,
-    const u2* insns);
-
-
-/*
- * Allocate and populate a 256-element array with instruction flags.
- */
-u1* dexCreateInstrFlagsTable(void);
+size_t dexGetInstrOrTableWidth(const u2* insns);
 
 /*
  * Returns true if the given flags represent a goto (unconditional branch).
@@ -198,12 +189,6 @@ DEX_INLINE int dexGetInstrFlags(const u1* flags, OpCode opCode)
     return flags[opCode];
 }
 
-
-/*
- * Allocate and populate a 256-element array with instruction formats.
- */
-InstructionFormat* dexCreateInstrFormatTable(void);
-
 /*
  * Return the instruction format for the specified opcode.
  */
@@ -213,11 +198,6 @@ DEX_INLINE InstructionFormat dexGetInstrFormat(const InstructionFormat* fmts,
     //assert(/*opCode >= 0 &&*/ opCode < kNumDalvikInstructions);
     return fmts[opCode];
 }
- /*
- * Allocate and populate an array with index types for all instructions.
- * Used in conjunction with dexDecodeInstruction.
- */
-InstructionIndexType* dexCreateInstrIndexTypeTable(void);
 
 /*
  * Return the instruction index type for the specified opcode.
@@ -230,22 +210,15 @@ DEX_INLINE InstructionIndexType dexGetInstrIndexType(
 }
 
 /*
- * Construct all of the instruction info tables, storing references to
- * them into the given struct. This returns 0 on success or non-zero on
- * failure. If this fails, then no net allocation will have occurred.
+ * Copy pointers to all of the instruction info tables into
+ * the given struct.
  */
-int dexCreateInstructionInfoTables(InstructionInfoTables* info);
-
-/*
- * Free up the tables referred to by the given instruction info struct.
- */
-void dexFreeInstructionInfoTables(InstructionInfoTables* info);
+void dexGetInstructionInfoTables(InstructionInfoTables* info);
 
 /*
  * Decode the instruction pointed to by "insns".
  */
-void dexDecodeInstruction(const InstructionInfoTables* info, const u2* insns,
-    DecodedInstruction* pDec);
+void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec);
 
 #ifdef __cplusplus
 };

@@ -1058,7 +1058,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             }
         }
 
-        dexDecodeInstruction(&gInstrInfo, insns, &decInsn);
+        dexDecodeInstruction(insns, &decInsn);
         dumpInstruction(pDexFile, pCode, insnIdx, insnWidth, &decInsn);
 
         insns += insnWidth;
@@ -1853,10 +1853,7 @@ int main(int argc, char* const argv[])
     }
 
     /* initialize some VM tables */
-    if (dexCreateInstructionInfoTables(&gInstrInfo)) {
-        fprintf(stderr, "Failed to construct instruction tables\n");
-        return 1;
-    }
+    dexGetInstructionInfoTables(&gInstrInfo);
 
     if (wantUsage) {
         usage();
@@ -1867,7 +1864,6 @@ int main(int argc, char* const argv[])
     while (optind < argc) {
         result |= process(argv[optind++]);
     }
-    dexFreeInstructionInfoTables(&gInstrInfo);
 
     return (result != 0);
 }
