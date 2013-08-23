@@ -49,8 +49,6 @@
 
 static const char* gProgName = "dexdump";
 
-static struct InstructionInfoTables gInstrInfo;
-
 enum OutputFormat {
     OUTPUT_PLAIN = 0,               /* default */
     OUTPUT_XML,                     /* fancy */
@@ -737,7 +735,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         printf("|%04x: %s", insnIdx, dexGetOpcodeName(pDecInsn->opCode));
     }
 
-    switch (dexGetInstrFormat(gInstrInfo.formats, pDecInsn->opCode)) {
+    switch (dexGetInstrFormat(pDecInsn->opCode)) {
     case kFmt10x:        // op
         break;
     case kFmt12x:        // op vA, vB
@@ -1050,7 +1048,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
             OpCode opcode = dexOpcodeFromCodeUnit(instr);
-            insnWidth = dexGetInstrWidth(gInstrInfo.widths, opcode);
+            insnWidth = dexGetInstrWidth(opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,
                     "GLITCH: zero-width instruction at idx=0x%04x\n", insnIdx);
@@ -1851,9 +1849,6 @@ int main(int argc, char* const argv[])
         fprintf(stderr, "Can't specify both -c and -i\n");
         wantUsage = true;
     }
-
-    /* initialize some VM tables */
-    dexGetInstructionInfoTables(&gInstrInfo);
 
     if (wantUsage) {
         usage();
