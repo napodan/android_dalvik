@@ -20,12 +20,6 @@
  *
  * TODO: might benefit from a signature-->class lookup cache.  Could avoid
  * some string-peeling and wouldn't need to compute hashes.
- *
- * TODO: we do too much stuff in here that could be done in the static
- * verification pass.  It's convenient, because we have all of the
- * necessary information, but it's more efficient to do it over in
- * DexVerify.c because in here we may have to process instructions
- * multiple times.
  */
 #include "Dalvik.h"
 #include "analysis/CodeVerify.h"
@@ -59,12 +53,6 @@ typedef enum RegisterTrackingMode {
 
 static bool gDebugVerbose = false;      // TODO: remove this
 
-#if 0
-int gDvm__totalInstr = 0;
-int gDvm__gcInstr = 0;
-int gDvm__gcData = 0;
-int gDvm__gcSimpleData = 0;
-#endif
 
 /*
  * Selectively enable verbose debug logging -- use this to activate
@@ -3450,7 +3438,7 @@ static bool verifyInstruction(const Method* meth, InsnFlags* insnFlags,
      * We can also return, in which case there is no successor instruction
      * from this point.
      *
-     * The behavior can be determined from the InstructionFlags.
+     * The behavior can be determined from the OpcodeFlags.
      */
 
     const DexFile* pDexFile = meth->clazz->pDvmDex->pDexFile;
@@ -3468,14 +3456,14 @@ static bool verifyInstruction(const Method* meth, InsnFlags* insnFlags,
 #endif
     dexDecodeInstruction(insns, &decInsn);
 
-    int nextFlags = dexGetInstrFlags(decInsn.opcode);
+    int nextFlags = dexGetFlagsFromOpcode(decInsn.opcode);
 
     /*
      * Make a copy of the previous register state.  If the instruction
-     * throws an exception, we merge *this* into the destination rather
-     * than workRegs, because we don't want the result from the "successful"
-     * code path (e.g. a check-cast that "improves" a type) to be visible
-     * to the exception handler.
+     * can throw an exception, we will copy/merge this into the "catch"
+     * address rather than workLine, because we don't want the result
+     * from the "successful" code path (e.g. a check-cast that "improves"
+     * a type) to be visible to the exception handler.
      */
     if ((nextFlags & kInstrCanThrow) != 0 && dvmInsnIsInTry(insnFlags, insnIdx))
     {

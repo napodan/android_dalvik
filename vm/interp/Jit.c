@@ -79,16 +79,6 @@ void* dvmSelfVerificationSaveState(const u2* pc, const void* fp,
 
     if (interpState->entryPoint == kInterpEntryResume) {
         interpState->entryPoint = kInterpEntryInstr;
-#if 0
-        /* Tracking the success rate of resume after single-stepping */
-        if (interpState->jitResumeDPC == pc) {
-            ALOGD("SV single step resumed at %p", pc);
-        }
-        else {
-            ALOGD("real %p DPC %p NPC %p", pc, interpState->jitResumeDPC,
-                 interpState->jitResumeNPC);
-        }
-#endif
     }
 
     // Dynamically grow shadow register space if necessary
@@ -684,7 +674,7 @@ static void insertMoveResult(const u2 *lastPC, int len, int offset,
     interpState->trace[currTraceRun].frag.isCode = true;
     interpState->totalTraceLen++;
 
-    interpState->currRunLen = dexGetInstrOrTableWidth(moveResultPC);
+    interpState->currRunLen = dexGetWidthFromInstruction(moveResultPC);
 }
 
 /*
@@ -745,12 +735,12 @@ int dvmCheckJit(const u2* pc, Thread* self, InterpState* interpState,
                 break;
             }
 
-
 #if defined(SHOW_TRACE)
-            ALOGD("TraceGen: adding %s", dexGetOpcodeName(decInsn.opcode));
+            ALOGD("TraceGen: adding %s",
+                 dexGetOpcodeName(decInsn.opcode));
 #endif
-            flags = dexGetInstrFlags(decInsn.opcode);
-            len = dexGetInstrOrTableWidth(lastPC);
+            flags = dexGetFlagsFromOpcode(decInsn.opcode);
+            len = dexGetWidthFromInstruction(lastPC);
             offset = lastPC - interpState->method->insns;
             assert((unsigned) offset <
                    dvmGetMethodInsnsSize(interpState->method));

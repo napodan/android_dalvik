@@ -492,10 +492,10 @@ void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
 {
     u2 inst = *insns;
     Opcode opcode = (Opcode) INST_INST(inst);
-    InstructionFormat format = dexGetInstrFormat(opcode);
+    InstructionFormat format = dexGetFormatFromOpcode(opcode);
 
     pDec->opcode = opcode;
-    pDec->indexType = dexGetInstrIndexType(opcode);
+    pDec->indexType = dexGetIndexTypeFromOpcode(opcode);
 
     switch (format) {
     case kFmt10x:       // op
@@ -581,22 +581,19 @@ void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
     case kFmt35ms:      // [opt] invoke-virtual+super
         {
             /*
-             * The lettering changes that came about when we went from 4 args
-             * to 5 made the "range" versions of the calls different from
-             * the non-range versions.  We have the choice between decoding
-             * them the way the spec shows and having lots of conditionals
-             * in the verifier, or mapping the values onto their original
-             * registers and leaving the verifier intact.
+             * Note that the fields mentioned in the spec don't appear in
+             * their "usual" positions here compared to most formats. This
+             * was done so that the field names for the argument count and
+             * reference index match between this format and the corresponding
+             * range formats (3rc and friends).
              *
-             * Current plan is to leave the verifier alone.  We can fix it
-             * later if it's architecturally unbearable.
-             *
-             * Bottom line: method constant is always in vB.
+             * Bottom line: The argument count is always in vA, and the
+             * method constant (or equivalent) is always in vB.
              */
             u2 regList;
             int i, count;
 
-            pDec->vA = INST_B(inst);
+            pDec->vA = INST_B(inst); // This is labeled A in the spec.
             pDec->vB = FETCH(1);
             regList = FETCH(2);
 
@@ -667,7 +664,7 @@ bail:
  * works for special OP_NOP entries, including switch statement data tables
  * and array data.
  */
-size_t dexGetInstrOrTableWidth(const u2* insns)
+size_t dexGetWidthFromInstruction(const u2* insns)
 {
     size_t width;
 
@@ -678,9 +675,11 @@ size_t dexGetInstrOrTableWidth(const u2* insns)
     } else if (*insns == kArrayDataSignature) {
         u2 elemWidth = insns[1];
         u4 len = insns[2] | (((u4)insns[3]) << 16);
+        // The plus 1 is to round up for odd size and width.
         width = 4 + (elemWidth * len + 1) / 2;
     } else {
-        width = dexGetInstrWidth(INST_INST(insns[0]));
+        width = dexGetWidthFromOpcode(INST_INST(insns[0]));
     }
+
     return width;
 }

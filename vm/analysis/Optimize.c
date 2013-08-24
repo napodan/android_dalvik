@@ -324,7 +324,7 @@ rewrite_static_field2:
             }
         }
 
-        width = dexGetInstrOrTableWidth(insns);
+        width = dexGetWidthFromInstruction(insns);
         assert(width > 0);
 
         insns += width;

@@ -497,7 +497,7 @@ static bool verifyInstructions(VerifierData* vdata)
 
         int width = dvmInsnGetWidth(insnFlags, i);
         Opcode opcode = *insns & 0xff;
-        InstructionFlags opFlags = dexGetInstrFlags(opcode);
+        OpcodeFlags opFlags = dexGetFlagsFromOpcode(opcode);
 
         if ((opFlags & gcMask) != 0) {
             /*

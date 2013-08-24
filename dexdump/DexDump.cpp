@@ -32,13 +32,13 @@
 
 #include "libdex/DexFile.h"
 
+#include "libdex/CmdUtils.h"
 #include "libdex/DexCatch.h"
 #include "libdex/DexClass.h"
 #include "libdex/DexOpcodes.h"
 #include "libdex/DexProto.h"
 #include "libdex/InstrUtils.h"
 #include "libdex/SysUtil.h"
-#include "libdex/CmdUtils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -737,7 +737,7 @@ void dumpInstruction(DexFile* pDexFile, const DexCode* pCode, int insnIdx,
         printf("|%04x: %s", insnIdx, dexGetOpcodeName(pDecInsn->opcode));
     }
 
-    switch (dexGetInstrFormat(pDecInsn->opcode)) {
+    switch (dexGetFormatFromOpcode(pDecInsn->opcode)) {
     case kFmt10x:        // op
         break;
     case kFmt12x:        // op vA, vB
@@ -1057,7 +1057,7 @@ void dumpBytecodes(DexFile* pDexFile, const DexMethod* pDexMethod)
             insnWidth = 4 + ((size * width) + 1) / 2;
         } else {
             Opcode opcode = dexOpcodeFromCodeUnit(instr);
-            insnWidth = dexGetInstrWidth(opcode);
+            insnWidth = dexGetWidthFromOpcode(opcode);
             if (insnWidth == 0) {
                 fprintf(stderr,
                     "GLITCH: zero-width instruction at idx=0x%04x\n", insnIdx);

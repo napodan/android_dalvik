@@ -29,21 +29,12 @@ extern "C" {
 #include "DexOpcodes.h"
 
 /*
- * Dalvik-defined instruction formats.
+ * Possible instruction formats associated with Dalvik opcodes.
  *
- * (This defines InstructionFormat as an unsigned char to reduce the size
- * of the table.  This isn't necessary with some compilers, which use an
- * integer width appropriate for the number of enum values.)
- *
- * If you add or delete a format, you have to change some or all of:
- *  - this enum
- *  - the switch inside dexDecodeInstruction() in InstrUtils.c
- *  - the switch inside dumpInstruction() in DexDump.c
+ * See the file opcode-gen/README.txt for information about updating
+ * opcodes and instruction formats.
  */
-#ifndef __cplusplus
-typedef unsigned char InstructionFormat;
-#endif
-enum InstructionFormat {
+typedef enum {
     kFmt00x = 0,    // unknown format (also used for "breakpoint" opcode)
     kFmt10x,        // op
     kFmt12x,        // op vA, vB
@@ -75,16 +66,13 @@ enum InstructionFormat {
     kFmt51l,        // op vAA, #+BBBBBBBBBBBBBBBB
     kFmt35mi,       // [opt] inline invoke
     kFmt3rmi,       // [opt] inline invoke/range
-};
+}InstructionFormat;
 
 /*
  * Types of indexed reference that are associated with opcodes whose
  * formats include such an indexed reference (e.g., 21c and 35c).
  */
-#ifndef __cplusplus
-typedef unsigned char InstructionIndexType;
-#endif
-enum InstructionIndexType {
+typedef enum {
     kIndexUnknown = 0,
     kIndexNone,         // has no index
     kIndexVaries,       // "It depends." Used for throw-verification-error
@@ -95,7 +83,7 @@ enum InstructionIndexType {
     kIndexInlineMethod, // inline method index (for inline linked methods)
     kIndexVtableOffset, // vtable offset (for static linked methods)
     kIndexFieldOffset   // field offset (for static linked fields)
-};
+}InstructionIndexType;
 
 /*
  * Instruction width implied by an opcode's format; a value in the
@@ -106,20 +94,17 @@ enum InstructionIndexType {
 typedef u1 InstructionWidth;
 
 /*
- * Instruction flags, used by the verifier and JIT to determine where
- * control can flow to next.  Expected to fit in 8 bits.
+ * Opcode control flow flags, used by the verifier and JIT.
  */
-#ifndef __cplusplus
-typedef u1 InstructionFlags;
-#endif
-enum InstructionFlags {
+typedef u1 OpcodeFlags;
+typedef enum {
     kInstrCanBranch     = 1,        // conditional or unconditional branch
     kInstrCanContinue   = 1 << 1,   // flow can continue to next statement
     kInstrCanSwitch     = 1 << 2,   // switch statement
     kInstrCanThrow      = 1 << 3,   // could cause an exception to be thrown
     kInstrCanReturn     = 1 << 4,   // returns, no additional statements
     kInstrInvoke        = 1 << 5,   // a flavor of invoke
-};
+}OpcodeFlagsBits;
 
 /*
  * Struct that includes a pointer to each of the opcode information
@@ -132,9 +117,9 @@ enum InstructionFlags {
  * suffice.
  */
 typedef struct InstructionInfoTables {
-    InstructionFormat*                formats;    /* InstructionFormat elements */
-    InstructionIndexType*                indexTypes; /* InstructionIndexType elements */
-    InstructionFlags*       flags;
+    u1*                formats;    /* InstructionFormat elements */
+    u1*                indexTypes; /* InstructionIndexType elements */
+    OpcodeFlags*       flags;
     InstructionWidth*  widths;
 } InstructionInfoTables;
 
@@ -157,9 +142,9 @@ typedef struct DecodedInstruction {
 } DecodedInstruction;
 
 /*
-* Return the width of the specified instruction, or 0 if not defined.
-*/
-DEX_INLINE size_t dexGetInstrWidth(Opcode opcode)
+ * Return the instruction width of the specified opcode, or 0 if not defined.
+ */
+DEX_INLINE size_t dexGetWidthFromOpcode(Opcode opcode)
 {
     //assert(/*opcode >= 0 &&*/ opcode < kNumDalvikInstructions);
     return gDexOpcodeInfo.widths[opcode];
@@ -170,12 +155,12 @@ DEX_INLINE size_t dexGetInstrWidth(Opcode opcode)
  * works for special OP_NOP entries, including switch statement data tables
  * and array data.
  */
-size_t dexGetInstrOrTableWidth(const u2* insns);
+size_t dexGetWidthFromInstruction(const u2* insns);
 
 /*
  * Returns the flags for the specified opcode.
  */
-DEX_INLINE int dexGetInstrFlags(Opcode opcode)
+DEX_INLINE OpcodeFlags dexGetFlagsFromOpcode(Opcode opcode)
 {
     //assert(/*opcode >= 0 &&*/ opcode < kNumDalvikInstructions);
     return gDexOpcodeInfo.flags[opcode];
@@ -184,7 +169,7 @@ DEX_INLINE int dexGetInstrFlags(Opcode opcode)
 /*
  * Returns true if the given flags represent a goto (unconditional branch).
  */
-DEX_INLINE bool dexIsGoto(int flags)
+DEX_INLINE bool dexIsGoto(OpcodeFlags flags)
 {
     return (flags & (kInstrCanBranch | kInstrCanContinue)) == kInstrCanBranch;
 }
@@ -192,19 +177,19 @@ DEX_INLINE bool dexIsGoto(int flags)
 /*
  * Return the instruction format for the specified opcode.
  */
-DEX_INLINE InstructionFormat dexGetInstrFormat(Opcode opcode)
+DEX_INLINE InstructionFormat dexGetFormatFromOpcode(Opcode opcode)
 {
     //assert(/*opcode >= 0 &&*/ opcode < kNumDalvikInstructions);
-    return gDexOpcodeInfo.formats[opcode];
+    return (InstructionFormat) gDexOpcodeInfo.formats[opcode];
 }
 
 /*
  * Return the instruction index type for the specified opcode.
  */
-DEX_INLINE InstructionIndexType dexGetInstrIndexType(Opcode opcode)
+DEX_INLINE InstructionIndexType dexGetIndexTypeFromOpcode(Opcode opcode)
 {
     //assert(/*opcode >= 0 &&*/ opcode < kNumDalvikInstructions);
-    return gDexOpcodeInfo.indexTypes[opcode];
+    return (InstructionIndexType) gDexOpcodeInfo.indexTypes[opcode];
 }
 
 /*

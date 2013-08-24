@@ -85,7 +85,7 @@ static void inlineGetter(CompilationUnit *cUnit,
     /* Now setup the Dalvik instruction with converted src/dst registers */
     newGetterMIR->dalvikInsn = getterInsn;
 
-    newGetterMIR->width = dexGetInstrWidth(getterInsn.opcode);
+    newGetterMIR->width = dexGetWidthFromOpcode(getterInsn.opcode);
 
     newGetterMIR->OptimizationFlags |= MIR_CALLEE;
 
@@ -100,9 +100,9 @@ static void inlineGetter(CompilationUnit *cUnit,
     dvmCompilerInsertMIRAfter(invokeBB, invokeMIR, newGetterMIR);
 
     if (isPredicted) {
-        MIR *invokeMIRSlow = dvmCompilerNew(sizeof(MIR), true);
+        MIR *invokeMIRSlow = (MIR *)dvmCompilerNew(sizeof(MIR), true);
         *invokeMIRSlow = *invokeMIR;
-        invokeMIR->dalvikInsn.opcode = kMirOpCheckInlinePrediction;
+        invokeMIR->dalvikInsn.opcode = (Opcode)kMirOpCheckInlinePrediction;
 
         /* Use vC to denote the first argument (ie this) */
         if (!isRange) {
@@ -164,7 +164,7 @@ static void inlineSetter(CompilationUnit *cUnit,
     /* Now setup the Dalvik instruction with converted src/dst registers */
     newSetterMIR->dalvikInsn = setterInsn;
 
-    newSetterMIR->width = dexGetInstrWidth(setterInsn.opcode);
+    newSetterMIR->width = dexGetWidthFromOpcode(setterInsn.opcode);
 
     newSetterMIR->OptimizationFlags |= MIR_CALLEE;
 
@@ -179,9 +179,9 @@ static void inlineSetter(CompilationUnit *cUnit,
     dvmCompilerInsertMIRAfter(invokeBB, invokeMIR, newSetterMIR);
 
     if (isPredicted) {
-        MIR *invokeMIRSlow = dvmCompilerNew(sizeof(MIR), true);
+        MIR *invokeMIRSlow = (MIR *)dvmCompilerNew(sizeof(MIR), true);
         *invokeMIRSlow = *invokeMIR;
-        invokeMIR->dalvikInsn.opcode = kMirOpCheckInlinePrediction;
+        invokeMIR->dalvikInsn.opcode = (Opcode)kMirOpCheckInlinePrediction;
 
         /* Use vC to denote the first argument (ie this) */
         if (!isRange) {
@@ -295,8 +295,8 @@ void dvmCompilerInlineMIR(CompilationUnit *cUnit)
         if (bb->blockType != kDalvikByteCode)
             continue;
         MIR *lastMIRInsn = bb->lastMIRInsn;
-        int opcode = lastMIRInsn->dalvikInsn.opcode;
-        int flags = dexGetInstrFlags(opcode);
+        Opcode opcode = lastMIRInsn->dalvikInsn.opcode;
+        int flags = (int)dexGetFlagsFromOpcode(opcode);
 
         /* No invoke - continue */
         if ((flags & kInstrInvoke) == 0)
