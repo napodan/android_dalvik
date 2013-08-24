@@ -106,46 +106,6 @@ static int getFileStartAndLength(int fd, off_t *start_, size_t *length_)
     return 0;
 }
 
-/*
- * Pull the contents of a file into an new shared memory segment.  We grab
- * everything from fd's current offset on.
- *
- * We need to know the length ahead of time so we can allocate a segment
- * of sufficient size.
- */
-int sysLoadFileInShmem(int fd, MemMapping* pMap)
-{
-#ifdef HAVE_POSIX_FILEMAP
-    off_t start;
-    size_t length, actual;
-    void* memPtr;
-
-    assert(pMap != NULL);
-
-    if (getFileStartAndLength(fd, &start, &length) < 0)
-        return -1;
-
-    memPtr = sysCreateAnonShmem(length);
-    if (memPtr == NULL)
-        return -1;
-
-    actual = read(fd, memPtr, length);
-    if (actual != length) {
-        ALOGE("only read %d of %d bytes\n", (int) actual, (int) length);
-        sysReleaseShmem(pMap);
-        return -1;
-    }
-
-    pMap->baseAddr = pMap->addr = memPtr;
-    pMap->baseLength = pMap->length = length;
-
-    return 0;
-#else
-    ALOGE("sysLoadFileInShmem not implemented.\n");
-    return -1;
-#endif
-}
-
 #ifndef HAVE_POSIX_FILEMAP
 int sysFakeMapFile(int fd, MemMapping* pMap)
 {
@@ -175,41 +135,6 @@ int sysFakeMapFile(int fd, MemMapping* pMap)
     return 0;
 }
 #endif
-
-/*
- * Map a file (from fd's current offset) into a shared, read-only memory
- * segment.  The file offset must be a multiple of the system page size.
- *
- * On success, returns 0 and fills out "pMap".  On failure, returns a nonzero
- * value and does not disturb "pMap".
- */
-int sysMapFileInShmemReadOnly(int fd, MemMapping* pMap)
-{
-#ifdef HAVE_POSIX_FILEMAP
-    off_t start;
-    size_t length;
-    void* memPtr;
-
-    assert(pMap != NULL);
-
-    if (getFileStartAndLength(fd, &start, &length) < 0)
-        return -1;
-
-    memPtr = mmap(NULL, length, PROT_READ, MAP_FILE | MAP_SHARED, fd, start);
-    if (memPtr == MAP_FAILED) {
-        ALOGW("mmap(%d, RO, FILE|SHARED, %d, %d) failed: %s\n", (int) length,
-            fd, (int) start, strerror(errno));
-        return -1;
-    }
-
-    pMap->baseAddr = pMap->addr = memPtr;
-    pMap->baseLength = pMap->length = length;
-
-    return 0;
-#else
-    return sysFakeMapFile(fd, pMap);
-#endif
-}
 
 /*
  * Map a file (from fd's current offset) into a private, read-write memory
@@ -402,6 +327,31 @@ int sysWriteFully(int fd, const void* buf, size_t count, const char* logMsg)
             buf = (const void*) (((const u1*) buf) + actual);
         }
         count -= actual;
+    }
+
+    return 0;
+}
+
+/* See documentation comment in header file. */
+int sysCopyFileToFile(int outFd, int inFd, size_t count)
+{
+    const size_t kBufSize = 32768;
+    unsigned char buf[kBufSize];
+
+    while (count != 0) {
+        size_t getSize = (count > kBufSize) ? kBufSize : count;
+
+        ssize_t actual = TEMP_FAILURE_RETRY(read(inFd, buf, getSize));
+        if (actual != (ssize_t) getSize) {
+            ALOGW("sysCopyFileToFile: copy read failed (%d vs %zd)",
+                (int) actual, getSize);
+            return -1;
+        }
+
+        if (sysWriteFully(outFd, buf, getSize, "sysCopyFileToFile") != 0)
+            return -1;
+
+        count -= getSize;
     }
 
     return 0;
