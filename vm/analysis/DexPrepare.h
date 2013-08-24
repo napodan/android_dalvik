@@ -17,18 +17,26 @@
 /*
  * DEX preparation declarations.
  */
-#ifndef _DALVIK_DEXPREPARE
-#define _DALVIK_DEXPREPARE
+#ifndef DALVIK_DEXPREPARE_H_
+#define DALVIK_DEXPREPARE_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Global DEX optimizer control.  Determines the circumstances in which we
  * try to rewrite instructions in the DEX file.
+ *
+ * Optimizing is performed ahead-of-time by dexopt and, in some cases, at
+ * load time by the VM.
  */
 typedef enum DexOptimizerMode {
     OPTIMIZE_MODE_UNKNOWN = 0,
-    OPTIMIZE_MODE_NONE,         /* never optimize */
+    OPTIMIZE_MODE_NONE,         /* never optimize (except "essential") */
     OPTIMIZE_MODE_VERIFIED,     /* only optimize verified classes (default) */
-    OPTIMIZE_MODE_ALL           /* optimize all classes */
+    OPTIMIZE_MODE_ALL,          /* optimize verified & unverified (risky) */
+    OPTIMIZE_MODE_FULL          /* fully opt verified classes at load time */
 } DexOptimizerMode;
 
 /* some additional bit flags for dexopt */
@@ -119,4 +127,8 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLen,
 bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
     const char* fileName, u4 modWhen, u4 crc, bool isBootstrap);
 
-#endif /*_DALVIK_DEXPREPARE*/
+#ifdef __cplusplus
+};
+#endif
+
+#endif /*DALVIK_DEXPREPARE_H_*/
