@@ -30,6 +30,7 @@
 #include "libdex/DexDebugInfo.h"
 #include "libdex/DexFile.h"
 #include "libdex/DexProto.h"
+#include "libdex/DexUtf.h"
 #include "libdex/ZipArchive.h"
 #include "DvmDex.h"
 #include "RawDexFile.h"

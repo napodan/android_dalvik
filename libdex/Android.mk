@@ -26,6 +26,7 @@ dex_src_files := \
 	DexOpcodes.cpp \
 	DexProto.cpp \
 	DexSwapVerify.cpp \
+	DexUtf.cpp \
 	InstrUtils.cpp \
 	Leb128.cpp \
 	OptInvocation.cpp \
