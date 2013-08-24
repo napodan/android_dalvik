@@ -19,6 +19,7 @@ dex_src_files := \
 	DexCatch.cpp \
 	DexClass.cpp \
 	DexDataMap.cpp \
+	DexDebugInfo.cpp \
 	DexFile.cpp \
 	DexInlines.cpp \
 	DexOptData.cpp \
