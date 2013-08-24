@@ -822,7 +822,7 @@ char *dvmCompilerGetDalvikDisassembly(DecodedInstruction *insn,
                                       char *note)
 {
     char buffer[256];
-    int opcode = insn->opcode;
+    Opcode opcode = insn->opcode;
     int dfAttributes = dvmCompilerDataFlowAttributes[opcode];
     char *ret;
 

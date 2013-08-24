@@ -46,9 +46,14 @@ bool dvmCheckAsmConstants(void)
      * If an instruction overflows the 64-byte handler size limit, it will
      * push everything up and alter the total size.  Check it here.
      */
+#if defined(__mips__)
+    const int width = 128;
+#else
     const int width = 64;
-    int interpSize = dvmAsmInstructionEnd - dvmAsmInstructionStart;
-    if (interpSize != 0 && interpSize != 256*width) {
+#endif
+    int interpSize = (uintptr_t) dvmAsmInstructionEnd -
+                     (uintptr_t) dvmAsmInstructionStart;
+    if (interpSize != 0 && interpSize != kNumPackedOpcodes*width) {
         ALOGE("ERROR: unexpected asm interp size %d\n", interpSize);
         ALOGE("(did an instruction handler exceed %d bytes?)\n", width);
         dvmAbort();
