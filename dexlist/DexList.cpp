@@ -22,6 +22,7 @@
 
 #include "libdex/CmdUtils.h"
 #include "libdex/DexClass.h"
+#include "libdex/DexDebugInfo.h"
 #include "libdex/DexProto.h"
 #include "libdex/SysUtil.h"
 

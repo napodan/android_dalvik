@@ -757,35 +757,6 @@ DEX_INLINE const u1* dexGetDebugInfoStream(const DexFile* pDexFile,
     }
 }
 
-/*
- * Callback for "new position table entry".
- * Returning non-0 causes the decoder to stop early.
- */
-typedef int (*DexDebugNewPositionCb)(void *cnxt, u4 address, u4 lineNum);
-
-/*
- * Callback for "new locals table entry". "signature" is an empty string
- * if no signature is available for an entry.
- */
-typedef void (*DexDebugNewLocalCb)(void *cnxt, u2 reg, u4 startAddress,
-        u4 endAddress, const char *name, const char *descriptor,
-        const char *signature);
-
-/*
- * Decode debug info for method.
- *
- * posCb is called in ascending address order.
- * localCb is called in order of ascending end address.
- */
-void dexDecodeDebugInfo(
-            const DexFile* pDexFile,
-            const DexCode* pDexCode,
-            const char* classDescriptor,
-            u4 protoIdx,
-            u4 accessFlags,
-            DexDebugNewPositionCb posCb, DexDebugNewLocalCb localCb,
-            void* cnxt);
-
 /* DexClassDef convenience - get class descriptor */
 DEX_INLINE const char* dexGetClassDescriptor(const DexFile* pDexFile,
     const DexClassDef* pClassDef)
@@ -909,16 +880,16 @@ DEX_INLINE int dexGetParameterAnnotationsSize(const DexFile* pDexFile,
 DEX_INLINE const DexAnnotationSetRefList* dexGetParameterAnnotationSetRefList(
     const DexFile* pDexFile, const DexParameterAnnotationsItem* pItem)
 {
-    return (const DexAnnotationSetRefList*)
-        (pDexFile->baseAddr + pItem->annotationsOff);
+    return (const DexAnnotationSetRefList*) (pDexFile->baseAddr + pItem->annotationsOff);
 }
 
 /* get method annotation list size */
 DEX_INLINE int dexGetParameterAnnotationSetRefSize(const DexFile* pDexFile,
     const DexParameterAnnotationsItem* pItem)
 {
-    if (pItem->annotationsOff == 0)
+    if (pItem->annotationsOff == 0) {
         return 0;
+    }
     return dexGetParameterAnnotationSetRefList(pDexFile, pItem)->size;
 }
 

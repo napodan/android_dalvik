@@ -27,6 +27,7 @@
 #include "Misc.h"
 #include "Bits.h"
 #include "libdex/SysUtil.h"
+#include "libdex/DexDebugInfo.h"
 #include "libdex/DexFile.h"
 #include "libdex/DexProto.h"
 #include "libdex/ZipArchive.h"
