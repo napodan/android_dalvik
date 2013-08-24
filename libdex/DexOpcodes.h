@@ -595,8 +595,6 @@ typedef enum {
         /* END(libdex-goto-table) */                                          \
     };
 
-#ifdef __cplusplus
-
 /*
  * Return the Opcode for a given raw opcode code unit (which may
  * include data payload). The packed index is a zero-based index which
@@ -619,8 +617,6 @@ DEX_INLINE Opcode dexOpcodeFromCodeUnit(u2 codeUnit) {
         return (Opcode) ((codeUnit >> 8) | 0x100);
     }
 }
-
-#endif /* __cplusplus */
 
 /*
  * Return the name of an opcode.

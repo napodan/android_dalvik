@@ -472,7 +472,6 @@ InstructionInfoTables gDexOpcodeInfo = {
  */
 #define FETCH(_offset)      (insns[(_offset)])
 #define FETCH_u4(_offset)   (fetch_u4_impl((_offset), insns))
-#define INST_INST(_inst)    ((_inst) & 0xff)
 #define INST_A(_inst)       (((u2)(_inst) >> 8) & 0x0f)
 #define INST_B(_inst)       ((u2)(_inst) >> 12)
 #define INST_AA(_inst)      ((_inst) >> 8)
@@ -491,7 +490,7 @@ static inline u4 fetch_u4_impl(u4 offset, const u2* insns) {
 void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
 {
     u2 inst = *insns;
-    Opcode opcode = (Opcode) INST_INST(inst);
+    Opcode opcode = dexOpcodeFromCodeUnit(inst);
     InstructionFormat format = dexGetFormatFromOpcode(opcode);
 
     pDec->opcode = opcode;
@@ -678,7 +677,7 @@ size_t dexGetWidthFromInstruction(const u2* insns)
         // The plus 1 is to round up for odd size and width.
         width = 4 + (elemWidth * len + 1) / 2;
     } else {
-        width = dexGetWidthFromOpcode(INST_INST(insns[0]));
+        width = dexGetWidthFromOpcode(dexOpcodeFromCodeUnit(insns[0]));
     }
 
     return width;
