@@ -27,7 +27,6 @@ extern "C" {
 #include "SysUtil.h"
 #include "DexFile.h"            // need DEX_INLINE
 
-
 /*
  * Trivial typedef to ensure that ZipEntry is not treated as a simple
  * integer.  We use NULL to indicate an invalid value.
@@ -40,7 +39,6 @@ typedef void* ZipEntry;
 typedef struct ZipHashEntry {
     const char*     name;
     unsigned short  nameLen;
-    //unsigned int    hash;
 } ZipHashEntry;
 
 /*

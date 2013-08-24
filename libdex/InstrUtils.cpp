@@ -578,6 +578,7 @@ void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
         break;
     case kFmt35c:       // op {vC, vD, vE, vF, vG}, thing@BBBB
     case kFmt35ms:      // [opt] invoke-virtual+super
+    case kFmt35mi:      // [opt] inline invoke
         {
             /*
              * Note that the fields mentioned in the spec don't appear in
@@ -596,45 +597,38 @@ void dexDecodeInstruction(const u2* insns, DecodedInstruction* pDec)
             pDec->vB = FETCH(1);
             regList = FETCH(2);
 
-            if (pDec->vA > 5) {
-                ALOGW("Invalid arg count in 35c/35ms (%d)\n", pDec->vA);
-                goto bail;
-            }
             count = pDec->vA;
-            if (count == 5) {
-                /* 5th arg comes from A field in instruction */
+
+            /*
+             * Copy the argument registers into the arg[] array, and
+             * also copy the first argument (if any) into vC. (The
+             * DecodedInstruction structure doesn't have separate
+             * fields for {vD, vE, vF, vG}, so there's no need to make
+             * copies of those.) Note that cases 5..2 fall through.
+             */
+            switch (count) {
+            case 5: {
+                if (format == kFmt35mi) {
+                    /* A fifth arg is verboten for inline invokes. */
+                    ALOGW("Invalid arg count in 35mi (5)");
+                    goto bail;
+                }
+                /*
+                 * Per note at the top of this format decoder, the
+                 * fifth argument comes from the A field in the
+                 * instruction, but it's labeled G in the spec.
+                 */
                 pDec->arg[4] = INST_A(inst);
-                count--;
             }
-            for (i = 0; i < count; i++) {
-                pDec->arg[i] = regList & 0x0f;
-                regList >>= 4;
-            }
-            /* copy arg[0] to vC; we don't have vD/vE/vF, so ignore those */
-            if (pDec->vA > 0)
-                pDec->vC = pDec->arg[0];
-        }
-        break;
-    case kFmt35mi:   // [opt] inline invoke
-        {
-            u2 regList;
-            int i;
-
-            pDec->vA = INST_B(inst);
-            pDec->vB = FETCH(1);
-            regList = FETCH(2);
-
-            if (pDec->vA > 4) {
-                ALOGW("Invalid arg count in 3inline (%d)\n", pDec->vA);
+            case 4: pDec->arg[3] = (regList >> 12) & 0x0f;
+            case 3: pDec->arg[2] = (regList >> 8) & 0x0f;
+            case 2: pDec->arg[1] = (regList >> 4) & 0x0f;
+            case 1: pDec->vC = pDec->arg[0] = regList & 0x0f; break;
+            case 0: break; // Valid, but no need to do anything.
+            default:
+                ALOGW("Invalid arg count in 35c/35ms/35mi (%d)", count);
                 goto bail;
             }
-            for (i = 0; i < (int) pDec->vA; i++) {
-                pDec->arg[i] = regList & 0x0f;
-                regList >>= 4;
-            }
-            /* copy arg[0] to vC; we don't have vD/vE/vF, so ignore those */
-            if (pDec->vA > 0)
-                pDec->vC = pDec->arg[0];
         }
         break;
     case kFmt3rc:       // op {vCCCC .. v(CCCC+AA-1)}, meth@BBBB
