@@ -24,52 +24,37 @@
  * See the file opcode-gen/README.txt for information about updating
  * opcodes and instruction formats.
  */
-#ifndef _LIBDEX_OPCODE
-#define _LIBDEX_OPCODE
+
+#ifndef LIBDEX_DEXOPCODES_H_
+#define LIBDEX_DEXOPCODES_H_
 
 #ifdef __cplusplus
 extern "C" {
 #include "DexFile.h"
 #endif /*__cplusplus*/
 /*
- * If you add, delete, or renumber instructions, you need to change things
- * in various places.  Renumbering really only affects the "unused" opcodes,
- * which are given explicit enumeration values to make it easier to find
- * the places in the code that need to be updated when making changes --
- * if you replace "OP_UNUSED_2D" and neglect to update a switch statement,
- * the compiler will complain about an unknown value.
+ * kMaxOpcodeValue: the highest possible raw (unpacked) opcode value
  *
- * Opcode definitions and attributes:
- *  - update the Opcode enum below
- *  - update the "goto table" definition macro, DEFINE_GOTO_TABLE(), below
- *  - update the instruction info table generators and (if you changed an
- *    instruction format) instruction decoder in InstrUtils.c
- *  - update the instruction format list in InstrUtils.h, if necessary
- *  - update the parallel definitions in the class dalvik.bytecode.Opcodes
+ * kNumPackedOpcodes: the highest possible packed opcode value of a
+ * valid Dalvik opcode, plus one
  *
- * Interpreter:
- *  - implement/update the instruction in C in mterp/c/...
- *    - verify new code by running with "dalvik.vm.execution-mode =
- *      int:portable" or "-Xint:portable"
- *  - implement/update the instruction in ARM in mterp/armv5/...
- *    - verify by enabling ARM handler for that instruction in mterp config
- *      and running int:fast as above
- *  - repeat for other platforms (x86, ...)
- *  (see notes in mterp/ReadMe.txt for rebuilding instructions)
- *
- * Verifier / optimizer:
- *  - update some stuff in analysis/DexOptimize.c, analysis/DexVerify.c,
- *    and/or analysis/CodeVerify.c as needed
- *    - verify by running with verifier enabled (it's on by default)
- *
- * Tools:
- *  - update the Opcode table in dexdump/Opcode.c
- *  - update dexdump/DexDump.c if an instruction format has changed
- *
- * Note: The Dalvik VM tests (in the tests subdirectory) provide a convenient
- * way to test most of the above without doing any rebuilds.  In particular,
- * test 003-omnibus-opcodes will exercise most of the opcodes.
+ * TODO: Change this once the rest of the code is prepared to deal with
+ * extended opcodes.
  */
+// BEGIN(libdex-maximum-values); GENERATED AUTOMATICALLY BY opcode-gen
+#define kMaxOpcodeValue 0xffff
+#define kNumPackedOpcodes 0x100
+// END(libdex-maximum-values); GENERATED AUTOMATICALLY BY opcode-gen
+
+/*
+ * Switch table and array data signatures are a code unit consisting
+ * of "NOP" (0x00) in the low-order byte and a non-zero identifying
+ * code in the high-order byte. (A true NOP is 0x0000.)
+ */
+#define kPackedSwitchSignature  0x0100
+#define kSparseSwitchSignature  0x0200
+#define kArrayDataSignature     0x0300
+
 /*
  * Enumeration of all Dalvik opcodes, where the enumeration value
  * associated with each is the corresponding packed opcode number.
@@ -83,13 +68,8 @@ extern "C" {
  * can find the next instruction" aren't possible. (This is
  * correctable, but probably not useful.)
  */
-
-#ifdef __cplusplus
-enum Opcode {
+typedef enum {
     // BEGIN(libdex-opcode-enum); GENERATED AUTOMATICALLY BY opcode-gen
-#else
-typedef enum Opcode {
-#endif /*__cplusplus*/
     OP_NOP                          = 0x00,
     OP_MOVE                         = 0x01,
     OP_MOVE_FROM16                  = 0x02,
@@ -347,29 +327,14 @@ typedef enum Opcode {
     OP_SPUT_OBJECT_VOLATILE         = 0xfe,
     OP_UNUSED_FF                    = 0xff,
     /* reserved for code expansion */
-#ifdef __cplusplus
-};
-#else
 } Opcode;
-#endif /*__cplusplus*/
-
-#define kNumDalvikInstructions 256
-
-
-/*
- * Switch-statement signatures are a "NOP" followed by a code.  (A true NOP
- * is 0x0000.)
- */
-#define kPackedSwitchSignature  0x0100
-#define kSparseSwitchSignature  0x0200
-#define kArrayDataSignature     0x0300
 
 /*
  * Macro used to generate a computed goto table for use in implementing
  * an interpreter in C.
  */
 #define DEFINE_GOTO_TABLE(_name) \
-    static const void* _name[kNumDalvikInstructions] = {                    \
+    static const void* _name[kNumPackedOpcodes] = {                      \
         /* BEGIN(libdex-goto-table); GENERATED AUTOMATICALLY BY opcode-gen */ \
         H(OP_NOP),                                                            \
         H(OP_MOVE),                                                           \
@@ -387,7 +352,6 @@ typedef enum Opcode {
         H(OP_MOVE_EXCEPTION),                                                 \
         H(OP_RETURN_VOID),                                                    \
         H(OP_RETURN),                                                         \
-        /* 10..1f */                                                          \
         H(OP_RETURN_WIDE),                                                    \
         H(OP_RETURN_OBJECT),                                                  \
         H(OP_CONST_4),                                                        \
@@ -404,7 +368,6 @@ typedef enum Opcode {
         H(OP_MONITOR_ENTER),                                                  \
         H(OP_MONITOR_EXIT),                                                   \
         H(OP_CHECK_CAST),                                                     \
-        /* 20..2f */                                                          \
         H(OP_INSTANCE_OF),                                                    \
         H(OP_ARRAY_LENGTH),                                                   \
         H(OP_NEW_INSTANCE),                                                   \
@@ -421,7 +384,6 @@ typedef enum Opcode {
         H(OP_CMPL_FLOAT),                                                     \
         H(OP_CMPG_FLOAT),                                                     \
         H(OP_CMPL_DOUBLE),                                                    \
-        /* 30..3f */                                                          \
         H(OP_CMPG_DOUBLE),                                                    \
         H(OP_CMP_LONG),                                                       \
         H(OP_IF_EQ),                                                          \
@@ -438,7 +400,6 @@ typedef enum Opcode {
         H(OP_IF_LEZ),                                                         \
         H(OP_UNUSED_3E),                                                      \
         H(OP_UNUSED_3F),                                                      \
-        /* 40..4f */                                                          \
         H(OP_UNUSED_40),                                                      \
         H(OP_UNUSED_41),                                                      \
         H(OP_UNUSED_42),                                                      \
@@ -455,7 +416,6 @@ typedef enum Opcode {
         H(OP_APUT_OBJECT),                                                    \
         H(OP_APUT_BOOLEAN),                                                   \
         H(OP_APUT_BYTE),                                                      \
-        /* 50..5f */                                                          \
         H(OP_APUT_CHAR),                                                      \
         H(OP_APUT_SHORT),                                                     \
         H(OP_IGET),                                                           \
@@ -472,7 +432,6 @@ typedef enum Opcode {
         H(OP_IPUT_BYTE),                                                      \
         H(OP_IPUT_CHAR),                                                      \
         H(OP_IPUT_SHORT),                                                     \
-        /* 60..6f */                                                          \
         H(OP_SGET),                                                           \
         H(OP_SGET_WIDE),                                                      \
         H(OP_SGET_OBJECT),                                                    \
@@ -489,7 +448,6 @@ typedef enum Opcode {
         H(OP_SPUT_SHORT),                                                     \
         H(OP_INVOKE_VIRTUAL),                                                 \
         H(OP_INVOKE_SUPER),                                                   \
-        /* 70..7f */                                                          \
         H(OP_INVOKE_DIRECT),                                                  \
         H(OP_INVOKE_STATIC),                                                  \
         H(OP_INVOKE_INTERFACE),                                               \
@@ -506,7 +464,6 @@ typedef enum Opcode {
         H(OP_NEG_LONG),                                                       \
         H(OP_NOT_LONG),                                                       \
         H(OP_NEG_FLOAT),                                                      \
-        /* 80..8f */                                                          \
         H(OP_NEG_DOUBLE),                                                     \
         H(OP_INT_TO_LONG),                                                    \
         H(OP_INT_TO_FLOAT),                                                   \
@@ -523,7 +480,6 @@ typedef enum Opcode {
         H(OP_INT_TO_BYTE),                                                    \
         H(OP_INT_TO_CHAR),                                                    \
         H(OP_INT_TO_SHORT),                                                   \
-        /* 90..9f */                                                          \
         H(OP_ADD_INT),                                                        \
         H(OP_SUB_INT),                                                        \
         H(OP_MUL_INT),                                                        \
@@ -540,7 +496,6 @@ typedef enum Opcode {
         H(OP_MUL_LONG),                                                       \
         H(OP_DIV_LONG),                                                       \
         H(OP_REM_LONG),                                                       \
-        /* a0..af */                                                          \
         H(OP_AND_LONG),                                                       \
         H(OP_OR_LONG),                                                        \
         H(OP_XOR_LONG),                                                       \
@@ -557,7 +512,6 @@ typedef enum Opcode {
         H(OP_MUL_DOUBLE),                                                     \
         H(OP_DIV_DOUBLE),                                                     \
         H(OP_REM_DOUBLE),                                                     \
-        /* b0..bf */                                                          \
         H(OP_ADD_INT_2ADDR),                                                  \
         H(OP_SUB_INT_2ADDR),                                                  \
         H(OP_MUL_INT_2ADDR),                                                  \
@@ -574,7 +528,6 @@ typedef enum Opcode {
         H(OP_MUL_LONG_2ADDR),                                                 \
         H(OP_DIV_LONG_2ADDR),                                                 \
         H(OP_REM_LONG_2ADDR),                                                 \
-        /* c0..cf */                                                          \
         H(OP_AND_LONG_2ADDR),                                                 \
         H(OP_OR_LONG_2ADDR),                                                  \
         H(OP_XOR_LONG_2ADDR),                                                 \
@@ -591,7 +544,6 @@ typedef enum Opcode {
         H(OP_MUL_DOUBLE_2ADDR),                                               \
         H(OP_DIV_DOUBLE_2ADDR),                                               \
         H(OP_REM_DOUBLE_2ADDR),                                               \
-        /* d0..df */                                                          \
         H(OP_ADD_INT_LIT16),                                                  \
         H(OP_RSUB_INT),                                                       \
         H(OP_MUL_INT_LIT16),                                                  \
@@ -608,7 +560,6 @@ typedef enum Opcode {
         H(OP_AND_INT_LIT8),                                                   \
         H(OP_OR_INT_LIT8),                                                    \
         H(OP_XOR_INT_LIT8),                                                   \
-        /* e0..ef */                                                          \
         H(OP_SHL_INT_LIT8),                                                   \
         H(OP_SHR_INT_LIT8),                                                   \
         H(OP_USHR_INT_LIT8),                                                  \
@@ -680,4 +631,4 @@ const char* dexGetOpcodeName(Opcode op);
 };
 #endif
 
-#endif /*_LIBDEX_OPCODE*/
+#endif /*LIBDEX_DEXOPCODES_H_*/

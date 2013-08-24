@@ -567,7 +567,7 @@ static void Dalvik_dalvik_system_VMDebug_getInstructionCount(const u4* args,
     storage = (int*) countArray->contents;
     sched_yield();
     memcpy(storage, gDvm.executedInstrCounts,
-        kNumDalvikInstructions * sizeof(int));
+        kNumPackedOpcodes * sizeof(int));
     RETURN_VOID();
 }
 
@@ -580,7 +580,7 @@ static void Dalvik_dalvik_system_VMDebug_resetInstructionCount(const u4* args,
     JValue* pResult)
 {
     sched_yield();
-    memset(gDvm.executedInstrCounts, 0, kNumDalvikInstructions * sizeof(int));
+    memset(gDvm.executedInstrCounts, 0, kNumPackedOpcodes * sizeof(int));
     RETURN_VOID();
 }
 
