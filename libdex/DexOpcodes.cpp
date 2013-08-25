@@ -92,14 +92,12 @@ static const char* gOpNames[kNumPackedOpcodes] = {
     "if-gez",
     "if-gtz",
     "if-lez",
-    "UNUSED",
-    "UNUSED",
-
-    /* 0x40 */
-    "UNUSED",
-    "UNUSED",
-    "UNUSED",
-    "UNUSED",
+    "unused-3e",
+    "unused-3f",
+    "unused-40",
+    "unused-41",
+    "unused-42",
+    "unused-43",
     "aget",
     "aget-wide",
     "aget-object",
@@ -147,14 +145,14 @@ static const char* gOpNames[kNumPackedOpcodes] = {
     "invoke-direct",
     "invoke-static",
     "invoke-interface",
-    "UNUSED",
+    "unused-73",
     "invoke-virtual/range",
     "invoke-super/range",
     "invoke-direct/range",
     "invoke-static/range",
     "invoke-interface/range",
-    "UNUSED",
-    "UNUSED",
+    "unused-79",
+    "unused-7a",
     "neg-int",
     "not-int",
     "neg-long",
@@ -287,7 +285,8 @@ static const char* gOpNames[kNumPackedOpcodes] = {
     "+iput-object-volatile",
     "+sget-object-volatile",
     "+sput-object-volatile",
-    "UNUSED",
+    "unused-ff",
+    // END(libdex-opcode-names)
 };
 
 /*
