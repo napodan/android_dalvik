@@ -44,11 +44,7 @@ endif
 # Make a debugging version when building the simulator (if not told
 # otherwise) and when explicitly asked.
 dvm_make_debug_vm := false
-ifeq ($(strip $(DEBUG_DALVIK_VM)),)
-  ifeq ($(dvm_simulator),true)
-    dvm_make_debug_vm := true
-  endif
-else
+ifneq ($(strip $(DEBUG_DALVIK_VM)),)
   dvm_make_debug_vm := $(DEBUG_DALVIK_VM)
 endif
 
@@ -60,7 +56,7 @@ ifeq ($(dvm_make_debug_vm),true)
   # - tracked-reference verification enabled
   # - allocation limits enabled
   # - GDB helpers enabled
-  # - ALOGV
+  # - LOGV
   # - assert()
   #
   LOCAL_CFLAGS += -DWITH_INSTR_CHECKS
@@ -69,7 +65,6 @@ ifeq ($(dvm_make_debug_vm),true)
   LOCAL_CFLAGS += -DWITH_ALLOC_LIMITS
   LOCAL_CFLAGS += -DWITH_EXTRA_GC_CHECKS=1
   #LOCAL_CFLAGS += -DCHECK_MUTEX
-  #LOCAL_CFLAGS += -DPROFILE_FIELD_ACCESS
   LOCAL_CFLAGS += -DDVM_SHOW_EXCEPTION=3
   # add some extra stuff to make it easier to examine with GDB
   LOCAL_CFLAGS += -DEASY_GDB
@@ -199,7 +194,7 @@ WITH_COPYING_GC := $(strip $(WITH_COPYING_GC))
 ifeq ($(WITH_COPYING_GC),true)
   LOCAL_CFLAGS += -DWITH_COPYING_GC
   LOCAL_SRC_FILES += \
-	alloc/Copying.c.arm
+	alloc/Copying.cpp.arm
 else
   LOCAL_SRC_FILES += \
 	alloc/HeapSource.c \
