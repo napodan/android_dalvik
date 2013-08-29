@@ -53,8 +53,7 @@ enum HpifWhen {
  */
 #define HPIF_SIZE(numHeaps) \
         (sizeof(u4) + (numHeaps) * (5 * sizeof(u4) + sizeof(u1) + sizeof(u8)))
-void
-dvmDdmSendHeapInfo(int reason, bool shouldLock)
+void dvmDdmSendHeapInfo(int reason, bool shouldLock)
 {
     struct timeval now;
     u8 nowMs;
@@ -70,7 +69,7 @@ dvmDdmSendHeapInfo(int reason, bool shouldLock)
      */
     if (reason == gDvm.gcHeap->ddmHpifWhen) {
         if (shouldLock && ! dvmLockHeap()) {
-            ALOGW("%s(): can't lock heap to clear when\n", __func__);
+            ALOGW("%s(): can't lock heap to clear when", __func__);
             goto skip_when;
         }
         if (reason == gDvm.gcHeap->ddmHpifWhen) {
@@ -123,8 +122,7 @@ skip_when:
     dvmDbgDdmSendChunk(CHUNK_TYPE("HPIF"), b - buf, buf);
 }
 
-bool
-dvmDdmHandleHpifChunk(int when)
+bool dvmDdmHandleHpifChunk(int when)
 {
     switch (when) {
     case HPIF_WHEN_NOW:
@@ -137,12 +135,12 @@ dvmDdmHandleHpifChunk(int when)
             gDvm.gcHeap->ddmHpifWhen = when;
             dvmUnlockHeap();
         } else {
-            ALOGI("%s(): can't lock heap to set when\n", __func__);
+            ALOGI("%s(): can't lock heap to set when", __func__);
             return false;
         }
         break;
     default:
-        ALOGI("%s(): bad when value 0x%08x\n", __func__, when);
+        ALOGI("%s(): bad when value 0x%08x", __func__, when);
         return false;
     }
 
@@ -187,8 +185,7 @@ typedef struct HeapChunkContext {
 
 #define ALLOCATION_UNIT_SIZE 8
 
-static void
-flush_hpsg_chunk(HeapChunkContext *ctx)
+static void flush_hpsg_chunk(HeapChunkContext *ctx)
 {
     /* Patch the "length of piece" field.
      */
@@ -208,8 +205,7 @@ flush_hpsg_chunk(HeapChunkContext *ctx)
     ctx->pieceLenField = NULL;
 }
 
-static void
-heap_chunk_callback(const void *chunkptr, size_t chunklen,
+static void heap_chunk_callback(const void *chunkptr, size_t chunklen,
                     const void *userptr, size_t userlen, void *arg)
 {
     HeapChunkContext *ctx = (HeapChunkContext *)arg;
@@ -273,7 +269,7 @@ heap_chunk_callback(const void *chunkptr, size_t chunklen,
          */
         state = HPSG_STATE(SOLIDITY_FREE, 0);
     } else {
-        const Object *obj = userptr;
+        const Object *obj = (const Object *)userptr;
         /* If we're looking at the native heap, we'll just return
          * (SOLIDITY_HARD, KIND_NATIVE) for all allocated chunks
          */
@@ -357,7 +353,7 @@ enum HpsgWhat {
  */
 #define HPSx_CHUNK_SIZE (16384 - 16)
 
-void dlmalloc_walk_heap(void(*)(const void*, size_t, const void*, size_t, void*),void*);
+extern "C" void dlmalloc_walk_heap(void(*)(const void*, size_t, const void*, size_t, void*),void*);
 
 static void
 walkHeap(bool merge, bool native)

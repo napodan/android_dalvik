@@ -128,7 +128,7 @@ LOCAL_SRC_FILES := \
 	alloc/HeapTable.c \
 	alloc/HeapWorker.c \
 	alloc/Heap.c.arm \
-	alloc/DdmHeap.c \
+	alloc/DdmHeap.cpp \
 	alloc/Verify.c \
 	alloc/Visit.c \
 	analysis/CodeVerify.c \
