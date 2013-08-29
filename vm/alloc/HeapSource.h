@@ -16,6 +16,10 @@
 #ifndef _DALVIK_HEAP_SOURCE
 #define _DALVIK_HEAP_SOURCE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "alloc/Heap.h"
 #include "alloc/HeapInternal.h" // for GcHeap
 
@@ -198,5 +202,10 @@ void dvmMarkImmuneObjects(const char *immuneLimit);
  * below this pointer are immune.
  */
 void *dvmHeapSourceGetImmuneLimit(GcMode mode);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif  // _DALVIK_HEAP_SOURCE

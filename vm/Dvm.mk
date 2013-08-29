@@ -127,7 +127,7 @@ LOCAL_SRC_FILES := \
 	UtfString.c \
 	alloc/clz.c.arm \
 	alloc/Alloc.cpp \
-	alloc/CardTable.c \
+	alloc/CardTable.cpp \
 	alloc/HeapBitmap.c.arm \
 	alloc/HeapDebug.c \
 	alloc/HeapTable.c \
