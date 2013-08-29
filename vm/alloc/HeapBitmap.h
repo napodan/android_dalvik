@@ -16,6 +16,11 @@
 #ifndef _DALVIK_HEAP_BITMAP
 #define _DALVIK_HEAP_BITMAP
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <limits.h>
 #include <stdint.h>
 #include "clz.h"
@@ -303,5 +308,10 @@ HB_INLINE_PROTO(
 }
 
 #undef HB_INLINE_PROTO
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif  // _DALVIK_HEAP_BITMAP
