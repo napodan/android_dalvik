@@ -16,6 +16,10 @@
 
 #ifndef _DALVIK_ALLOC_VISIT
 #define _DALVIK_ALLOC_VISIT
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "Dalvik.h"
 
@@ -34,5 +38,10 @@ void dvmVisitObject(Visitor *visitor, Object *obj, void *arg);
  * Visits references in the root set.
  */
 void dvmVisitRoots(Visitor *visitor, void *arg);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /* _DALVIK_ALLOC_VISIT */
