@@ -19,6 +19,10 @@
  */
 #ifndef _DALVIK_EXCEPTION
 #define _DALVIK_EXCEPTION
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /* initialization */
 bool dvmExceptionStartup(void);
@@ -199,5 +203,10 @@ ArrayObject* dvmGetStackTraceRaw(const int* intVals, int stackDepth);
  * Print a formatted version of a raw stack trace to the log file.
  */
 void dvmLogRawStackTrace(const int* intVals, int stackDepth);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_EXCEPTION*/

@@ -38,11 +38,11 @@
 #include <errno.h>
 
 static const char* GcReasonStr[] = {
-    [GC_FOR_MALLOC] = "GC_FOR_MALLOC",
-    [GC_CONCURRENT] = "GC_CONCURRENT",
-    [GC_EXPLICIT] = "GC_EXPLICIT",
-    [GC_EXTERNAL_ALLOC] = "GC_EXTERNAL_ALLOC",
-    [GC_HPROF_DUMP_HEAP] = "GC_HPROF_DUMP_HEAP"
+    "GC_FOR_MALLOC",
+    "GC_CONCURRENT",
+    "GC_EXPLICIT",
+    "GC_EXTERNAL_ALLOC",
+    "GC_HPROF_DUMP_HEAP"
 };
 
 /*
@@ -508,7 +508,7 @@ void* dvmMalloc(size_t size, int flags)
          * internal tracking list.
          */
         if ((flags & ALLOC_DONT_TRACK) == 0) {
-            dvmAddTrackedAlloc(ptr, NULL);
+            dvmAddTrackedAlloc((Object*)ptr, NULL);
         }
     } else {
         /*

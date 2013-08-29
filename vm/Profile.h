@@ -19,6 +19,9 @@
  */
 #ifndef _DALVIK_PROFILE
 #define _DALVIK_PROFILE
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef NOT_VM      /* for utilities that sneakily include this file */
 
@@ -192,5 +195,10 @@ enum {
 #define METHOD_ID(_method)      ((_method) & (~METHOD_ACTION_MASK))
 #define METHOD_ACTION(_method)  (((unsigned int)(_method)) & METHOD_ACTION_MASK)
 #define METHOD_COMBINE(_method, _action)    ((_method) | (_action))
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_PROFILE*/

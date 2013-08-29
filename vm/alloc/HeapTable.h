@@ -15,6 +15,10 @@
  */
 #ifndef _DALVIK_ALLOC_HEAP_TABLE
 #define _DALVIK_ALLOC_HEAP_TABLE
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "ReferenceTable.h"
 
@@ -45,5 +49,9 @@ Object *dvmHeapGetNextObjectFromLargeTable(LargeHeapRefTable **pTable);
 
 #define dvmHeapRemoveFromHeapRefTable(refs, ptr) \
             dvmRemoveFromReferenceTable((refs), (refs)->table, (ptr))
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif  // _DALVIK_ALLOC_HEAP_TABLE
