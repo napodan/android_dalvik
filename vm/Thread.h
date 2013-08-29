@@ -20,6 +20,11 @@
 #ifndef _DALVIK_THREAD
 #define _DALVIK_THREAD
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include "jni.h"
 
 #include <errno.h>
@@ -559,5 +564,10 @@ void dvmAddToMonitorList(Thread* self, Object* obj, bool withTrace);
 void dvmRemoveFromMonitorList(Thread* self, Object* obj);
 LockedObjectData* dvmFindInMonitorList(const Thread* self, const Object* obj);
 #endif
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_THREAD*/

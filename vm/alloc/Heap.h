@@ -19,6 +19,10 @@
 #ifndef _DALVIK_ALLOC_HEAP
 #define _DALVIK_ALLOC_HEAP
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Initialize the GC heap.
  *
@@ -88,5 +92,9 @@ void dvmCollectGarbageInternal(bool clearSoftRefs, GcReason reason);
  * concurrent GC.
  */
 void dvmWaitForConcurrentGcToComplete(void);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif  // _DALVIK_ALLOC_HEAP

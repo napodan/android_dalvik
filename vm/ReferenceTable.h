@@ -23,6 +23,11 @@
 #ifndef _DALVIK_REFERENCETABLE
 #define _DALVIK_REFERENCETABLE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Table definition.
  *
@@ -113,5 +118,10 @@ bool dvmRemoveFromReferenceTable(ReferenceTable* pRef, Object** bottom,
  * Dump the contents of a reference table to the log file.
  */
 void dvmDumpReferenceTable(const ReferenceTable* pRef, const char* descr);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_REFERENCETABLE*/

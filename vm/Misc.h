@@ -19,6 +19,10 @@
  */
 #ifndef _DALVIK_MISC
 #define _DALVIK_MISC
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "Inlines.h"
 
@@ -324,5 +328,9 @@ void *dvmAllocRegion(size_t size, int prot, const char *name);
  * as, for example, in the dependency paths of optimized dex files).
  */
 const char* dvmPathToAbsolutePortion(const char* path);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_MISC*/

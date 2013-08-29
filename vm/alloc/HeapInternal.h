@@ -19,6 +19,11 @@
 #ifndef _DALVIK_ALLOC_HEAP_INTERNAL
 #define _DALVIK_ALLOC_HEAP_INTERNAL
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <time.h>  // for struct timespec
 
 #include "HeapTable.h"
@@ -158,5 +163,10 @@ void dvmLogMadviseStats(size_t madvisedSizes[], size_t arrayLen);
                             ((((n) % (1024 * 1024)) / 1024) * 1000) / 1024
 #define FRACTIONAL_PCT(n,max)    ((n) * 100) / (max), \
                                  (((n) * 1000) / (max)) % 10
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif  // _DALVIK_ALLOC_HEAP_INTERNAL
