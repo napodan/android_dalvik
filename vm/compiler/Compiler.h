@@ -20,6 +20,10 @@
 #ifndef _DALVIK_VM_COMPILER
 #define _DALVIK_VM_COMPILER
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Uncomment the following to enable JIT signature breakpoint
  * #define SIGNATURE_BREAKPOINT
@@ -293,4 +297,8 @@ void dvmCompilerStateRefresh(void);
 JitTraceDescription *dvmCopyTraceDescriptor(const u2 *pc,
                                             const struct JitEntry *desc);
 void *dvmCompilerGetInterpretTemplate();
+#ifdef __cplusplus
+};
+#endif
+
 #endif /* _DALVIK_VM_COMPILER */

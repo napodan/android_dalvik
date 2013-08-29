@@ -17,6 +17,11 @@
 #ifndef _DALVIK_ALLOC_VERIFY
 #define _DALVIK_ALLOC_VERIFY
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Verifies an object reference.
  */
@@ -32,5 +37,10 @@ void dvmVerifyBitmap(const HeapBitmap *bitmap);
  * Verifies the contents of various global roots.
  */
 void dvmVerifyRoots(void);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /* _DALVIK_ALLOC_VERIFY */

@@ -125,9 +125,9 @@ LOCAL_SRC_FILES := \
 	alloc/CardTable.cpp \
 	alloc/HeapBitmap.cpp.arm \
 	alloc/HeapDebug.c \
+	alloc/Heap.cpp.arm \
 	alloc/HeapTable.c \
 	alloc/HeapWorker.c \
-	alloc/Heap.c.arm \
 	alloc/DdmHeap.cpp \
 	alloc/Verify.c \
 	alloc/Visit.c \
