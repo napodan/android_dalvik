@@ -123,7 +123,7 @@ LOCAL_SRC_FILES := \
 	alloc/clz.c.arm \
 	alloc/Alloc.cpp \
 	alloc/CardTable.cpp \
-	alloc/HeapBitmap.c.arm \
+	alloc/HeapBitmap.cpp.arm \
 	alloc/HeapDebug.c \
 	alloc/HeapTable.c \
 	alloc/HeapWorker.c \
