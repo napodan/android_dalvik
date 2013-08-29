@@ -19,6 +19,11 @@
 #ifndef _DALVIK_ALLOC_HEAP_WORKER
 #define _DALVIK_ALLOC_HEAP_WORKER
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Initialize any HeapWorker state that Heap.c
  * cares about.  This lets the GC start before the
@@ -88,5 +93,10 @@ typedef enum HeapWorkerOperation {
  * @return The object to operate on, or NULL.
  */
 Object *dvmGetNextHeapWorkerObject(HeapWorkerOperation *op);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_ALLOC_HEAP_WORKER*/

@@ -19,6 +19,11 @@
 #ifndef _DALVIK_ALLOC_GC
 #define _DALVIK_ALLOC_GC
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * Initiate garbage collection.
  *
@@ -150,6 +155,10 @@ void dvmGcMarkDebuggerRefs(void);
 #else
 #define HPROF_SET_GC_SCAN_STATE(tag_, thread_)  do {} while (false)
 #define HPROF_CLEAR_GC_SCAN_STATE()  do {} while (false)
+#endif
+
+#ifdef __cplusplus
+};
 #endif
 
 #endif  // _DALVIK_ALLOC_GC

@@ -19,6 +19,11 @@
 #ifndef _DALVIK_ALLOC_ALLOC
 #define _DALVIK_ALLOC_ALLOC
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <stddef.h>
 
 /*
@@ -188,5 +193,10 @@ size_t dvmCountInstancesOfClass(const ClassObject *clazz);
  * Returns a count of the instances of a class and its subclasses.
  */
 size_t dvmCountAssignableInstancesOfClass(const ClassObject *clazz);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_ALLOC_ALLOC*/

@@ -18,6 +18,10 @@
  */
 #ifndef _DALVIK_SYNC
 #define _DALVIK_SYNC
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /*
  * Monitor shape field.  Used to distinguish immediate thin locks from
@@ -163,5 +167,10 @@ int dvmRelativeCondWait(pthread_cond_t* cond, pthread_mutex_t* mutex,
  * Debug.
  */
 void dvmDumpMonitorInfo(const char* msg);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_SYNC*/

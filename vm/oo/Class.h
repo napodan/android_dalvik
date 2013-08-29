@@ -19,6 +19,11 @@
 #ifndef _DALVIK_OO_CLASS
 #define _DALVIK_OO_CLASS
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /*
  * The classpath and bootclasspath differ in that only the latter is
  * consulted when looking for classes needed by the VM.  When searching
@@ -277,5 +282,10 @@ int dvmCompareNameDescriptorAndMethod(const char* name,
  * Returns the size of the given class object in bytes.
  */
 size_t dvmClassObjectSize(const ClassObject *clazz);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_OO_CLASS*/
