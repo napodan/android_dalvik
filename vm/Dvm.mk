@@ -90,7 +90,7 @@ endif  # !dvm_make_debug_vm
 #LOCAL_CFLAGS += -DWITH_JNI_STACK_CHECK
 
 LOCAL_SRC_FILES := \
-	AllocTracker.c \
+	AllocTracker.cpp \
 	Atomic.c.arm \
 	AtomicCache.c \
 	CheckJni.c \
