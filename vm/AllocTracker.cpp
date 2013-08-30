@@ -73,7 +73,7 @@ struct AllocRecord {
  * Initialize a few things.  This gets called early, so keep activity to
  * a minimum.
  */
-bool dvmAllocTrackerStartup(void)
+bool dvmAllocTrackerStartup()
 {
     /* prep locks */
     dvmInitMutex(&gDvm.allocTrackerLock);
@@ -87,7 +87,7 @@ bool dvmAllocTrackerStartup(void)
 /*
  * Release anything we're holding on to.
  */
-void dvmAllocTrackerShutdown(void)
+void dvmAllocTrackerShutdown()
 {
     free(gDvm.allocRecords);
     dvmDestroyMutex(&gDvm.allocTrackerLock);
@@ -105,13 +105,13 @@ void dvmAllocTrackerShutdown(void)
  *
  * Returns "true" on success.
  */
-bool dvmEnableAllocTracker(void)
+bool dvmEnableAllocTracker()
 {
     bool result = true;
     dvmLockMutex(&gDvm.allocTrackerLock);
 
     if (gDvm.allocRecords == NULL) {
-        ALOGI("Enabling alloc tracker (%d entries, %d frames --> %d bytes)\n",
+        ALOGI("Enabling alloc tracker (%d entries, %d frames --> %d bytes)",
             kNumAllocRecords, kMaxAllocRecordStackDepth,
             sizeof(AllocRecord) * kNumAllocRecords);
         gDvm.allocRecordHead = gDvm.allocRecordCount = 0;
@@ -129,7 +129,7 @@ bool dvmEnableAllocTracker(void)
 /*
  * Disable allocation tracking.  Does nothing if tracking is not enabled.
  */
-void dvmDisableAllocTracker(void)
+void dvmDisableAllocTracker()
 {
     dvmLockMutex(&gDvm.allocTrackerLock);
 
@@ -155,7 +155,7 @@ static void getStackFrames(Thread* self, AllocRecord* pRec)
         const StackSaveArea* saveArea = SAVEAREA_FROM_FP(fp);
         const Method* method = saveArea->method;
 
-        if (!dvmIsBreakFrame(fp)) {
+        if (!dvmIsBreakFrame((u4*) fp)) {
             pRec->stackElem[stackDepth].method = method;
             if (dvmIsNativeMethod(method)) {
                 pRec->stackElem[stackDepth].pc = 0;
@@ -186,14 +186,16 @@ static void getStackFrames(Thread* self, AllocRecord* pRec)
  */
 void dvmDoTrackAllocation(ClassObject* clazz, int size)
 {
-    dvmLockMutex(&gDvm.allocTrackerLock);
-    if (gDvm.allocRecords == NULL)
-        goto bail;
-
     Thread* self = dvmThreadSelf();
     if (self == NULL) {
-        ALOGW("alloc tracker: no thread\n");
-        goto bail;
+        ALOGW("alloc tracker: no thread");
+        return;
+    }
+
+    dvmLockMutex(&gDvm.allocTrackerLock);
+    if (gDvm.allocRecords == NULL) {
+        dvmUnlockMutex(&gDvm.allocTrackerLock);
+        return;
     }
 
     /* advance and clip */
@@ -210,7 +212,6 @@ void dvmDoTrackAllocation(ClassObject* clazz, int size)
     if (gDvm.allocRecordCount < kNumAllocRecords)
         gDvm.allocRecordCount++;
 
-bail:
     dvmUnlockMutex(&gDvm.allocTrackerLock);
 }
 
@@ -277,7 +278,7 @@ const int kStackFrameLen = 8;
  * We need to handle underflow in our circular buffer, so we add
  * kNumAllocRecords and then mask it back down.
  */
-inline static int headIndex(void)
+inline static int headIndex()
 {
     return (gDvm.allocRecordHead+1 + kNumAllocRecords - gDvm.allocRecordCount)
         & (kNumAllocRecords-1);
@@ -350,7 +351,7 @@ static bool populateStringTables(PointerSet* classNames,
         idx = (idx + 1) & (kNumAllocRecords-1);
     }
 
-    ALOGI("class %d/%d, method %d/%d, file %d/%d\n",
+    ALOGI("class %d/%d, method %d/%d, file %d/%d",
         dvmPointerSetGetCount(classNames), classCount,
         dvmPointerSetGetCount(methodNames), methodCount,
         dvmPointerSetGetCount(fileNames), fileCount);
@@ -526,7 +527,7 @@ bool dvmGenerateTrackedAllocationReport(u1** pData, size_t* pDataLen)
     methodNames = dvmPointerSetAlloc(128);
     fileNames = dvmPointerSetAlloc(128);
     if (classNames == NULL || methodNames == NULL || fileNames == NULL) {
-        ALOGE("Failed allocating pointer sets\n");
+        ALOGE("Failed allocating pointer sets");
         goto bail;
     }
 
@@ -554,7 +555,7 @@ bool dvmGenerateTrackedAllocationReport(u1** pData, size_t* pDataLen)
     totalSize += computeStringTableSize(classNames);
     totalSize += computeStringTableSize(methodNames);
     totalSize += computeStringTableSize(fileNames);
-    ALOGI("Generated AT, size is %zd/%zd\n", baseSize, totalSize);
+    ALOGI("Generated AT, size is %zd/%zd", baseSize, totalSize);
 
     /*
      * Part 3: allocate a buffer and generate the output.
@@ -568,7 +569,7 @@ bool dvmGenerateTrackedAllocationReport(u1** pData, size_t* pDataLen)
     strPtr += outputStringTable(methodNames, strPtr);
     strPtr += outputStringTable(fileNames, strPtr);
     if (strPtr - buffer != (int)totalSize) {
-        ALOGE("size mismatch (%d vs %zd)\n", strPtr - buffer, totalSize);
+        ALOGE("size mismatch (%d vs %zd)", strPtr - buffer, totalSize);
         dvmAbort();
     }
     //dvmPrintHexDump(buffer, totalSize);
@@ -600,8 +601,10 @@ void dvmDumpTrackedAllocations(bool enable)
         dvmEnableAllocTracker();
 
     dvmLockMutex(&gDvm.allocTrackerLock);
-    if (gDvm.allocRecords == NULL)
-        goto bail;
+    if (gDvm.allocRecords == NULL) {
+        dvmUnlockMutex(&gDvm.allocTrackerLock);
+        return;
+    }
 
     /*
      * "idx" is the head of the list.  We want to start at the end of the
@@ -610,25 +613,24 @@ void dvmDumpTrackedAllocations(bool enable)
     int idx = headIndex();
     int count = gDvm.allocRecordCount;
 
-    ALOGI("Tracked allocations, (head=%d count=%d)\n",
+    ALOGI("Tracked allocations, (head=%d count=%d)",
         gDvm.allocRecordHead, count);
     while (count--) {
         AllocRecord* pRec = &gDvm.allocRecords[idx];
-        ALOGI(" T=%-2d %6d %s\n",
+        ALOGI(" T=%-2d %6d %s",
             pRec->threadId, pRec->size, pRec->clazz->descriptor);
 
         if (true) {
-            int i;
-            for (i = 0; i < kMaxAllocRecordStackDepth; i++) {
+            for (int i = 0; i < kMaxAllocRecordStackDepth; i++) {
                 if (pRec->stackElem[i].method == NULL)
                     break;
 
                 const Method* method = pRec->stackElem[i].method;
                 if (dvmIsNativeMethod(method)) {
-                    ALOGI("    %s.%s (Native)\n",
+                    ALOGI("    %s.%s (Native)",
                         method->clazz->descriptor, method->name);
                 } else {
-                    ALOGI("    %s.%s +%d\n",
+                    ALOGI("    %s.%s +%d",
                         method->clazz->descriptor, method->name,
                         pRec->stackElem[i].pc);
                 }
@@ -642,7 +644,6 @@ void dvmDumpTrackedAllocations(bool enable)
         idx = (idx + 1) & (kNumAllocRecords-1);
     }
 
-bail:
     dvmUnlockMutex(&gDvm.allocTrackerLock);
     if (false) {
         u1* data;
