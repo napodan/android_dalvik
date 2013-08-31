@@ -19,6 +19,10 @@
 #ifndef _DALVIK_REFLECT_REFLECT
 #define _DALVIK_REFLECT_REFLECT
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 bool dvmReflectStartup(void);
 bool dvmReflectProxyStartup(void);
 bool dvmReflectAnnotationStartup(void);
@@ -235,5 +239,10 @@ bool dvmEncodedArrayIteratorHasNext(const EncodedArrayIterator* iterator);
  */
 bool dvmEncodedArrayIteratorGetNext(EncodedArrayIterator* iterator,
         AnnotationValue* value);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_REFLECT_REFLECT*/

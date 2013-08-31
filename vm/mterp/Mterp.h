@@ -19,6 +19,9 @@
  */
 #ifndef _DALVIK_MTERP_MTERP
 #define _DALVIK_MTERP_MTERP
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "Dalvik.h"
 #include "interp/InterpDefs.h"
@@ -51,5 +54,9 @@ bool dvmCheckAsmConstants(void);
  */
 bool dvmMterpStdRun(MterpGlue* glue);
 void dvmMterpStdBail(MterpGlue* glue, bool changeInterp);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_MTERP_MTERP*/

@@ -19,6 +19,11 @@
  */
 #ifndef _DALVIK_DEXVERIFY
 #define _DALVIK_DEXVERIFY
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 
 /*
  * Global verification mode.  These must be in order from least verification
@@ -50,5 +55,9 @@ bool dvmVerifyClass(ClassObject* clazz);
  * Release the storage associated with a RegisterMap.
  */
 void dvmFreeRegisterMap(RegisterMap* pMap);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_DEXVERIFY*/

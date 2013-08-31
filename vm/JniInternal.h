@@ -19,6 +19,10 @@
 #ifndef _DALVIK_JNIINTERNAL
 #define _DALVIK_JNIINTERNAL
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "jni.h"
 
 /* system init/shutdown */
@@ -244,5 +248,10 @@ INLINE jobject dvmNormalizeWeakGlobalRef(jweak ref) {
 INLINE bool dvmIsWeakGlobalRef(jobject jobj) {
     return (((u4) jobj & 0x07) == 0x07);
 }
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_JNIINTERNAL*/
