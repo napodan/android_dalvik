@@ -24,6 +24,9 @@
 #ifndef _DALVIK_INTERP_DEFS
 #define _DALVIK_INTERP_DEFS
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Specify the starting point when switching between interpreters.
@@ -272,6 +275,10 @@ static inline bool dvmJitStayInPortableInterpreter()
     return dvmJitHideTranslation() ||
            (gDvmJit.compilerQueueLength >= gDvmJit.compilerHighWater);
 }
+#endif
+
+#ifdef __cplusplus
+};
 #endif
 
 #endif /*_DALVIK_INTERP_DEFS*/

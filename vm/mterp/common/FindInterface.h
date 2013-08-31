@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /* common includes */
 #include "Dalvik.h"
@@ -35,3 +39,8 @@ INLINE Method* dvmFindInterfaceMethodInCache(ClassObject* thisClass,
 
 #undef ATOMIC_CACHE_CALC
 }
+
+#ifdef __cplusplus
+};
+#endif
+
