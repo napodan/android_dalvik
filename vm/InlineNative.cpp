@@ -27,7 +27,7 @@
 //#warning "trying memcmp16"
 //#define CHECK_MEMCMP16
 /* "count" is in 16-bit units */
-extern u4 __memcmp16(const u2* s0, const u2* s1, size_t count);
+extern "C" u4 __memcmp16(const u2* s0, const u2* s1, size_t count);
 #endif
 
 /*
@@ -124,7 +124,7 @@ static bool org_apache_harmony_dalvik_NativeTestTarget_emptyInlineMethod(
 /*
  * public char charAt(int index)
  */
-static bool javaLangString_charAt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_charAt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     int count, offset;
@@ -134,7 +134,7 @@ static bool javaLangString_charAt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     if (!dvmValidateObject((Object*) arg0))
         return false;
 
-    //ALOGI("String.charAt this=0x%08x index=%d\n", arg0, arg1);
+    //ALOGI("String.charAt this=0x%08x index=%d", arg0, arg1);
     count = dvmGetFieldInt((Object*) arg0, STRING_FIELDOFF_COUNT);
     if ((s4) arg1 < 0 || (s4) arg1 >= count) {
         dvmThrowException("Ljava/lang/StringIndexOutOfBoundsException;", NULL);
@@ -144,7 +144,7 @@ static bool javaLangString_charAt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
         chars = (ArrayObject*)
             dvmGetFieldObject((Object*) arg0, STRING_FIELDOFF_VALUE);
 
-        pResult->i = ((const u2*) chars->contents)[arg1 + offset];
+        pResult->i = ((const u2*)(void*)chars->contents)[arg1 + offset];
         return true;
     }
 }
@@ -178,9 +178,9 @@ static void badMatch(StringObject* thisStrObj, StringObject* compStrObj,
     thisStr = dvmCreateCstrFromString(thisStrObj);
     compStr = dvmCreateCstrFromString(compStrObj);
 
-    ALOGE("%s expected %d got %d\n", compareType, expectResult, newResult);
-    ALOGE(" this (o=%d l=%d) '%s'\n", thisOffset, thisCount, thisStr);
-    ALOGE(" comp (o=%d l=%d) '%s'\n", compOffset, compCount, compStr);
+    ALOGE("%s expected %d got %d", compareType, expectResult, newResult);
+    ALOGE(" this (o=%d l=%d) '%s'", thisOffset, thisCount, thisStr);
+    ALOGE(" comp (o=%d l=%d) '%s'", compOffset, compCount, compStr);
     dvmPrintHexDumpEx(ANDROID_LOG_INFO, LOG_TAG,
         ((const u2*) thisArray->contents) + thisOffset, thisCount*2,
         kHexDumpLocal);
@@ -194,7 +194,7 @@ static void badMatch(StringObject* thisStrObj, StringObject* compStrObj,
 /*
  * public int compareTo(String s)
  */
-static bool javaLangString_compareTo(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_compareTo(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     /*
@@ -237,8 +237,8 @@ static bool javaLangString_compareTo(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
         dvmGetFieldObject((Object*) arg0, STRING_FIELDOFF_VALUE);
     compArray = (ArrayObject*)
         dvmGetFieldObject((Object*) arg1, STRING_FIELDOFF_VALUE);
-    thisChars = ((const u2*) thisArray->contents) + thisOffset;
-    compChars = ((const u2*) compArray->contents) + compOffset;
+    thisChars = ((const u2*)(void*)thisArray->contents) + thisOffset;
+    compChars = ((const u2*)(void*)compArray->contents) + compOffset;
 
 #ifdef HAVE__MEMCMP16
     /*
@@ -290,7 +290,7 @@ static bool javaLangString_compareTo(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public boolean equals(Object anObject)
  */
-static bool javaLangString_equals(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_equals(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     /*
@@ -341,8 +341,8 @@ static bool javaLangString_equals(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
         dvmGetFieldObject((Object*) arg0, STRING_FIELDOFF_VALUE);
     compArray = (ArrayObject*)
         dvmGetFieldObject((Object*) arg1, STRING_FIELDOFF_VALUE);
-    thisChars = ((const u2*) thisArray->contents) + thisOffset;
-    compChars = ((const u2*) compArray->contents) + compOffset;
+    thisChars = ((const u2*)(void*)thisArray->contents) + thisOffset;
+    compChars = ((const u2*)(void*)compArray->contents) + compOffset;
 
 #ifdef HAVE__MEMCMP16
     pResult->i = (__memcmp16(thisChars, compChars, thisCount) == 0);
@@ -382,10 +382,10 @@ static bool javaLangString_equals(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public int length()
  */
-static bool javaLangString_length(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_length(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
-    //ALOGI("String.length this=0x%08x pResult=%p\n", arg0, pResult);
+    //ALOGI("String.length this=0x%08x pResult=%p", arg0, pResult);
 
     /* null reference check on "this" */
     if (!dvmValidateObject((Object*) arg0))
@@ -398,10 +398,10 @@ static bool javaLangString_length(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public boolean isEmpty()
  */
-static bool javaLangString_isEmpty(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_isEmpty(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
-    //ALOGI("String.isEmpty this=0x%08x pResult=%p\n", arg0, pResult);
+    //ALOGI("String.isEmpty this=0x%08x pResult=%p", arg0, pResult);
 
     /* null reference check on "this" */
     if (!dvmValidateObject((Object*) arg0))
@@ -430,10 +430,10 @@ static inline int indexOfCommon(Object* strObj, int ch, int start)
     /* pull out the basic elements */
     ArrayObject* charArray =
         (ArrayObject*) dvmGetFieldObject(strObj, STRING_FIELDOFF_VALUE);
-    const u2* chars = (const u2*) charArray->contents;
+    const u2* chars = (const u2*)(void*)charArray->contents;
     int offset = dvmGetFieldInt(strObj, STRING_FIELDOFF_OFFSET);
     int count = dvmGetFieldInt(strObj, STRING_FIELDOFF_COUNT);
-    //ALOGI("String.indexOf(0x%08x, 0x%04x, %d) off=%d count=%d\n",
+    //ALOGI("String.indexOf(0x%08x, 0x%04x, %d) off=%d count=%d",
     //    (u4) strObj, ch, start, offset, count);
 
     /* factor out the offset */
@@ -469,7 +469,7 @@ static inline int indexOfCommon(Object* strObj, int ch, int start)
  * The character must be <= 0xffff; this method does not handle supplementary
  * characters.
  */
-static bool javaLangString_fastIndexOf_II(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangString_fastIndexOf_II(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     /* null reference check on "this" */
@@ -487,21 +487,21 @@ static bool javaLangString_fastIndexOf_II(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
  * ===========================================================================
  */
 
-typedef union {
+union Convert32 {
     u4 arg;
     float ff;
-} Convert32;
+};
 
-typedef union {
+union Convert64 {
     u4 arg[2];
     s8 ll;
     double dd;
-} Convert64;
+};
 
 /*
  * public static int abs(int)
  */
-static bool javaLangMath_abs_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_abs_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     s4 val = (s4) arg0;
@@ -512,7 +512,7 @@ static bool javaLangMath_abs_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static long abs(long)
  */
-static bool javaLangMath_abs_long(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_abs_long(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert64 convert;
@@ -526,7 +526,7 @@ static bool javaLangMath_abs_long(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static float abs(float)
  */
-static bool javaLangMath_abs_float(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_abs_float(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert32 convert;
@@ -539,7 +539,7 @@ static bool javaLangMath_abs_float(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static double abs(double)
  */
-static bool javaLangMath_abs_double(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_abs_double(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert64 convert;
@@ -554,7 +554,7 @@ static bool javaLangMath_abs_double(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static int min(int)
  */
-static bool javaLangMath_min_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_min_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     pResult->i = ((s4) arg0 < (s4) arg1) ? arg0 : arg1;
@@ -564,7 +564,7 @@ static bool javaLangMath_min_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static int max(int)
  */
-static bool javaLangMath_max_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_max_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     pResult->i = ((s4) arg0 > (s4) arg1) ? arg0 : arg1;
@@ -578,7 +578,7 @@ static bool javaLangMath_max_int(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
  * by an fcmpd of the result against itself.  If it doesn't match (i.e.
  * it's NaN), the libm sqrt() is invoked.
  */
-static bool javaLangMath_sqrt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_sqrt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert64 convert;
@@ -591,7 +591,7 @@ static bool javaLangMath_sqrt(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static double cos(double)
  */
-static bool javaLangMath_cos(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_cos(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert64 convert;
@@ -604,7 +604,7 @@ static bool javaLangMath_cos(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
 /*
  * public static double sin(double)
  */
-static bool javaLangMath_sin(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
+bool javaLangMath_sin(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult)
 {
     Convert64 convert;
@@ -620,7 +620,7 @@ static bool javaLangMath_sin(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
  * ===========================================================================
  */
 
-static bool javaLangFloat_floatToIntBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
+bool javaLangFloat_floatToIntBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     JValue* pResult)
 {
     Convert32 convert;
@@ -629,14 +629,14 @@ static bool javaLangFloat_floatToIntBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     return true;
 }
 
-static bool javaLangFloat_floatToRawIntBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
+bool javaLangFloat_floatToRawIntBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     JValue* pResult)
 {
     pResult->i = arg0;
     return true;
 }
 
-static bool javaLangFloat_intBitsToFloat(u4 arg0, u4 arg1, u4 arg2, u4 arg,
+bool javaLangFloat_intBitsToFloat(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     JValue* pResult)
 {
     Convert32 convert;
@@ -651,7 +651,7 @@ static bool javaLangFloat_intBitsToFloat(u4 arg0, u4 arg1, u4 arg2, u4 arg,
  * ===========================================================================
  */
 
-static bool javaLangDouble_doubleToLongBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
+bool javaLangDouble_doubleToLongBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     JValue* pResult)
 {
     Convert64 convert;
@@ -661,7 +661,7 @@ static bool javaLangDouble_doubleToLongBits(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     return true;
 }
 
-static bool javaLangDouble_doubleToRawLongBits(u4 arg0, u4 arg1, u4 arg2,
+bool javaLangDouble_doubleToRawLongBits(u4 arg0, u4 arg1, u4 arg2,
     u4 arg, JValue* pResult)
 {
     Convert64 convert;
@@ -671,7 +671,7 @@ static bool javaLangDouble_doubleToRawLongBits(u4 arg0, u4 arg1, u4 arg2,
     return true;
 }
 
-static bool javaLangDouble_longBitsToDouble(u4 arg0, u4 arg1, u4 arg2, u4 arg,
+bool javaLangDouble_longBitsToDouble(u4 arg0, u4 arg1, u4 arg2, u4 arg,
     JValue* pResult)
 {
     Convert64 convert;
@@ -706,57 +706,36 @@ const InlineOperation gDvmInlineOpsTable[] = {
         "Lorg/apache/harmony/dalvik/NativeTestTarget;",
         "emptyInlineMethod", "()V" },
 
-    { javaLangString_charAt,
-        "Ljava/lang/String;", "charAt", "(I)C" },
-    { javaLangString_compareTo,
-        "Ljava/lang/String;", "compareTo", "(Ljava/lang/String;)I" },
-    { javaLangString_equals,
-        "Ljava/lang/String;", "equals", "(Ljava/lang/Object;)Z" },
-    { javaLangString_fastIndexOf_II,
-        "Ljava/lang/String;", "fastIndexOf", "(II)I" },
-    { javaLangString_isEmpty,
-        "Ljava/lang/String;", "isEmpty", "()Z" },
-    { javaLangString_length,
-        "Ljava/lang/String;", "length", "()I" },
+    { javaLangString_charAt, "Ljava/lang/String;", "charAt", "(I)C" },
+    { javaLangString_compareTo, "Ljava/lang/String;", "compareTo", "(Ljava/lang/String;)I" },
+    { javaLangString_equals, "Ljava/lang/String;", "equals", "(Ljava/lang/Object;)Z" },
+    { javaLangString_fastIndexOf_II, "Ljava/lang/String;", "fastIndexOf", "(II)I" },
+    { javaLangString_isEmpty, "Ljava/lang/String;", "isEmpty", "()Z" },
+    { javaLangString_length, "Ljava/lang/String;", "length", "()I" },
 
-    { javaLangMath_abs_int,
-        "Ljava/lang/Math;", "abs", "(I)I" },
-    { javaLangMath_abs_long,
-        "Ljava/lang/Math;", "abs", "(J)J" },
-    { javaLangMath_abs_float,
-        "Ljava/lang/Math;", "abs", "(F)F" },
-    { javaLangMath_abs_double,
-        "Ljava/lang/Math;", "abs", "(D)D" },
-    { javaLangMath_min_int,
-        "Ljava/lang/Math;", "min", "(II)I" },
-    { javaLangMath_max_int,
-        "Ljava/lang/Math;", "max", "(II)I" },
-    { javaLangMath_sqrt,
-        "Ljava/lang/Math;", "sqrt", "(D)D" },
-    { javaLangMath_cos,
-        "Ljava/lang/Math;", "cos", "(D)D" },
-    { javaLangMath_sin,
-        "Ljava/lang/Math;", "sin", "(D)D" },
+    { javaLangMath_abs_int, "Ljava/lang/Math;", "abs", "(I)I" },
+    { javaLangMath_abs_long, "Ljava/lang/Math;", "abs", "(J)J" },
+    { javaLangMath_abs_float, "Ljava/lang/Math;", "abs", "(F)F" },
+    { javaLangMath_abs_double, "Ljava/lang/Math;", "abs", "(D)D" },
+    { javaLangMath_min_int, "Ljava/lang/Math;", "min", "(II)I" },
+    { javaLangMath_max_int, "Ljava/lang/Math;", "max", "(II)I" },
+    { javaLangMath_sqrt, "Ljava/lang/Math;", "sqrt", "(D)D" },
+    { javaLangMath_cos, "Ljava/lang/Math;", "cos", "(D)D" },
+    { javaLangMath_sin, "Ljava/lang/Math;", "sin", "(D)D" },
 
-    { javaLangFloat_floatToIntBits,
-        "Ljava/lang/Float;", "floatToIntBits", "(F)I" },
-    { javaLangFloat_floatToRawIntBits,
-        "Ljava/lang/Float;", "floatToRawIntBits", "(F)I" },
-    { javaLangFloat_intBitsToFloat,
-        "Ljava/lang/Float;", "intBitsToFloat", "(I)F" },
+    { javaLangFloat_floatToIntBits, "Ljava/lang/Float;", "floatToIntBits", "(F)I" },
+    { javaLangFloat_floatToRawIntBits, "Ljava/lang/Float;", "floatToRawIntBits", "(F)I" },
+    { javaLangFloat_intBitsToFloat, "Ljava/lang/Float;", "intBitsToFloat", "(I)F" },
 
-    { javaLangDouble_doubleToLongBits,
-        "Ljava/lang/Double;", "doubleToLongBits", "(D)J" },
-    { javaLangDouble_doubleToRawLongBits,
-        "Ljava/lang/Double;", "doubleToRawLongBits", "(D)J" },
-    { javaLangDouble_longBitsToDouble,
-        "Ljava/lang/Double;", "longBitsToDouble", "(J)D" },
+    { javaLangDouble_doubleToLongBits, "Ljava/lang/Double;", "doubleToLongBits", "(D)J" },
+    { javaLangDouble_doubleToRawLongBits, "Ljava/lang/Double;", "doubleToRawLongBits", "(D)J" },
+    { javaLangDouble_longBitsToDouble, "Ljava/lang/Double;", "longBitsToDouble", "(J)D" },
 };
 
 /*
  * Allocate some tables.
  */
-bool dvmInlineNativeStartup(void)
+bool dvmInlineNativeStartup()
 {
     gDvm.inlinedMethods =
         (Method**) calloc(NELEM(gDvmInlineOpsTable), sizeof(Method*));
@@ -769,7 +748,7 @@ bool dvmInlineNativeStartup(void)
 /*
  * Free generated tables.
  */
-void dvmInlineNativeShutdown(void)
+void dvmInlineNativeShutdown()
 {
     free(gDvm.inlinedMethods);
 }
@@ -778,7 +757,7 @@ void dvmInlineNativeShutdown(void)
 /*
  * Get a pointer to the inlineops table.
  */
-const InlineOperation* dvmGetInlineOpsTable(void)
+const InlineOperation* dvmGetInlineOpsTable()
 {
     return gDvmInlineOpsTable;
 }
@@ -786,9 +765,95 @@ const InlineOperation* dvmGetInlineOpsTable(void)
 /*
  * Get the number of entries in the inlineops table.
  */
-int dvmGetInlineOpsTableLength(void)
+int dvmGetInlineOpsTableLength()
 {
     return NELEM(gDvmInlineOpsTable);
+}
+
+Method* dvmFindInlinableMethod(const char* classDescriptor,
+    const char* methodName, const char* methodSignature)
+{
+    /*
+     * Find the class.
+     */
+    ClassObject* clazz = dvmFindClassNoInit(classDescriptor, NULL);
+    if (clazz == NULL) {
+        ALOGE("dvmFindInlinableMethod: can't find class '%s'",
+            classDescriptor);
+        dvmClearException(dvmThreadSelf());
+        return NULL;
+    }
+
+    /*
+     * Method could be virtual or direct.  Try both.  Don't use
+     * the "hier" versions.
+     */
+    Method* method = dvmFindDirectMethodByDescriptor(clazz, methodName,
+        methodSignature);
+    if (method == NULL) {
+        method = dvmFindVirtualMethodByDescriptor(clazz, methodName,
+            methodSignature);
+    }
+    if (method == NULL) {
+        ALOGE("dvmFindInlinableMethod: can't find method %s.%s %s",
+            clazz->descriptor, methodName, methodSignature);
+        return NULL;
+    }
+
+    /*
+     * Check that the method is appropriate for inlining.
+     */
+    if (!dvmIsFinalClass(clazz) && !dvmIsFinalMethod(method)) {
+        ALOGE("dvmFindInlinableMethod: can't inline non-final method %s.%s",
+            clazz->descriptor, method->name);
+        return NULL;
+    }
+    if (dvmIsSynchronizedMethod(method) ||
+            dvmIsDeclaredSynchronizedMethod(method)) {
+        ALOGE("dvmFindInlinableMethod: can't inline synchronized method %s.%s",
+            clazz->descriptor, method->name);
+        return NULL;
+    }
+
+    return method;
+}
+
+/*
+ * Populate the methods table on first use.  It's possible the class
+ * hasn't been resolved yet, so we need to do the full "calling the
+ * method for the first time" routine.  (It's probably okay to skip
+ * the access checks.)
+ *
+ * Currently assuming that we're only inlining stuff loaded by the
+ * bootstrap class loader.  This is a safe assumption for many reasons.
+ */
+Method* dvmResolveInlineNative(int opIndex)
+{
+    assert(opIndex >= 0 && opIndex < NELEM(gDvmInlineOpsTable));
+    Method* method = gDvm.inlinedMethods[opIndex];
+    if (method != NULL) {
+        return method;
+    }
+
+    method = dvmFindInlinableMethod(
+        gDvmInlineOpsTable[opIndex].classDescriptor,
+        gDvmInlineOpsTable[opIndex].methodName,
+        gDvmInlineOpsTable[opIndex].methodSignature);
+
+    if (method == NULL) {
+        /* We already reported the error. */
+        return NULL;
+    }
+
+    gDvm.inlinedMethods[opIndex] = method;
+    IF_ALOGV() {
+        char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
+        ALOGV("Registered for profile: %s.%s %s",
+            method->clazz->descriptor, method->name, desc);
+        free(desc);
+    }
+
+    return method;
 }
 
 /*
@@ -798,60 +863,16 @@ int dvmGetInlineOpsTableLength(void)
 bool dvmPerformInlineOp4Dbg(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult, int opIndex)
 {
-    Thread* self = dvmThreadSelf();
-    bool result;
-
-    assert(opIndex >= 0 && opIndex < NELEM(gDvmInlineOpsTable));
-
-    /*
-     * Populate the methods table on first use.  It's possible the class
-     * hasn't been resolved yet, so we need to do the full "calling the
-     * method for the first time" routine.  (It's probably okay to skip
-     * the access checks.)
-     *
-     * Currently assuming that we're only inlining stuff loaded by the
-     * bootstrap class loader.  This is a safe assumption for many reasons.
-     */
-    Method* method = gDvm.inlinedMethods[opIndex];
+    Method* method = dvmResolveInlineNative(opIndex);
     if (method == NULL) {
-        ClassObject* clazz;
-
-        clazz = dvmFindClassNoInit(
-                gDvmInlineOpsTable[opIndex].classDescriptor, NULL);
-        if (clazz == NULL) {
-            ALOGW("Warning: can't find class '%s'\n", clazz->descriptor);
-            goto skip_prof;
-        }
-        method = dvmFindDirectMethodByDescriptor(clazz,
-                    gDvmInlineOpsTable[opIndex].methodName,
-                    gDvmInlineOpsTable[opIndex].methodSignature);
-        if (method == NULL)
-            method = dvmFindVirtualMethodByDescriptor(clazz,
-                        gDvmInlineOpsTable[opIndex].methodName,
-                        gDvmInlineOpsTable[opIndex].methodSignature);
-        if (method == NULL) {
-            ALOGW("Warning: can't find method %s.%s %s\n",
-                clazz->descriptor,
-                gDvmInlineOpsTable[opIndex].methodName,
-                gDvmInlineOpsTable[opIndex].methodSignature);
-            goto skip_prof;
-        }
-
-        gDvm.inlinedMethods[opIndex] = method;
-        IF_ALOGV() {
-            char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-            ALOGV("Registered for profile: %s.%s %s\n",
-                method->clazz->descriptor, method->name, desc);
-            free(desc);
-        }
+        return (*gDvmInlineOpsTable[opIndex].func)(arg0, arg1, arg2, arg3,
+            pResult);
     }
 
+    Thread* self = dvmThreadSelf();
     TRACE_METHOD_ENTER(self, method);
-    result = (*gDvmInlineOpsTable[opIndex].func)(arg0, arg1, arg2, arg3,
-                pResult);
+    bool result = (*gDvmInlineOpsTable[opIndex].func)(arg0, arg1, arg2, arg3,
+        pResult);
     TRACE_METHOD_EXIT(self, method);
     return result;
-
-skip_prof:
-    return (*gDvmInlineOpsTable[opIndex].func)(arg0, arg1, arg2, arg3, pResult);
 }

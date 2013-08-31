@@ -101,9 +101,9 @@ LOCAL_SRC_FILES := \
 	Hash.cpp \
 	IndirectRefTable.cpp.arm \
 	Init.cpp \
-	InlineNative.c.arm \
-	Inlines.c \
-	Intern.c \
+	InlineNative.cpp.arm \
+	Inlines.cpp \
+	Intern.cpp \
 	Jni.c \
 	JarFile.c \
 	LinearAlloc.c \
