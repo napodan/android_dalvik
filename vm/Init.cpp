@@ -1512,7 +1512,7 @@ static bool dvmInitJDWP(void)
         } else {
             params.host[0] = '\0';
         }
-        params.transport = gDvm.jdwpTransport;
+        params.transport = (JdwpTransportType)gDvm.jdwpTransport;
         params.server = gDvm.jdwpServer;
         params.suspend = gDvm.jdwpSuspend;
         params.port = gDvm.jdwpPort;

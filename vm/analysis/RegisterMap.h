@@ -21,6 +21,10 @@
  */
 #ifndef _DALVIK_REGISTERMAP
 #define _DALVIK_REGISTERMAP
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "analysis/VerifySubs.h"
 #include "analysis/CodeVerify.h"
@@ -262,5 +266,10 @@ INLINE const RegisterMap* dvmGetExpandedRegisterMap(Method* method)
 
 /* dump stats gathered during register map creation process */
 void dvmRegisterMapDumpStats(void);
+
+#ifdef __cplusplus
+};
+#endif
+
 
 #endif /*_DALVIK_REGISTERMAP*/

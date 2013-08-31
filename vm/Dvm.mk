@@ -98,9 +98,9 @@ LOCAL_SRC_FILES := \
 	Debugger.cpp \
 	DvmDex.cpp \
 	Exception.cpp \
-	Hash.c \
-	IndirectRefTable.c.arm \
-	Init.c \
+	Hash.cpp \
+	IndirectRefTable.cpp.arm \
+	Init.cpp \
 	InlineNative.c.arm \
 	Inlines.c \
 	Intern.c \

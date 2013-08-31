@@ -18,6 +18,9 @@
  */
 #ifndef _DALVIK_INLINENATIVE
 #define _DALVIK_INLINENATIVE
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* startup/shutdown */
 bool dvmInlineNativeStartup(void);
@@ -107,5 +110,9 @@ INLINE bool dvmPerformInlineOp4Std(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
  */
 bool dvmPerformInlineOp4Dbg(u4 arg0, u4 arg1, u4 arg2, u4 arg3,
     JValue* pResult, int opIndex);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_INLINENATIVE*/

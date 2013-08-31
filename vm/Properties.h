@@ -18,6 +18,9 @@
  */
 #ifndef _DALVIK_PROPERTIES
 #define _DALVIK_PROPERTIES
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Initialization.
@@ -33,5 +36,9 @@ void dvmCreateDefaultProperties(Object* propObj);
 void dvmSetCommandLineProperties(Object* propObj);
 
 char* dvmGetProperty(const char* key);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_PROPERTIES*/
