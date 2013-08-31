@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /*
  * Handle Dalvik Debug Monitor requests and events.
  *
@@ -41,6 +42,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     Thread* self = dvmThreadSelf();
     const int kChunkHdrLen = 8;
     ArrayObject* dataArray = NULL;
+    Object* chunk = NULL;
     bool result = false;
 
     assert(dataLen >= 0);
@@ -91,7 +93,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
      */
     dataArray = dvmAllocPrimitiveArray('B', dataLen, ALLOC_DEFAULT);
     if (dataArray == NULL) {
-        ALOGW("array alloc failed (%d)\n", dataLen);
+        ALOGW("array alloc failed (%d)", dataLen);
         dvmClearException(self);
         goto bail;
     }
@@ -105,7 +107,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     length = get4BE((u1*)dataArray->contents + 4);
     offset = kChunkHdrLen;
     if (offset+length > (unsigned int) dataLen) {
-        ALOGW("WARNING: bad chunk found (len=%u pktLen=%d)\n", length, dataLen);
+        ALOGW("WARNING: bad chunk found (len=%u pktLen=%d)", length, dataLen);
         goto bail;
     }
 
@@ -116,13 +118,12 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     dvmCallMethod(self, dispatch, NULL, &callRes, type, dataArray, offset,
         length);
     if (dvmCheckException(self)) {
-        ALOGI("Exception thrown by dispatcher for 0x%08x\n", type);
+        ALOGI("Exception thrown by dispatcher for 0x%08x", type);
         dvmLogExceptionStackTrace();
         dvmClearException(self);
         goto bail;
     }
 
-    Object* chunk;
     ArrayObject* replyData;
     chunk = (Object*) callRes.l;
     if (chunk == NULL)
@@ -146,13 +147,13 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     offset = dvmGetFieldInt(chunk, chunkOffsetOff);
     length = dvmGetFieldInt(chunk, chunkLengthOff);
 
-    ALOGV("DDM reply: type=0x%08x data=%p offset=%d length=%d\n",
+    ALOGV("DDM reply: type=0x%08x data=%p offset=%d length=%d",
         type, replyData, offset, length);
 
     if (length == 0 || replyData == NULL)
         goto bail;
     if (offset + length > replyData->length) {
-        ALOGW("WARNING: chunk off=%d len=%d exceeds reply array len %d\n",
+        ALOGW("WARNING: chunk off=%d len=%d exceeds reply array len %d",
             offset, length, replyData->length);
         goto bail;
     }
@@ -160,7 +161,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     u1* reply;
     reply = (u1*) malloc(length + kChunkHdrLen);
     if (reply == NULL) {
-        ALOGW("malloc %d failed\n", length+kChunkHdrLen);
+        ALOGW("malloc %d failed", length+kChunkHdrLen);
         goto bail;
     }
     set4BE(reply + 0, type);
@@ -171,7 +172,7 @@ bool dvmDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
     *pReplyLen = length + kChunkHdrLen;
     result = true;
 
-    ALOGV("dvmHandleDdm returning type=%.4s buf=%p len=%d\n",
+    ALOGV("dvmHandleDdm returning type=%.4s buf=%p len=%d",
         (char*) reply, reply, length);
 
 bail:
@@ -195,32 +196,29 @@ static void broadcast(int event)
         dvmFindClass("Lorg/apache/harmony/dalvik/ddmc/DdmServer;", NULL);
     if (ddmServerClass == NULL) {
         ALOGW("Unable to find org.apache.harmony.dalvik.ddmc.DdmServer\n");
-        goto bail;
+        return;
     }
     bcast = dvmFindDirectMethodByDescriptor(ddmServerClass, "broadcast", "(I)V");
     if (bcast == NULL) {
         ALOGW("Unable to find DdmServer.broadcast\n");
-        goto bail;
+        return;
     }
 
     Thread* self = dvmThreadSelf();
 
     if (self->status != THREAD_RUNNING) {
-        ALOGE("ERROR: DDM broadcast with thread status=%d\n", self->status);
+        ALOGE("ERROR: DDM broadcast with thread status=%d", self->status);
         /* try anyway? */
     }
 
     JValue unused;
     dvmCallMethod(self, bcast, NULL, &unused, event);
     if (dvmCheckException(self)) {
-        ALOGI("Exception thrown by broadcast(%d)\n", event);
+        ALOGI("Exception thrown by broadcast(%d)", event);
         dvmLogExceptionStackTrace();
         dvmClearException(self);
-        goto bail;
+        return;
     }
-
-bail:
-    ;
 }
 
 /*
@@ -228,11 +226,11 @@ bail:
  *
  * We can do some initialization here too.
  */
-void dvmDdmConnected(void)
+void dvmDdmConnected()
 {
     // TODO: any init
 
-    ALOGV("Broadcasting DDM connect\n");
+    ALOGV("Broadcasting DDM connect");
     broadcast(CONNECTED);
 }
 
@@ -241,9 +239,9 @@ void dvmDdmConnected(void)
  *
  * Do some cleanup.
  */
-void dvmDdmDisconnected(void)
+void dvmDdmDisconnected()
 {
-    ALOGV("Broadcasting DDM disconnect\n");
+    ALOGV("Broadcasting DDM disconnect");
     broadcast(DISCONNECTED);
 
     gDvm.ddmThreadNotification = false;
@@ -266,7 +264,7 @@ void dvmDdmSetThreadNotification(bool enable)
     if (enable) {
         Thread* thread;
         for (thread = gDvm.threadList; thread != NULL; thread = thread->next) {
-            //ALOGW("notify %d\n", thread->threadId);
+            //ALOGW("notify %d", thread->threadId);
             dvmDdmSendThreadNotification(thread, true);
         }
     }
@@ -282,8 +280,9 @@ void dvmDdmSetThreadNotification(bool enable)
  */
 void dvmDdmSendThreadNotification(Thread* thread, bool started)
 {
-    if (!gDvm.ddmThreadNotification)
+    if (!gDvm.ddmThreadNotification) {
         return;
+    }
 
     StringObject* nameObj = NULL;
     Object* threadObj = thread->threadObj;
@@ -312,17 +311,19 @@ void dvmDdmSendThreadNotification(Thread* thread, bool started)
         }
 
         /* leave room for the two integer fields */
-        if (stringLen > (sizeof(buf) - sizeof(u4)*2) / 2)
+        if (stringLen > (sizeof(buf) - sizeof(u4)*2) / 2) {
             stringLen = (sizeof(buf) - sizeof(u4)*2) / 2;
+        }
         len = stringLen*2 + sizeof(u4)*2;
 
         set4BE(&buf[0x00], thread->threadId);
         set4BE(&buf[0x04], stringLen);
 
         /* copy the UTF-16 string, transforming to big-endian */
-        outChars = (u2*) &buf[0x08];
-        while (stringLen--)
+        outChars = (u2*)(void*)&buf[0x08];
+        while (stringLen--) {
             set2BE((u1*) (outChars++), *chars++);
+        }
     } else {
         type = CHUNK_TYPE("THDE");
 
@@ -339,8 +340,9 @@ void dvmDdmSendThreadNotification(Thread* thread, bool started)
  */
 void dvmDdmSendThreadNameChange(int threadId, StringObject* newName)
 {
-    if (!gDvm.ddmThreadNotification)
+    if (!gDvm.ddmThreadNotification) {
         return;
+    }
 
     size_t stringLen = dvmStringLen(newName);
     const u2* chars = dvmStringChars(newName);
@@ -356,9 +358,10 @@ void dvmDdmSendThreadNameChange(int threadId, StringObject* newName)
 
     set4BE(&buf[0x00], threadId);
     set4BE(&buf[0x04], stringLen);
-    u2* outChars = (u2*) &buf[0x08];
-    while (stringLen--)
+    u2* outChars = (u2*)(void*)&buf[0x08];
+    while (stringLen--) {
         set2BE((u1*) (outChars++), *chars++);
+    }
 
     dvmDbgDdmSendChunk(CHUNK_TYPE("THNM"), bufLen, buf);
 }
@@ -372,31 +375,6 @@ void dvmDdmSendThreadNameChange(int threadId, StringObject* newName)
 static bool getThreadStats(pid_t pid, pid_t tid, unsigned long* pUtime,
     unsigned long* pStime)
 {
-    /*
-    int pid;
-    char comm[128];
-    char state;
-    int ppid, pgrp, session, tty_nr, tpgid;
-    unsigned long flags, minflt, cminflt, majflt, cmajflt, utime, stime;
-    long cutime, cstime, priority, nice, zero, itrealvalue;
-    unsigned long starttime, vsize;
-    long rss;
-    unsigned long rlim, startcode, endcode, startstack, kstkesp, kstkeip;
-    unsigned long signal, blocked, sigignore, sigcatch, wchan, nswap, cnswap;
-    int exit_signal, processor;
-    unsigned long rt_priority, policy;
-
-    scanf("%d %s %c %d %d %d %d %d %lu %lu %lu %lu %lu %lu %lu %ld %ld %ld "
-          "%ld %ld %ld %lu %lu %ld %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu "
-          "%lu %lu %lu %d %d %lu %lu",
-        &pid, comm, &state, &ppid, &pgrp, &session, &tty_nr, &tpgid,
-        &flags, &minflt, &cminflt, &majflt, &cmajflt, &utime, &stime,
-        &cutime, &cstime, &priority, &nice, &zero, &itrealvalue,
-        &starttime, &vsize, &rss, &rlim, &startcode, &endcode,
-        &startstack, &kstkesp, &kstkeip, &signal, &blocked, &sigignore,
-        &sigcatch, &wchan, &nswap, &cnswap, &exit_signal, &processor,
-        &rt_priority, &policy);
-    */
 
     char nameBuf[64];
     int i, fd;
@@ -476,7 +454,7 @@ static bool getThreadStats(pid_t pid, pid_t tid, unsigned long* pUtime,
  * Returns a new byte[] with the data inside, or NULL on failure.  The
  * caller must call dvmReleaseTrackedAlloc() on the array.
  */
-ArrayObject* dvmDdmGenerateThreadStats(void)
+ArrayObject* dvmDdmGenerateThreadStats()
 {
     const int kHeaderLen = 4;
     const int kBytesPerEntry = 18;
@@ -557,7 +535,7 @@ ArrayObject* dvmDdmGetStackTraceById(u4 threadId)
             break;
     }
     if (thread == NULL) {
-        ALOGI("dvmDdmGetStackTraceById: threadid=%d not found\n", threadId);
+        ALOGI("dvmDdmGetStackTraceById: threadid=%d not found", threadId);
         dvmUnlockThreadList();
         return NULL;
     }
@@ -588,7 +566,7 @@ ArrayObject* dvmDdmGetStackTraceById(u4 threadId)
  *
  * Returns NULL on failure with an exception raised.
  */
-ArrayObject* dvmDdmGetRecentAllocations(void)
+ArrayObject* dvmDdmGetRecentAllocations()
 {
     u1* data;
     size_t len;

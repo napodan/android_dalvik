@@ -95,7 +95,7 @@ same time.
  * System init.  We don't allocate the registry until first use.
  * Make sure we do this before initializing JDWP.
  */
-bool dvmDebuggerStartup(void)
+bool dvmDebuggerStartup()
 {
     if (!dvmBreakpointStartup())
         return false;
@@ -107,7 +107,7 @@ bool dvmDebuggerStartup(void)
 /*
  * Free registry storage.
  */
-void dvmDebuggerShutdown(void)
+void dvmDebuggerShutdown()
 {
     dvmHashTableFree(gDvm.dbgRegistry);
     gDvm.dbgRegistry = NULL;
@@ -153,9 +153,9 @@ void dvmDbgCondBroadcast(pthread_cond_t* pCond)
 
 
 /* keep track of type, in case we need to distinguish them someday */
-typedef enum RegistryType {
+enum RegistryType {
     kObjectId = 0xc1, kRefTypeId
-} RegistryType;
+};
 
 /*
  * Hash function for object IDs.  Since objects are at least 8 bytes, and
@@ -223,13 +223,13 @@ static ObjectId registerObject(const Object* obj, RegistryType type, bool reg)
     dvmHashTableLock(gDvm.dbgRegistry);
     if (!gDvm.debuggerConnected) {
         /* debugger has detached while we were doing stuff? */
-        ALOGI("ignoring registerObject request in thread=%d\n",
+        ALOGI("ignoring registerObject request in thread=%d",
             dvmThreadSelf()->threadId);
         //dvmAbort();
         goto bail;
     }
 
-    (void) dvmHashTableLookup(gDvm.dbgRegistry, registryHash((u4) id),
+    dvmHashTableLookup(gDvm.dbgRegistry, registryHash((u4) id),
                 (void*)(u4) id, registryCompare, true);
 
 bail:
@@ -245,7 +245,7 @@ static int markRef(void* data, void* arg)
     UNUSED_PARAMETER(arg);
 
     //ALOGI("dbg mark %p\n", data);
-    dvmMarkObjectNonNull(data);
+    dvmMarkObjectNonNull((const Object*)data);
     return 0;
 }
 
@@ -336,7 +336,7 @@ static Object* objectIdToObject(ObjectId id)
 void dvmDbgRegisterObjectId(ObjectId id)
 {
     Object* obj = (Object*)(u4) id;
-    ALOGV("+++ registering %p (%s)\n", obj, obj->clazz->descriptor);
+    ALOGV("+++ registering %p (%s)", obj, obj->clazz->descriptor);
     registerObject(obj, kObjectId, true);
 }
 
@@ -381,16 +381,16 @@ static FrameId frameToFrameId(const void* frame)
 {
     return (FrameId)(u4) frame;
 }
-static void* frameIdToFrame(FrameId id)
+static u4* frameIdToFrame(FrameId id)
 {
-    return (void*)(u4) id;
+    return (u4*)(u4) id;
 }
 
 
 /*
  * Get the invocation request state.
  */
-DebugInvokeReq* dvmDbgGetInvokeReq(void)
+DebugInvokeReq* dvmDbgGetInvokeReq()
 {
     return &dvmThreadSelf()->invokeReq;
 }
@@ -400,11 +400,11 @@ DebugInvokeReq* dvmDbgGetInvokeReq(void)
  *
  * Only called from the JDWP handler thread.
  */
-void dvmDbgConnected(void)
+void dvmDbgConnected()
 {
     assert(!gDvm.debuggerConnected);
 
-    ALOGV("JDWP has attached\n");
+    ALOGV("JDWP has attached");
     assert(dvmHashTableNumEntries(gDvm.dbgRegistry) == 0);
     gDvm.debuggerConnected = true;
 }
@@ -416,12 +416,12 @@ void dvmDbgConnected(void)
  *
  * Only called from the JDWP handler thread.
  */
-void dvmDbgActive(void)
+void dvmDbgActive()
 {
     if (gDvm.debuggerActive)
         return;
 
-    ALOGI("Debugger is active\n");
+    ALOGI("Debugger is active");
     dvmInitBreakpoints();
     gDvm.debuggerActive = true;
 #if defined(WITH_JIT)
@@ -437,7 +437,7 @@ void dvmDbgActive(void)
  *
  * Only called from the JDWP handler thread.
  */
-void dvmDbgDisconnected(void)
+void dvmDbgDisconnected()
 {
     assert(gDvm.debuggerConnected);
 
@@ -446,11 +446,11 @@ void dvmDbgDisconnected(void)
     dvmHashTableLock(gDvm.dbgRegistry);
     gDvm.debuggerConnected = false;
 
-    ALOGD("Debugger has detached; object registry had %d entries\n",
+    ALOGD("Debugger has detached; object registry had %d entries",
         dvmHashTableNumEntries(gDvm.dbgRegistry));
     //int i;
     //for (i = 0; i < gDvm.dbgRegistryNext; i++)
-    //    LOGVV("%4d: 0x%llx\n", i, gDvm.dbgRegistryTable[i]);
+    //    LOGVV("%4d: 0x%llx", i, gDvm.dbgRegistryTable[i]);
 
     dvmHashTableClear(gDvm.dbgRegistry);
     dvmHashTableUnlock(gDvm.dbgRegistry);
@@ -464,7 +464,7 @@ void dvmDbgDisconnected(void)
  *
  * Does not return "true" if it's just a DDM server.
  */
-bool dvmDbgIsDebuggerConnected(void)
+bool dvmDbgIsDebuggerConnected()
 {
     return gDvm.debuggerActive;
 }
@@ -473,7 +473,7 @@ bool dvmDbgIsDebuggerConnected(void)
  * Get time since last debugger activity.  Used when figuring out if the
  * debugger has finished configuring us.
  */
-s8 dvmDbgLastDebuggerActivity(void)
+s8 dvmDbgLastDebuggerActivity()
 {
     return dvmJdwpLastDebuggerActivity(gDvm.jdwpState);
 }
@@ -481,17 +481,19 @@ s8 dvmDbgLastDebuggerActivity(void)
 /*
  * JDWP thread is running, don't allow GC.
  */
-int dvmDbgThreadRunning(void)
+int dvmDbgThreadRunning()
 {
-    return dvmChangeStatus(NULL, THREAD_RUNNING);
+    ThreadStatus oldStatus = dvmChangeStatus(NULL, THREAD_RUNNING);
+    return static_cast<int>(oldStatus);
 }
 
 /*
  * JDWP thread is idle, allow GC.
  */
-int dvmDbgThreadWaiting(void)
+int dvmDbgThreadWaiting()
 {
-    return dvmChangeStatus(NULL, THREAD_VMWAIT);
+    ThreadStatus oldStatus = dvmChangeStatus(NULL, THREAD_VMWAIT);
+    return static_cast<int>(oldStatus);
 }
 
 /*
@@ -499,7 +501,9 @@ int dvmDbgThreadWaiting(void)
  */
 int dvmDbgThreadContinuing(int status)
 {
-    return dvmChangeStatus(NULL, status);
+    ThreadStatus newStatus = static_cast<ThreadStatus>(status);
+    ThreadStatus oldStatus = dvmChangeStatus(NULL, newStatus);
+    return static_cast<int>(oldStatus);
 }
 
 /*
@@ -509,7 +513,7 @@ void dvmDbgExit(int status)
 {
     // TODO? invoke System.exit() to perform exit processing; ends up
     // in System.exitInternal(), which can call JNI exit hook
-    ALOGI("GC lifetime allocation: %d bytes\n", gDvm.allocProf.allocCount);
+    ALOGI("GC lifetime allocation: %d bytes", gDvm.allocProf.allocCount);
     if (CALC_CACHE_STATS) {
         dvmDumpAtomicCacheStats(gDvm.instanceofCache);
         dvmDumpBootClassPath();
@@ -607,10 +611,11 @@ void dvmDbgGetClassList(u4* pNumClasses, RefTypeId** pClassRefBuf)
 
     dvmHashTableLock(gDvm.loadedClasses);
     *pNumClasses = dvmHashTableNumEntries(gDvm.loadedClasses);
-    pRefType = *pClassRefBuf = malloc(sizeof(RefTypeId) * *pNumClasses);
+    pRefType = *pClassRefBuf =
+        (RefTypeId*)malloc(sizeof(RefTypeId) * *pNumClasses);
 
     if (dvmHashForeach(gDvm.loadedClasses, copyRefType, &pRefType) != 0) {
-        ALOGW("Warning: problem getting class list\n");
+        ALOGW("Warning: problem getting class list");
         /* not really expecting this to happen */
     } else {
         assert(pRefType - *pClassRefBuf == (int) *pNumClasses);
@@ -635,13 +640,13 @@ void dvmDbgGetVisibleClassList(ObjectId classLoaderId, u4* pNumClasses,
     classLoader = objectIdToObject(classLoaderId);
     // I don't think classLoader can be NULL, but the spec doesn't say
 
-    LOGVV("GetVisibleList: comparing to %p\n", classLoader);
+    LOGVV("GetVisibleList: comparing to %p", classLoader);
 
     dvmHashTableLock(gDvm.loadedClasses);
 
     /* over-allocate the return buffer */
     maxClasses = dvmHashTableNumEntries(gDvm.loadedClasses);
-    *pClassRefBuf = malloc(sizeof(RefTypeId) * maxClasses);
+    *pClassRefBuf = (RefTypeId*)malloc(sizeof(RefTypeId) * maxClasses);
 
     /*
      * Run through the list, looking for matches.
@@ -655,7 +660,7 @@ void dvmDbgGetVisibleClassList(ObjectId classLoaderId, u4* pNumClasses,
         if (clazz->classLoader == classLoader ||
             dvmLoaderInInitiatingList(clazz, classLoader))
         {
-            LOGVV("  match '%s'\n", clazz->descriptor);
+            LOGVV("  match '%s'", clazz->descriptor);
             (*pClassRefBuf)[numClasses++] = classObjectToRefTypeId(clazz);
         }
     }
@@ -758,8 +763,6 @@ u1 dvmDbgGetClassObjectType(RefTypeId refTypeId)
 
 /*
  * Get a class' signature.
- *
- * Returns a newly-allocated string.
  */
 char* dvmDbgGetSignature(RefTypeId refTypeId)
 {
@@ -923,7 +926,7 @@ int dvmDbgGetTagWidth(int tag)
     case JT_LONG:
         return 8;
     default:
-        ALOGE("ERROR: unhandled tag '%c'\n", tag);
+        ALOGE("ERROR: unhandled tag '%c'", tag);
         assert(false);
         return -1;
     }
@@ -1013,7 +1016,7 @@ static void copyValuesToBE(u1* out, const u1* in, int count, int width)
 }
 
 /*
- * Copy a series of values with the specified with, changing the
+ * Copy a series of values with the specified width, changing the
  * byte order from big-endian.
  */
 static void copyValuesFromBE(u1* out, const u1* in, int count, int width)
@@ -1056,7 +1059,7 @@ bool dvmDbgOutputArray(ObjectId arrayId, int firstIndex, int count,
     assert(dvmIsArray(arrayObj));
 
     if (firstIndex + count > (int)arrayObj->length) {
-        ALOGW("Request for index=%d + count=%d excceds length=%d\n",
+        ALOGW("Request for index=%d + count=%d excceds length=%d",
             firstIndex, count, arrayObj->length);
         return false;
     }
@@ -1077,7 +1080,7 @@ bool dvmDbgOutputArray(ObjectId arrayId, int firstIndex, int count,
         pObjects = (Object**) data;
         pObjects += firstIndex;
 
-        ALOGV("    --> copying %d object IDs\n", count);
+        ALOGV("    --> copying %d object IDs", count);
         //assert(tag == JT_OBJECT);     // could be object or "refined" type
 
         for (i = 0; i < count; i++, pObjects++) {
@@ -1107,7 +1110,7 @@ bool dvmDbgSetArrayElements(ObjectId arrayId, int firstIndex, int count,
     assert(dvmIsArray(arrayObj));
 
     if (firstIndex + count > (int)arrayObj->length) {
-        ALOGW("Attempt to set index=%d + count=%d excceds length=%d\n",
+        ALOGW("Attempt to set index=%d + count=%d excceds length=%d",
             firstIndex, count, arrayObj->length);
         return false;
     }
@@ -1117,7 +1120,7 @@ bool dvmDbgSetArrayElements(ObjectId arrayId, int firstIndex, int count,
     if (isTagPrimitive(tag)) {
         int width = dvmDbgGetTagWidth(tag);
 
-        ALOGV("    --> setting %d '%c' width=%d\n", count, tag, width);
+        ALOGV("    --> setting %d '%c' width=%d", count, tag, width);
 
         copyValuesFromBE(data + firstIndex*width, buf, count, width);
     } else {
@@ -1211,42 +1214,38 @@ const char* dvmDbgGetMethodName(RefTypeId refTypeId, MethodId id)
 
 /*
  * For ReferenceType.Fields and ReferenceType.FieldsWithGeneric:
- * output all fields declared by the class.  Inerhited fields are
+ * output all fields declared by the class.  Inherited fields are
  * not included.
  */
 void dvmDbgOutputAllFields(RefTypeId refTypeId, bool withGeneric,
     ExpandBuf* pReply)
 {
-    static const u1 genericSignature[1] = "";
-    ClassObject* clazz;
-    Field* field;
-    u4 declared;
-    int i;
-
-    clazz = refTypeIdToClassObject(refTypeId);
+    ClassObject* clazz = refTypeIdToClassObject(refTypeId);
     assert(clazz != NULL);
 
-    declared = clazz->sfieldCount + clazz->ifieldCount;
+    u4 declared = clazz->sfieldCount + clazz->ifieldCount;
     expandBufAdd4BE(pReply, declared);
 
-    for (i = 0; i < clazz->sfieldCount; i++) {
-        field = (Field*) &clazz->sfields[i];
-
+    for (int i = 0; i < clazz->sfieldCount; i++) {
+        Field* field = (Field*) (void*)&clazz->sfields[i];
         expandBufAddFieldId(pReply, fieldToFieldId(field));
         expandBufAddUtf8String(pReply, (const u1*) field->name);
         expandBufAddUtf8String(pReply, (const u1*) field->signature);
-        if (withGeneric)
+        if (withGeneric) {
+            static const u1 genericSignature[1] = "";
             expandBufAddUtf8String(pReply, genericSignature);
+        }
         expandBufAdd4BE(pReply, field->accessFlags);
     }
-    for (i = 0; i < clazz->ifieldCount; i++) {
-        field = (Field*) &clazz->ifields[i];
-
+    for (int i = 0; i < clazz->ifieldCount; i++) {
+        Field* field = (Field*) &clazz->ifields[i];
         expandBufAddFieldId(pReply, fieldToFieldId(field));
         expandBufAddUtf8String(pReply, (const u1*) field->name);
         expandBufAddUtf8String(pReply, (const u1*) field->signature);
-        if (withGeneric)
+        if (withGeneric) {
+            static const u1 genericSignature[1] = "";
             expandBufAddUtf8String(pReply, genericSignature);
+        }
         expandBufAdd4BE(pReply, field->accessFlags);
     }
 }
@@ -2163,7 +2162,7 @@ int dvmDbgGetThreadFrameCount(ObjectId threadId)
 
     framePtr = thread->curFrame;
     while (framePtr != NULL) {
-        if (!dvmIsBreakFrame(framePtr))
+        if (!dvmIsBreakFrame((const u4*)framePtr))
             count++;
 
         framePtr = SAVEAREA_FROM_FP(framePtr)->prevFrame;
@@ -2199,7 +2198,7 @@ bool dvmDbgGetThreadFrame(ObjectId threadId, int num, FrameId* pFrameId,
         const StackSaveArea* saveArea = SAVEAREA_FROM_FP(framePtr);
         const Method* method = saveArea->method;
 
-        if (!dvmIsBreakFrame(framePtr)) {
+        if (!dvmIsBreakFrame((u4*)framePtr)) {
             if (count == num) {
                 *pFrameId = frameToFrameId(framePtr);
                 if (dvmIsInterfaceClass(method->clazz))
@@ -2230,7 +2229,7 @@ bail:
 /*
  * Get the ThreadId for the current thread.
  */
-ObjectId dvmDbgGetThreadSelfId(void)
+ObjectId dvmDbgGetThreadSelfId()
 {
     Thread* self = dvmThreadSelf();
     return objectToObjectId(self->threadObj);
@@ -2265,7 +2264,7 @@ void dvmDbgSuspendThread(ObjectId threadId)
     thread = threadObjToThread(threadObj);
     if (thread == NULL) {
         /* can happen if our ThreadDeath notify crosses in the mail */
-        ALOGW("WARNING: threadid=%llx obj=%p no match\n", threadId, threadObj);
+        ALOGW("WARNING: threadid=%llx obj=%p no match", threadId, threadObj);
     } else {
         dvmSuspendThread(thread);
     }
@@ -2285,7 +2284,7 @@ void dvmDbgResumeThread(ObjectId threadId)
 
     thread = threadObjToThread(threadObj);
     if (thread == NULL) {
-        ALOGW("WARNING: threadid=%llx obj=%p no match\n", threadId, threadObj);
+        ALOGW("WARNING: threadid=%llx obj=%p no match", threadId, threadObj);
     } else {
         dvmResumeThread(thread);
     }
@@ -2296,7 +2295,7 @@ void dvmDbgResumeThread(ObjectId threadId)
 /*
  * Suspend ourselves after sending an event to the debugger.
  */
-void dvmDbgSuspendSelf(void)
+void dvmDbgSuspendSelf()
 {
     dvmSuspendSelf(true);
 }
@@ -2317,8 +2316,8 @@ static Object* getThisObject(const u4* framePtr)
         return NULL;
     }
 
-    LOGVV("  Pulling this object for frame at %p\n", framePtr);
-    LOGVV("    Method='%s' native=%d static=%d this=%p\n",
+    LOGVV("  Pulling this object for frame at %p", framePtr);
+    LOGVV("    Method='%s' native=%d static=%d this=%p",
         method->name, dvmIsNativeMethod(method),
         dvmIsStaticMethod(method), (Object*) framePtr[argOffset]);
 
@@ -2332,7 +2331,7 @@ static Object* getThisObject(const u4* framePtr)
         thisObj = (Object*) framePtr[argOffset];
 
     if (thisObj != NULL && !dvmIsValidObject(thisObj)) {
-        ALOGW("Debugger: invalid 'this' pointer %p in %s.%s; returning NULL\n",
+        ALOGW("Debugger: invalid 'this' pointer %p in %s.%s; returning NULL",
             framePtr, method->clazz->descriptor, method->name);
         thisObj = NULL;
     }
@@ -2360,6 +2359,9 @@ bool dvmDbgGetThisObject(ObjectId threadId, FrameId frameId, ObjectId* pThisId)
 /*
  * Copy the value of a method argument or local variable into the
  * specified buffer.  The value will be preceeded with the tag.
+ *
+ * The debugger includes the tags in the request.  Object tags may
+ * be updated with a more refined type.
  */
 void dvmDbgGetLocalValue(ObjectId threadId, FrameId frameId, int slot,
     u1 tag, u1* buf, int expectedLen)
@@ -2397,12 +2399,12 @@ void dvmDbgGetLocalValue(ObjectId threadId, FrameId frameId, int slot,
         set4BE(buf+1, intVal);
         break;
     case JT_ARRAY:
-        assert(expectedLen == 8);
+        assert(expectedLen == sizeof(ObjectId));
         {
             /* convert to "ObjectId" */
             objVal = (Object*)framePtr[slot];
             if (objVal != NULL && !dvmIsValidObject(objVal)) {
-                ALOGW("JDWP: slot %d expected to hold array, %p invalid\n",
+                ALOGW("JDWP: slot %d expected to hold array, %p invalid",
                     slot, objVal);
                 dvmAbort();         // DEBUG: make it obvious
                 objVal = NULL;
@@ -2412,11 +2414,10 @@ void dvmDbgGetLocalValue(ObjectId threadId, FrameId frameId, int slot,
         }
         break;
     case JT_OBJECT:
-        assert(expectedLen == 8);
+        assert(expectedLen == sizeof(ObjectId));
         {
             /* convert to "ObjectId" */
             objVal = (Object*)framePtr[slot];
-            //char* name;
 
             if (objVal != NULL) {
                 if (!dvmIsValidObject(objVal)) {
@@ -2441,11 +2442,12 @@ void dvmDbgGetLocalValue(ObjectId threadId, FrameId frameId, int slot,
         set8BE(buf+1, longVal);
         break;
     default:
-        ALOGE("ERROR: unhandled tag '%c'\n", tag);
+        ALOGE("ERROR: unhandled tag '%c'", tag);
         assert(false);
         break;
     }
 
+    /* prepend tag, which may have been updated */
     set1(buf, tag);
 }
 
@@ -2499,8 +2501,9 @@ void dvmDbgSetLocalValue(ObjectId threadId, FrameId frameId, int slot, u1 tag,
     case JT_THREAD:
     case JT_THREAD_GROUP:
     case JT_CLASS_LOADER:
+        /* not expecting these from debugger; fall through to failure */
     default:
-        ALOGE("ERROR: unhandled tag '%c'\n", tag);
+        ALOGE("ERROR: unhandled tag '%c'", tag);
         assert(false);
         break;
     }
@@ -2579,7 +2582,7 @@ void dvmDbgPostException(void* throwFp, int throwRelPc, void* catchFp,
     }
 
     /* need this for InstanceOnly filters */
-    Object* thisObj = getThisObject(throwFp);
+    Object* thisObj = getThisObject((u4*)throwFp);
 
     /*
      * Hand the event to the JDWP exception handler.  Note we're using the
@@ -2627,8 +2630,8 @@ void dvmDbgPostThreadDeath(Thread* thread)
  */
 void dvmDbgPostClassPrepare(ClassObject* clazz)
 {
-    int tag;
     char* signature;
+    int tag;
 
     if (dvmIsInterfaceClass(clazz))
         tag = TT_INTERFACE;
@@ -2671,8 +2674,8 @@ void dvmDbgUnwatchLocation(const JdwpLocation* pLoc)
  * The JDWP event mechanism has registered a single-step event.  Tell
  * the interpreter about it.
  */
-bool dvmDbgConfigureStep(ObjectId threadId, enum JdwpStepSize size,
-    enum JdwpStepDepth depth)
+bool dvmDbgConfigureStep(ObjectId threadId, JdwpStepSize size,
+    JdwpStepDepth depth)
 {
     Object* threadObj;
     Thread* thread;
@@ -2690,11 +2693,11 @@ bool dvmDbgConfigureStep(ObjectId threadId, enum JdwpStepSize size,
     thread = threadObjToThread(threadObj);
 
     if (thread == NULL) {
-        ALOGE("Thread for single-step not found\n");
+        ALOGE("Thread for single-step not found");
         goto bail;
     }
     if (!dvmIsSuspended(thread)) {
-        ALOGE("Thread for single-step not suspended\n");
+        ALOGE("Thread for single-step not suspended");
         assert(!"non-susp step");      // I want to know if this can happen
         goto bail;
     }
@@ -2732,21 +2735,17 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
     u4 options, u1* pResultTag, u8* pResultValue, ObjectId* pExceptObj)
 {
     Object* threadObj = objectIdToObject(threadId);
-    Thread* targetThread;
-    JdwpError err = ERR_NONE;
 
     dvmLockThreadList(NULL);
 
-    targetThread = threadObjToThread(threadObj);
+    Thread* targetThread = threadObjToThread(threadObj);
     if (targetThread == NULL) {
-        err = ERR_INVALID_THREAD;       /* thread does not exist */
         dvmUnlockThreadList();
-        goto bail;
+        return ERR_INVALID_THREAD;       /* thread does not exist */
     }
     if (!targetThread->invokeReq.ready) {
-        err = ERR_INVALID_THREAD;       /* thread not stopped by event */
         dvmUnlockThreadList();
-        goto bail;
+        return ERR_INVALID_THREAD;       /* thread not stopped by event */
     }
 
     /*
@@ -2765,12 +2764,11 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
      */
     if (targetThread->suspendCount > 1) {
         ALOGW("threadid=%d: suspend count on threadid=%d is %d, too deep "
-             "for method exec\n",
+             "for method exec",
             dvmThreadSelf()->threadId, targetThread->threadId,
             targetThread->suspendCount);
-        err = ERR_THREAD_SUSPENDED;     /* probably not expected here */
         dvmUnlockThreadList();
-        goto bail;
+        return ERR_THREAD_SUSPENDED;     /* probably not expected here */
     }
 
     /*
@@ -2801,16 +2799,16 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
      * the invokeReq mutex, although that should never be held for long.
      */
     Thread* self = dvmThreadSelf();
-    int oldStatus = dvmChangeStatus(self, THREAD_VMWAIT);
+    ThreadStatus oldStatus = dvmChangeStatus(self, THREAD_VMWAIT);
 
-    ALOGV("    Transferring control to event thread\n");
+    ALOGV("    Transferring control to event thread");
     dvmLockMutex(&targetThread->invokeReq.lock);
 
     if ((options & INVOKE_SINGLE_THREADED) == 0) {
-        ALOGV("      Resuming all threads\n");
+        ALOGV("      Resuming all threads");
         dvmResumeAllThreads(SUSPEND_FOR_DEBUG_EVENT);
     } else {
-        ALOGV("      Resuming event thread only\n");
+        ALOGV("      Resuming event thread only");
         dvmResumeThread(targetThread);
     }
 
@@ -2822,7 +2820,7 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
                           &targetThread->invokeReq.lock);
     }
     dvmUnlockMutex(&targetThread->invokeReq.lock);
-    ALOGV("    Control has returned from event thread\n");
+    ALOGV("    Control has returned from event thread");
 
     /* wait for thread to re-suspend itself */
     dvmWaitForSuspend(targetThread);
@@ -2840,9 +2838,9 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
      * so we want to resume the target thread once to keep the books straight.
      */
     if ((options & INVOKE_SINGLE_THREADED) == 0) {
-        ALOGV("      Suspending all threads\n");
+        ALOGV("      Suspending all threads");
         dvmSuspendAllThreads(SUSPEND_FOR_DEBUG_EVENT);
-        ALOGV("      Resuming event thread to balance the count\n");
+        ALOGV("      Resuming event thread to balance the count");
         dvmResumeThread(targetThread);
     }
 
@@ -2852,13 +2850,12 @@ JdwpError dvmDbgInvokeMethod(ObjectId threadId, ObjectId objectId,
     *pResultTag = targetThread->invokeReq.resultTag;
     if (isTagPrimitive(targetThread->invokeReq.resultTag))
         *pResultValue = targetThread->invokeReq.resultValue.j;
-    else
-        *pResultValue = objectToObjectId(targetThread->invokeReq.resultValue.l);
+    else {
+        Object* tmpObj = (Object*)targetThread->invokeReq.resultValue.l;
+        *pResultValue = objectToObjectId(tmpObj);
+    }
     *pExceptObj = targetThread->invokeReq.exceptObj;
-    err = targetThread->invokeReq.err;
-
-bail:
-    return err;
+    return targetThread->invokeReq.err;
 }
 
 /*
@@ -2881,7 +2878,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
     Thread* self = dvmThreadSelf();
     const Method* meth;
     Object* oldExcept;
-    int oldStatus;
+    ThreadStatus oldStatus;
 
     /*
      * We can be called while an exception is pending in the VM.  We need
@@ -2909,7 +2906,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
 
     IF_ALOGV() {
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        ALOGV("JDWP invoking method %p/%p %s.%s:%s\n",
+        ALOGV("JDWP invoking method %p/%p %s.%s:%s",
             pReq->method, meth, meth->clazz->descriptor, meth->name, desc);
         free(desc);
     }
@@ -2920,7 +2917,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
     pReq->resultTag = resultTagFromSignature(meth);
     if (pReq->exceptObj != 0) {
         Object* exc = dvmGetException(self);
-        ALOGD("  JDWP invocation returning with exceptObj=%p (%s)\n",
+        ALOGD("  JDWP invocation returning with exceptObj=%p (%s)",
             exc, exc->clazz->descriptor);
         //dvmLogExceptionStackTrace();
         dvmClearException(self);
@@ -2931,26 +2928,27 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
         pReq->resultValue.j = 0; /*0xadadadad;*/
     } else if (pReq->resultTag == JT_OBJECT) {
         /* if no exception thrown, examine object result more closely */
-        u1 newTag = resultTagFromObject(pReq->resultValue.l);
+        u1 newTag = resultTagFromObject((Object*)pReq->resultValue.l);
         if (newTag != pReq->resultTag) {
-            LOGVV("  JDWP promoted result from %d to %d\n",
+            LOGVV("  JDWP promoted result from %d to %d",
                 pReq->resultTag, newTag);
             pReq->resultTag = newTag;
         }
     }
 
-    if (oldExcept != NULL)
+    if (oldExcept != NULL) {
         dvmSetException(self, oldExcept);
+    }
     dvmChangeStatus(self, oldStatus);
 }
 
 // for dvmAddressSetForLine
-typedef struct AddressSetContext {
+struct AddressSetContext {
     bool lastAddressValid;
     u4 lastAddress;
     u4 lineNum;
     AddressSet *pSet;
-} AddressSetContext;
+};
 
 // for dvmAddressSetForLine
 static int addressSetCb (void *cnxt, u4 address, u4 lineNum)
@@ -2988,7 +2986,7 @@ const AddressSet *dvmAddressSetForLine(const Method* method, int line)
     u4 insnsSize = dvmGetMethodInsnsSize(method);
     AddressSetContext context;
 
-    result = calloc(1, sizeof(AddressSet) + (insnsSize/8) + 1);
+    result = (AddressSet*)calloc(1, sizeof(AddressSet) + (insnsSize/8) + 1);
     result->setSize = insnsSize;
 
     memset(&context, 0, sizeof(context));
@@ -3032,7 +3030,7 @@ bool dvmDbgDdmHandlePacket(const u1* buf, int dataLen, u1** pReplyBuf,
 /*
  * First DDM packet has arrived over JDWP.  Notify the press.
  */
-void dvmDbgDdmConnected(void)
+void dvmDbgDdmConnected()
 {
     dvmDdmConnected();
 }
@@ -3040,7 +3038,7 @@ void dvmDbgDdmConnected(void)
 /*
  * JDWP connection has dropped.
  */
-void dvmDbgDdmDisconnected(void)
+void dvmDbgDdmDisconnected()
 {
     dvmDdmDisconnected();
 }
@@ -3062,7 +3060,7 @@ void dvmDbgDdmSendChunk(int type, size_t len, const u1* buf)
 void dvmDbgDdmSendChunkV(int type, const struct iovec* iov, int iovcnt)
 {
     if (gDvm.jdwpState == NULL) {
-        ALOGV("Debugger thread not active, ignoring DDM send (t=0x%08x)\n",
+        ALOGV("Debugger thread not active, ignoring DDM send (t=0x%08x)",
             type);
         return;
     }

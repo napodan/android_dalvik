@@ -37,6 +37,7 @@
  * invoke-virtual-quick), creating the possibility of some space reduction
  * at dexopt time.
  */
+
 static DvmDex* allocateAuxStructures(DexFile* pDexFile)
 {
     DvmDex* pDvmDex;
@@ -91,7 +92,6 @@ static DvmDex* allocateAuxStructures(DexFile* pDexFile)
     }
 
     return pDvmDex;
-
 }
 
 /*
@@ -112,18 +112,18 @@ int dvmDexFileOpenFromFd(int fd, DvmDex** ppDvmDex)
         parseFlags |= kDexParseVerifyChecksum;
 
     if (lseek(fd, 0, SEEK_SET) < 0) {
-        ALOGE("lseek rewind failed\n");
+        ALOGE("lseek rewind failed");
         goto bail;
     }
 
     if (sysMapFileInShmemWritableReadOnly(fd, &memMap) != 0) {
-        ALOGE("Unable to map file\n");
+        ALOGE("Unable to map file");
         goto bail;
     }
 
-    pDexFile = dexFileParse(memMap.addr, memMap.length, parseFlags);
+    pDexFile = dexFileParse((u1*)memMap.addr, memMap.length, parseFlags);
     if (pDexFile == NULL) {
-        ALOGE("DEX parse failed\n");
+        ALOGE("DEX parse failed");
         sysReleaseShmem(&memMap);
         goto bail;
     }
@@ -164,9 +164,9 @@ int dvmDexFileOpenPartial(const void* addr, int len, DvmDex** ppDvmDex)
         parseFlags |= kDexParseVerifyChecksum;
     */
 
-    pDexFile = dexFileParse(addr, len, parseFlags);
+    pDexFile = dexFileParse((u1*)addr, len, parseFlags);
     if (pDexFile == NULL) {
-        ALOGE("DEX parse failed\n");
+        ALOGE("DEX parse failed");
         goto bail;
     }
     pDvmDex = allocateAuxStructures(pDexFile);
@@ -230,7 +230,7 @@ void dvmDexFileFree(DvmDex* pDvmDex)
 bool dvmDexChangeDex1(DvmDex* pDvmDex, u1* addr, u1 newVal)
 {
     if (*addr == newVal) {
-        ALOGV("+++ byte at %p is already 0x%02x\n", addr, newVal);
+        ALOGV("+++ byte at %p is already 0x%02x", addr, newVal);
         return true;
     }
 
@@ -240,16 +240,16 @@ bool dvmDexChangeDex1(DvmDex* pDvmDex, u1* addr, u1 newVal)
      */
     dvmLockMutex(&pDvmDex->modLock);
 
-    ALOGV("+++ change byte at %p from 0x%02x to 0x%02x\n", addr, *addr, newVal);
+    ALOGV("+++ change byte at %p from 0x%02x to 0x%02x", addr, *addr, newVal);
     if (sysChangeMapAccess(addr, 1, true, &pDvmDex->memMap) != 0) {
-        ALOGD("NOTE: DEX page access change (->RW) failed\n");
+        ALOGD("NOTE: DEX page access change (->RW) failed");
         /* expected on files mounted from FAT; keep going (may crash) */
     }
 
     *addr = newVal;
 
     if (sysChangeMapAccess(addr, 1, false, &pDvmDex->memMap) != 0) {
-        ALOGD("NOTE: DEX page access change (->RO) failed\n");
+        ALOGD("NOTE: DEX page access change (->RO) failed");
         /* expected on files mounted from FAT; keep going */
     }
 
@@ -267,7 +267,7 @@ bool dvmDexChangeDex1(DvmDex* pDvmDex, u1* addr, u1 newVal)
 bool dvmDexChangeDex2(DvmDex* pDvmDex, u2* addr, u2 newVal)
 {
     if (*addr == newVal) {
-        ALOGV("+++ value at %p is already 0x%04x\n", addr, newVal);
+        ALOGV("+++ value at %p is already 0x%04x", addr, newVal);
         return true;
     }
 
@@ -277,16 +277,16 @@ bool dvmDexChangeDex2(DvmDex* pDvmDex, u2* addr, u2 newVal)
      */
     dvmLockMutex(&pDvmDex->modLock);
 
-    ALOGV("+++ change 2byte at %p from 0x%04x to 0x%04x\n", addr, *addr, newVal);
+    ALOGV("+++ change 2byte at %p from 0x%04x to 0x%04x", addr, *addr, newVal);
     if (sysChangeMapAccess(addr, 2, true, &pDvmDex->memMap) != 0) {
-        ALOGD("NOTE: DEX page access change (->RW) failed\n");
+        ALOGD("NOTE: DEX page access change (->RW) failed");
         /* expected on files mounted from FAT; keep going (may crash) */
     }
 
     *addr = newVal;
 
     if (sysChangeMapAccess(addr, 2, false, &pDvmDex->memMap) != 0) {
-        ALOGD("NOTE: DEX page access change (->RO) failed\n");
+        ALOGD("NOTE: DEX page access change (->RO) failed");
         /* expected on files mounted from FAT; keep going */
     }
 
