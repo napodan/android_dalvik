@@ -91,13 +91,13 @@ endif  # !dvm_make_debug_vm
 
 LOCAL_SRC_FILES := \
 	AllocTracker.cpp \
-	Atomic.c.arm \
-	AtomicCache.c \
+	Atomic.cpp.arm \
+	AtomicCache.cpp \
 	CheckJni.c \
-	Ddm.c \
-	Debugger.c \
-	DvmDex.c \
-	Exception.c \
+	Ddm.cpp \
+	Debugger.cpp \
+	DvmDex.cpp \
+	Exception.cpp \
 	Hash.c \
 	IndirectRefTable.c.arm \
 	Init.c \

@@ -18,6 +18,10 @@
  */
 #ifndef _DALVIK_OO_RESOLVE
 #define _DALVIK_OO_RESOLVE
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /*
  * "Direct" and "virtual" methods are stored independently.  The type of call
@@ -91,5 +95,9 @@ StringObject* dvmResolveString(const ClassObject* referrer, u4 stringIdx);
  * Return debug string constant for enum.
  */
 const char* dvmMethodTypeStr(MethodType methodType);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_OO_RESOLVE*/

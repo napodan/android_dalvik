@@ -267,7 +267,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
 
     /* make sure the exception is initialized */
     if (!dvmIsClassInitialized(excepClass) && !dvmInitClass(excepClass)) {
-        ALOGE("ERROR: unable to initialize exception class '%s'\n",
+        ALOGE("ERROR: unable to initialize exception class '%s'",
             excepClass->descriptor);
         if (strcmp(excepClass->descriptor, "Ljava/lang/InternalError;") == 0)
             dvmAbort();
@@ -288,7 +288,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
          */
         if (dvmCheckException(self))
             goto bail;
-        ALOGE("FATAL: unable to allocate exception '%s' '%s'\n",
+        ALOGE("FATAL: unable to allocate exception '%s' '%s'",
             excepClass->descriptor, msg != NULL ? msg : "(no msg)");
         dvmAbort();
     }
@@ -298,7 +298,7 @@ void dvmThrowChainedExceptionByClass(ClassObject* excepClass, const char* msg,
      */
     if (gDvm.optimizing) {
         /* need the exception object, but can't invoke interpreted code */
-        ALOGV("Skipping init of exception %s '%s'\n",
+        ALOGV("Skipping init of exception %s '%s'",
             excepClass->descriptor, msg);
     } else {
         assert(excepClass == exception->clazz);
@@ -329,8 +329,9 @@ bail:
  * Throw the named exception using the dotted form of the class
  * descriptor as the exception message, and with the specified cause.
  */
-void dvmThrowChainedExceptionWithClassMessage(const char* exceptionDescriptor,
-    const char* messageDescriptor, Object* cause)
+void dvmThrowChainedExceptionWithClassMessage(
+    const char* exceptionDescriptor, const char* messageDescriptor,
+    Object* cause)
 {
     char* message = dvmDescriptorToDot(messageDescriptor);
 
@@ -342,8 +343,8 @@ void dvmThrowChainedExceptionWithClassMessage(const char* exceptionDescriptor,
  * Like dvmThrowExceptionWithMessageFromDescriptor, but take a
  * class object instead of a name.
  */
-void dvmThrowExceptionByClassWithClassMessage(ClassObject* exceptionClass,
-    const char* messageDescriptor)
+void dvmThrowExceptionByClassWithClassMessage(
+    ClassObject* exceptionClass, const char* messageDescriptor)
 {
     char* message = dvmDescriptorToName(messageDescriptor);
 
@@ -427,7 +428,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
         msgStr = dvmCreateStringFromCstr(msg);
         if (msgStr == NULL) {
             ALOGW("Could not allocate message string \"%s\" while "
-                    "throwing internal exception (%s)\n",
+                    "throwing internal exception (%s)",
                     msg, excepClass->descriptor);
             goto bail;
         }
@@ -435,7 +436,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
 
     if (cause != NULL) {
         if (!dvmInstanceof(cause->clazz, gDvm.classJavaLangThrowable)) {
-            ALOGE("Tried to init exception with cause '%s'\n",
+            ALOGE("Tried to init exception with cause '%s'",
                 cause->clazz->descriptor);
             dvmAbort();
         }
@@ -524,7 +525,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
          * when a message has been provided.
          */
         ALOGW("WARNING: exception class '%s' missing constructor "
-            "(msg='%s' kind=%d)\n",
+            "(msg='%s' kind=%d)",
             excepClass->descriptor, msg, initKind);
         assert(strcmp(excepClass->descriptor,
                       "Ljava/lang/RuntimeException;") != 0);
@@ -539,11 +540,11 @@ static bool initException(Object* exception, const char* msg, Object* cause,
     JValue unused;
     switch (initKind) {
     case kInitNoarg:
-        LOGVV("+++ exc noarg (ic=%d)\n", needInitCause);
+        LOGVV("+++ exc noarg (ic=%d)", needInitCause);
         dvmCallMethod(self, initMethod, exception, &unused);
         break;
     case kInitMsg:
-        LOGVV("+++ exc msg (ic=%d)\n", needInitCause);
+        LOGVV("+++ exc msg (ic=%d)", needInitCause);
         dvmCallMethod(self, initMethod, exception, &unused, msgStr);
         break;
     case kInitThrow:
@@ -566,7 +567,7 @@ static bool initException(Object* exception, const char* msg, Object* cause,
      * return an error and let our caller deal with it.
      */
     if (self->exception != NULL) {
-        ALOGW("Exception thrown (%s) while throwing internal exception (%s)\n",
+        ALOGW("Exception thrown (%s) while throwing internal exception (%s)",
             self->exception->clazz->descriptor, exception->clazz->descriptor);
         goto bail;
     }
@@ -587,13 +588,13 @@ static bool initException(Object* exception, const char* msg, Object* cause,
                  * let the caller deal with it.
                  */
                 ALOGW("Exception thrown (%s) during initCause() "
-                        "of internal exception (%s)\n",
+                        "of internal exception (%s)",
                         self->exception->clazz->descriptor,
                         exception->clazz->descriptor);
                 goto bail;
             }
         } else {
-            ALOGW("WARNING: couldn't find initCause in '%s'\n",
+            ALOGW("WARNING: couldn't find initCause in '%s'",
                 excepClass->descriptor);
         }
     }
@@ -722,7 +723,7 @@ Object* dvmGetExceptionCause(const Object* exception)
  * Exceptions thrown during the course of printing the stack trace are
  * ignored.
  */
-void dvmPrintExceptionStackTrace(void)
+void dvmPrintExceptionStackTrace()
 {
     Thread* self = dvmThreadSelf();
     Object* exception;
@@ -739,12 +740,12 @@ void dvmPrintExceptionStackTrace(void)
         JValue unused;
         dvmCallMethod(self, printMethod, exception, &unused);
     } else {
-        ALOGW("WARNING: could not find printStackTrace in %s\n",
+        ALOGW("WARNING: could not find printStackTrace in %s",
             exception->clazz->descriptor);
     }
 
     if (self->exception != NULL) {
-        ALOGW("NOTE: exception thrown while printing stack trace: %s\n",
+        ALOGW("NOTE: exception thrown while printing stack trace: %s",
             self->exception->clazz->descriptor);
     }
 
@@ -766,7 +767,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
     assert(!dvmCheckException(self));
     assert(!dvmIsNativeMethod(method));
 
-    LOGVV("findCatchInMethod %s.%s excep=%s depth=%d\n",
+    LOGVV("findCatchInMethod %s.%s excep=%s depth=%d",
         method->clazz->descriptor, method->name, excepClass->descriptor,
         dvmComputeExactFrameDepth(self->curFrame));
 
@@ -784,7 +785,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
 
             if (handler->typeIdx == kDexNoIndex) {
                 /* catch-all */
-                ALOGV("Match on catch-all block at 0x%02x in %s.%s for %s\n",
+                ALOGV("Match on catch-all block at 0x%02x in %s.%s for %s",
                         relPc, method->clazz->descriptor,
                         method->name, excepClass->descriptor);
                 return handler->address;
@@ -831,7 +832,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
                      * Keep the exception status clear.
                      */
                     ALOGW("Could not resolve class ref'ed in exception "
-                            "catch list (class index %d, exception %s)\n",
+                            "catch list (class index %d, exception %s)",
                             handler->typeIdx,
                             (self->exception != NULL) ?
                             self->exception->clazz->descriptor : "(none)");
@@ -840,11 +841,11 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
                 }
             }
 
-            //ALOGD("ADDR MATCH, check %s instanceof %s\n",
+            //ALOGD("ADDR MATCH, check %s instanceof %s",
             //    excepClass->descriptor, pEntry->excepClass->descriptor);
 
             if (dvmInstanceof(excepClass, throwable)) {
-                ALOGV("Match on catch block at 0x%02x in %s.%s for %s\n",
+                ALOGV("Match on catch block at 0x%02x in %s.%s for %s",
                         relPc, method->clazz->descriptor,
                         method->name, excepClass->descriptor);
                 return handler->address;
@@ -852,7 +853,7 @@ static int findCatchInMethod(Thread* self, const Method* method, int relPc,
         }
     }
 
-    ALOGV("No matching catch block at 0x%02x in %s for %s\n",
+    ALOGV("No matching catch block at 0x%02x in %s for %s",
         relPc, method->name, excepClass->descriptor);
     return -1;
 }
@@ -904,7 +905,7 @@ int dvmFindCatchBlock(Thread* self, int relPc, Object* exception,
          * if this was a native method.
          */
         assert(saveArea->prevFrame != NULL);
-        if (dvmIsBreakFrame(saveArea->prevFrame)) {
+        if (dvmIsBreakFrame((u4*)saveArea->prevFrame)) {
             if (!scanOnly)
                 break;      // bail with catchAddr == -1
 
@@ -921,7 +922,7 @@ int dvmFindCatchBlock(Thread* self, int relPc, Object* exception,
             saveArea = SAVEAREA_FROM_FP(fp);
             fp = saveArea->prevFrame;           // this may be a good one
             while (fp != NULL) {
-                if (!dvmIsBreakFrame(fp)) {
+                if (!dvmIsBreakFrame((u4*)fp)) {
                     saveArea = SAVEAREA_FROM_FP(fp);
                     if (!dvmIsNativeMethod(saveArea->method))
                         break;
@@ -1008,11 +1009,11 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
         const StackSaveArea* saveArea = SAVEAREA_FROM_FP(fp);
         const Method* method = saveArea->method;
 
-        if (dvmIsBreakFrame(fp))
+        if (dvmIsBreakFrame((u4*)fp))
             break;
         if (!dvmInstanceof(method->clazz, gDvm.classJavaLangThrowable))
             break;
-        //ALOGD("EXCEP: ignoring %s.%s\n",
+        //ALOGD("EXCEP: ignoring %s.%s",
         //         method->clazz->descriptor, method->name);
         fp = saveArea->prevFrame;
     }
@@ -1025,13 +1026,13 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
     while (fp != NULL) {
         const StackSaveArea* saveArea = SAVEAREA_FROM_FP(fp);
 
-        if (!dvmIsBreakFrame(fp))
+        if (!dvmIsBreakFrame((u4*)fp))
             stackDepth++;
 
         assert(fp != saveArea->prevFrame);
         fp = saveArea->prevFrame;
     }
-    //ALOGD("EXCEP: stack depth is %d\n", stackDepth);
+    //ALOGD("EXCEP: stack depth is %d", stackDepth);
 
     if (!stackDepth)
         goto bail;
@@ -1047,7 +1048,7 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
             assert(dvmCheckException(dvmThreadSelf()));
             goto bail;
         }
-        intPtr = (int*) stackData->contents;
+        intPtr = (int*)(void*)stackData->contents;
     } else {
         /* array of ints; first entry is stack depth */
         assert(sizeof(Method*) == sizeof(int));
@@ -1066,8 +1067,8 @@ void* dvmFillInStackTraceInternal(Thread* thread, bool wantObject, int* pCount)
         const StackSaveArea* saveArea = SAVEAREA_FROM_FP(fp);
         const Method* method = saveArea->method;
 
-        if (!dvmIsBreakFrame(fp)) {
-            //ALOGD("EXCEP keeping %s.%s\n", method->clazz->descriptor,
+        if (!dvmIsBreakFrame((u4*)fp)) {
+            //ALOGD("EXCEP keeping %s.%s", method->clazz->descriptor,
             //         method->name);
 
             *intPtr++ = (int) method;
@@ -1108,11 +1109,8 @@ bail:
 ArrayObject* dvmGetStackTrace(const Object* ostackData)
 {
     const ArrayObject* stackData = (const ArrayObject*) ostackData;
-    const int* intVals;
-    int stackSize;
-
-    stackSize = stackData->length / 2;
-    intVals = (const int*) stackData->contents;
+    size_t stackSize = stackData->length / 2;
+    const int* intVals = (const int*)(void*)stackData->contents;
     return dvmGetStackTraceRaw(intVals, stackSize);
 }
 
@@ -1246,14 +1244,9 @@ void dvmLogRawStackTrace(const int* intVals, int stackDepth)
 /*
  * Print the direct stack trace of the given exception to the log.
  */
-static void logStackTraceOf(Object* exception)
-{
-    const ArrayObject* stackData;
-    StringObject* messageStr;
-    int stackSize;
-    const int* intVals;
+static void logStackTraceOf(Object* exception) {
 
-    messageStr = (StringObject*) dvmGetFieldObject(exception,
+    StringObject* messageStr = (StringObject*) dvmGetFieldObject(exception,
                     gDvm.offJavaLangThrowable_message);
     if (messageStr != NULL) {
         char* cp = dvmCreateCstrFromString(messageStr);
@@ -1263,15 +1256,21 @@ static void logStackTraceOf(Object* exception)
         ALOGI("%s:\n", exception->clazz->descriptor);
     }
 
-    stackData = (const ArrayObject*) dvmGetFieldObject(exception,
+    /*
+     * This relies on the stackState field, which contains the "raw"
+     * form of the stack.  The Throwable class may clear this field
+     * after it generates the "cooked" form, in which case we'll have
+     * nothing to show.
+     */
+    const ArrayObject* stackData = (const ArrayObject*) dvmGetFieldObject(exception,
                     gDvm.offJavaLangThrowable_stackState);
     if (stackData == NULL) {
-        ALOGI("  (no stack trace data found)\n");
+        ALOGI("  (raw stack trace not found)");
         return;
     }
 
-    stackSize = stackData->length / 2;
-    intVals = (const int*) stackData->contents;
+    int stackSize = stackData->length / 2;
+    const int* intVals = (const int*)(void*)stackData->contents;
 
     dvmLogRawStackTrace(intVals, stackSize);
 }
@@ -1282,13 +1281,13 @@ static void logStackTraceOf(Object* exception)
  * the stored stack trace and process it internally instead of calling
  * interpreted code.
  */
-void dvmLogExceptionStackTrace(void)
+void dvmLogExceptionStackTrace()
 {
     Object* exception = dvmThreadSelf()->exception;
     Object* cause;
 
     if (exception == NULL) {
-        ALOGW("tried to log a null exception?\n");
+        ALOGW("tried to log a null exception?");
         return;
     }
 
@@ -1298,7 +1297,7 @@ void dvmLogExceptionStackTrace(void)
         if (cause == NULL) {
             break;
         }
-        ALOGI("Caused by:\n");
+        ALOGI("Caused by:");
         exception = cause;
     }
 }

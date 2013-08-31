@@ -19,6 +19,9 @@
  */
 #ifndef _DALVIK_INTERP_INTERP
 #define _DALVIK_INTERP_INTERP
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Interpreter entry point.  Call here after setting up the interpreted
@@ -58,5 +61,9 @@ u1 dvmGetOriginalOpcode(const u2* addr);
  * Flush any breakpoints associated with methods in "clazz".
  */
 void dvmFlushBreakpoints(ClassObject* clazz);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_INTERP_INTERP*/
