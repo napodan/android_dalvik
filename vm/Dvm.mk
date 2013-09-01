@@ -108,16 +108,16 @@ LOCAL_SRC_FILES := \
 	Jni.cpp \
 	JarFile.cpp \
 	LinearAlloc.cpp \
-	Misc.cpp.arm \
-	Native.c \
-	PointerSet.c \
-	Profile.c \
+	Misc.cpp \
+	Native.cpp \
+	PointerSet.cpp \
+	Profile.cpp \
 	Properties.c \
-	RawDexFile.c \
-	ReferenceTable.c \
-	SignalCatcher.c \
-	StdioConverter.c \
-	Sync.c \
+	RawDexFile.cpp \
+	ReferenceTable.cpp \
+	SignalCatcher.cpp \
+	StdioConverter.cpp \
+	Sync.cpp \
 	TestCompability.c \
 	Thread.c \
 	UtfString.c \

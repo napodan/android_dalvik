@@ -54,10 +54,10 @@ static bool verifySorted(PointerSet* pSet)
  */
 PointerSet* dvmPointerSetAlloc(int initialSize)
 {
-    PointerSet* pSet = calloc(1, sizeof(PointerSet));
+    PointerSet* pSet = (PointerSet*)calloc(1, sizeof(PointerSet));
     if (pSet != NULL) {
         if (initialSize > 0) {
-            pSet->list = malloc(sizeof(const void*) * initialSize);
+            pSet->list = (const void**)malloc(sizeof(void*) * initialSize);
             if (pSet->list == NULL) {
                 free(pSet);
                 return NULL;
@@ -130,10 +130,10 @@ bool dvmPointerSetAddEntry(PointerSet* pSet, const void* ptr)
             pSet->alloc = 4;
         else
             pSet->alloc *= 2;
-        LOGVV("expanding %p to %d\n", pSet, pSet->alloc);
-        newList = realloc(pSet->list, pSet->alloc * sizeof(const void*));
+        LOGVV("expanding %p to %d", pSet, pSet->alloc);
+        newList = (const void**)realloc(pSet->list, pSet->alloc * sizeof(void*));
         if (newList == NULL) {
-            ALOGE("Failed expanding ptr set (alloc=%d)\n", pSet->alloc);
+            ALOGE("Failed expanding ptr set (alloc=%d)", pSet->alloc);
             dvmAbort();
         }
         pSet->list = newList;
@@ -148,14 +148,14 @@ bool dvmPointerSetAddEntry(PointerSet* pSet, const void* ptr)
          * terminated "above" or "below" the value.
          */
         if (nearby != 0 && ptr < pSet->list[nearby-1]) {
-            //ALOGD("nearby-1=%d %p, inserting %p at -1\n",
+            //ALOGD("nearby-1=%d %p, inserting %p at -1",
             //    nearby-1, pSet->list[nearby-1], ptr);
             nearby--;
         } else if (ptr < pSet->list[nearby]) {
-            //ALOGD("nearby=%d %p, inserting %p at +0\n",
+            //ALOGD("nearby=%d %p, inserting %p at +0",
             //    nearby, pSet->list[nearby], ptr);
         } else {
-            //ALOGD("nearby+1=%d %p, inserting %p at +1\n",
+            //ALOGD("nearby+1=%d %p, inserting %p at +1",
             //    nearby+1, pSet->list[nearby+1], ptr);
             nearby++;
         }
@@ -267,7 +267,8 @@ void dvmPointerSetIntersect(PointerSet* pSet, const void** ptrArray, int count)
  */
 void dvmPointerSetDump(const PointerSet* pSet)
 {
+    ALOGI("PointerSet %p", pSet);
     int i;
     for (i = 0; i < pSet->count; i++)
-        printf(" %p", pSet->list[i]);
+        ALOGI(" %2d: %p", i, pSet->list[i]);
 }
