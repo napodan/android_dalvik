@@ -39,7 +39,7 @@ static void* signalCatcherThreadStart(void* arg);
  *
  * Returns immediately.
  */
-bool dvmSignalCatcherStartup(void)
+bool dvmSignalCatcherStartup()
 {
     gDvm.haltSignalCatcher = false;
 
@@ -56,7 +56,7 @@ bool dvmSignalCatcherStartup(void)
  * Since we know the thread is just sitting around waiting for signals
  * to arrive, send it one.
  */
-void dvmSignalCatcherShutdown(void)
+void dvmSignalCatcherShutdown()
 {
     gDvm.haltSignalCatcher = true;
     if (gDvm.signalCatcherHandle == 0)      // not started yet
@@ -65,7 +65,7 @@ void dvmSignalCatcherShutdown(void)
     pthread_kill(gDvm.signalCatcherHandle, SIGQUIT);
 
     pthread_join(gDvm.signalCatcherHandle, NULL);
-    ALOGV("signal catcher has shut down\n");
+    ALOGV("signal catcher has shut down");
 }
 
 
@@ -138,7 +138,7 @@ static void logThreadStacks(FILE* fp)
  *
  * If JIT tuning is compiled in, dump compiler stats as well.
  */
-static void handleSigQuit(void)
+static void handleSigQuit()
 {
     char* traceBuf = NULL;
     size_t traceLen;
@@ -156,7 +156,7 @@ static void handleSigQuit(void)
         /* write to memory buffer */
         FILE* memfp = open_memstream(&traceBuf, &traceLen);
         if (memfp == NULL) {
-            ALOGE("Unable to create memstream for stack traces\n");
+            ALOGE("Unable to create memstream for stack traces");
             traceBuf = NULL;        /* make sure it didn't touch this */
             /* continue on */
         } else {
@@ -183,7 +183,7 @@ static void handleSigQuit(void)
          * We don't know how long it will take to do the disk I/O, so put us
          * into VMWAIT for the duration.
          */
-        int oldStatus = dvmChangeStatus(dvmThreadSelf(), THREAD_VMWAIT);
+        ThreadStatus oldStatus = dvmChangeStatus(dvmThreadSelf(), THREAD_VMWAIT);
 
         /*
          * Open the stack trace output file, creating it if necessary.  It
@@ -191,16 +191,16 @@ static void handleSigQuit(void)
          */
         int fd = open(gDvm.stackTraceFile, O_WRONLY | O_APPEND | O_CREAT, 0666);
         if (fd < 0) {
-            ALOGE("Unable to open stack trace file '%s': %s\n",
+            ALOGE("Unable to open stack trace file '%s': %s",
                 gDvm.stackTraceFile, strerror(errno));
         } else {
             ssize_t actual = write(fd, traceBuf, traceLen);
             if (actual != (ssize_t) traceLen) {
-                ALOGE("Failed to write stack traces to %s (%d of %zd): %s\n",
+                ALOGE("Failed to write stack traces to %s (%d of %zd): %s",
                     gDvm.stackTraceFile, (int) actual, traceLen,
                     strerror(errno));
             } else {
-                ALOGI("Wrote stack traces to '%s'\n", gDvm.stackTraceFile);
+                ALOGI("Wrote stack traces to '%s'", gDvm.stackTraceFile);
             }
             close(fd);
         }
@@ -213,9 +213,9 @@ static void handleSigQuit(void)
 /*
  * Respond to a SIGUSR1 by forcing a GC.
  */
-static void handleSigUsr1(void)
+static void handleSigUsr1()
 {
-    ALOGI("SIGUSR1 forcing GC (no HPROF)\n");
+    ALOGI("SIGUSR1 forcing GC (no HPROF)");
     dvmCollectGarbage(false);
 }
 
@@ -224,7 +224,7 @@ static void handleSigUsr1(void)
  * Respond to a SIGUSR2 by dumping some JIT stats and possibly resetting
  * the code cache.
  */
-static void handleSigUsr2(void)
+static void handleSigUsr2()
 {
     static int codeCacheResetCount = 0;
     if ((--codeCacheResetCount & 7) == 0) {
@@ -233,7 +233,7 @@ static void handleSigUsr2(void)
         dvmCompilerDumpStats();
         /* Stress-test unchain all */
         dvmJitUnchainAll();
-        ALOGD("Send %d more signals to rest the code cache",
+        ALOGD("Send %d more signals to reset the code cache",
              codeCacheResetCount & 7);
     }
 }
@@ -250,7 +250,7 @@ static void* signalCatcherThreadStart(void* arg)
 
     UNUSED_PARAMETER(arg);
 
-    ALOGV("Signal catcher thread started (threadid=%d)\n", self->threadId);
+    ALOGV("Signal catcher thread started (threadid=%d)", self->threadId);
 
     /* set up mask with signals we want to handle */
     sigemptyset(&mask);
@@ -278,14 +278,14 @@ loop:
         cc = sigwait(&mask, &rcvd);
         if (cc != 0) {
             if (cc == EINTR) {
-                //ALOGV("sigwait: EINTR\n");
+                //ALOGV("sigwait: EINTR");
                 goto loop;
             }
             assert(!"bad result from sigwait");
         }
 
         if (!gDvm.haltSignalCatcher) {
-            ALOGI("threadid=%d: reacting to signal %d\n",
+            ALOGI("threadid=%d: reacting to signal %d",
                 dvmThreadSelf()->threadId, rcvd);
         }
 
@@ -308,7 +308,7 @@ loop:
             break;
 #endif
         default:
-            ALOGE("unexpected signal %d\n", rcvd);
+            ALOGE("unexpected signal %d", rcvd);
             break;
         }
     }

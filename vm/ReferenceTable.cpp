@@ -56,15 +56,15 @@ void dvmClearReferenceTable(ReferenceTable* pRef)
  */
 bool dvmAddToReferenceTable(ReferenceTable* pRef, Object* obj)
 {
-    assert(dvmIsValidObject(obj));
     assert(obj != NULL);
+    assert(dvmIsValidObject(obj));
     assert(pRef->table != NULL);
     assert(pRef->allocEntries <= pRef->maxEntries);
 
     if (pRef->nextEntry == pRef->table + pRef->allocEntries) {
         /* reached end of allocated space; did we hit buffer max? */
         if (pRef->nextEntry == pRef->table + pRef->maxEntries) {
-            ALOGW("ReferenceTable overflow (max=%d)\n", pRef->maxEntries);
+            ALOGW("ReferenceTable overflow (max=%d)", pRef->maxEntries);
             return false;
         }
 
@@ -78,11 +78,11 @@ bool dvmAddToReferenceTable(ReferenceTable* pRef, Object* obj)
 
         newTable = (Object**) realloc(pRef->table, newSize * sizeof(Object*));
         if (newTable == NULL) {
-            ALOGE("Unable to expand ref table (from %d to %d %d-byte entries)\n",
+            ALOGE("Unable to expand ref table (from %d to %d %d-byte entries)",
                 pRef->allocEntries, newSize, sizeof(Object*));
             return false;
         }
-        LOGVV("Growing %p from %d to %d\n", pRef, pRef->allocEntries, newSize);
+        LOGVV("Growing %p from %d to %d", pRef, pRef->allocEntries, newSize);
 
         /* update entries; adjust "nextEntry" in case memory moved */
         pRef->nextEntry = newTable + (pRef->nextEntry - pRef->table);
@@ -141,10 +141,10 @@ bool dvmRemoveFromReferenceTable(ReferenceTable* pRef, Object** bottom,
     if (moveCount != 0) {
         /* remove from middle, slide the rest down */
         memmove(ptr, ptr+1, moveCount * sizeof(Object*));
-        //ALOGV("LREF delete %p, shift %d down\n", obj, moveCount);
+        //ALOGV("LREF delete %p, shift %d down", obj, moveCount);
     } else {
         /* last entry, falls off the end */
-        //ALOGV("LREF delete %p from end\n", obj);
+        //ALOGV("LREF delete %p from end", obj);
     }
 
     return true;

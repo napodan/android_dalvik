@@ -40,10 +40,10 @@ typedef struct StdPipes {
 /*
  * Hold some data.
  */
-typedef struct BufferedData {
+struct BufferedData {
     char    buf[kMaxLine+1];
     int     count;
-} BufferedData;
+};
 
 // fwd
 static void* stdioConverterThreadStart(void* arg);
@@ -55,7 +55,7 @@ static bool readAndLog(int fd, BufferedData* data, const char* tag);
  *
  * Returns immediately.
  */
-bool dvmStdioConverterStartup(void)
+bool dvmStdioConverterStartup()
 {
     StdPipes* pipeStorage;
 
@@ -122,7 +122,7 @@ bool dvmStdioConverterStartup(void)
  * Since we know the thread is just sitting around waiting for something
  * to arrive on stdout, print something.
  */
-void dvmStdioConverterShutdown(void)
+void dvmStdioConverterShutdown()
 {
     gDvm.haltStdioConverter = true;
     if (gDvm.stdioConverterHandle == 0)    // not started, or still starting
@@ -132,7 +132,7 @@ void dvmStdioConverterShutdown(void)
     printf("Shutting down\n");
     fflush(stdout);
 
-    ALOGD("Joining stdio converter...\n");
+    ALOGD("Joining stdio converter...");
     pthread_join(gDvm.stdioConverterHandle, NULL);
 }
 
@@ -181,12 +181,12 @@ static void* stdioConverterThreadStart(void* arg)
 
         if (fdCount < 0) {
             if (errno != EINTR) {
-                ALOGE("select on stdout/stderr failed\n");
+                ALOGE("select on stdout/stderr failed");
                 break;
             }
-            ALOGD("Got EINTR, ignoring\n");
+            ALOGD("Got EINTR, ignoring");
         } else if (fdCount == 0) {
-            ALOGD("WEIRD: select returned zero\n");
+            ALOGD("WEIRD: select returned zero");
         } else {
             bool err = false;
             if (FD_ISSET(pipeStorage->stdoutPipe[0], &readfds)) {
@@ -200,7 +200,7 @@ static void* stdioConverterThreadStart(void* arg)
 
             /* probably EOF; give up */
             if (err) {
-                ALOGW("stdio converter got read error; shutting it down\n");
+                ALOGW("stdio converter got read error; shutting it down");
                 break;
             }
         }
@@ -232,11 +232,11 @@ static bool readAndLog(int fd, BufferedData* data, const char* tag)
     want = kMaxLine - data->count;
     actual = read(fd, data->buf + data->count, want);
     if (actual <= 0) {
-        ALOGW("read %s: (%d,%d) failed (%d): %s\n",
+        ALOGW("read %s: (%d,%d) failed (%d): %s",
             tag, fd, want, (int)actual, strerror(errno));
         return false;
     } else {
-        //ALOGI("read %s: %d at %d\n", tag, actual, data->count);
+        //ALOGI("read %s: %d at %d", tag, actual, data->count);
     }
     data->count += actual;
 
@@ -250,7 +250,7 @@ static bool readAndLog(int fd, BufferedData* data, const char* tag)
     for (i = data->count; i > 0; i--, cp++) {
         if (*cp == '\n' || (*cp == '\r' && i != 0 && *(cp+1) != '\n')) {
             *cp = '\0';
-            //ALOGW("GOT %d at %d '%s'\n", cp - start, start - data->buf, start);
+            //ALOGW("GOT %d at %d '%s'", cp - start, start - data->buf, start);
             ALOG(LOG_INFO, tag, "%s", start);
             start = cp+1;
         }
