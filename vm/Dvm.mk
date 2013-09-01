@@ -93,6 +93,7 @@ LOCAL_SRC_FILES := \
 	AllocTracker.cpp \
 	Atomic.cpp.arm \
 	AtomicCache.cpp \
+	BitVector.cpp.arm \
 	CheckJni.c \
 	Ddm.cpp \
 	Debugger.cpp \
@@ -106,8 +107,8 @@ LOCAL_SRC_FILES := \
 	Intern.cpp \
 	Jni.cpp \
 	JarFile.cpp \
-	LinearAlloc.c \
-	Misc.c.arm \
+	LinearAlloc.cpp \
+	Misc.cpp.arm \
 	Native.c \
 	PointerSet.c \
 	Profile.c \

@@ -24,11 +24,12 @@ extern "C" {
 #endif
 
 
-#include "Inlines.h"
 
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
+
+#include "Inlines.h"
 
 /*
  * Used to shut up the compiler when a parameter isn't used.
@@ -91,17 +92,19 @@ INLINE void dvmPrintHexDumpDbg(const void* vaddr, size_t length,const char* tag)
 #endif
 }
 
+typedef enum {
+    kDebugTargetUnknown = 0,
+    kDebugTargetLog,
+    kDebugTargetFile,
+}DebugTargetKind;
+
 /*
  * We pass one of these around when we want code to be able to write debug
  * info to either the log or to a file (or stdout/stderr).
  */
 typedef struct DebugOutputTarget {
     /* where to? */
-    enum {
-        kDebugTargetUnknown = 0,
-        kDebugTargetLog,
-        kDebugTargetFile,
-    } which;
+    DebugTargetKind which;
 
     /* additional bits */
     union {
