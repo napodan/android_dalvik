@@ -105,7 +105,7 @@ LOCAL_SRC_FILES := \
 	Inlines.cpp \
 	Intern.cpp \
 	Jni.cpp \
-	JarFile.c \
+	JarFile.cpp \
 	LinearAlloc.c \
 	Misc.c.arm \
 	Native.c \
