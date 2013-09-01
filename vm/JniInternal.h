@@ -195,11 +195,6 @@ void dvmDestroyJNIEnv(JNIEnv* env);
 JNIEnvExt* dvmGetJNIEnvForThread(void);
 
 /*
- * Extract the return type enum from the "jniArgInfo" value.
- */
-DalvikJniReturnType dvmGetArgInfoReturnType(int jniArgInfo);
-
-/*
  * Release all MonitorEnter-acquired locks that are still held.  Called at
  * DetachCurrentThread time.
  */
