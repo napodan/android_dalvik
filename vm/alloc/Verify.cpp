@@ -20,6 +20,11 @@
 #include "alloc/Verify.h"
 #include "alloc/Visit.h"
 
+/*
+ * Visitor applied to each reference field when searching for things
+ * that point to an object.  Sets the argument to NULL when a match is
+ * found.
+ */
 static void dumpReferencesVisitor(void *pObj, void *arg)
 {
     Object *obj = *(Object **)pObj;
@@ -29,21 +34,30 @@ static void dumpReferencesVisitor(void *pObj, void *arg)
     }
 }
 
+/*
+ * Visitor applied to each bitmap element to search for things that
+ * point to an object.  Logs a message when a match is found.
+ */
 static void dumpReferencesCallback(void *ptr, void *arg)
 {
-    Object *obj = arg;
+    Object *obj = (Object *)arg;
     if (ptr == obj) {
         ALOGD("skipping %p == %p", ptr, obj);
         return;
     }
-    dvmVisitObject(dumpReferencesVisitor, ptr, &obj);
+    dvmVisitObject(dumpReferencesVisitor, (Object *)ptr, &obj);
     if (obj == NULL) {
         ALOGD("Found %p in the heap @ %p", arg, ptr);
-        dvmDumpObject(ptr);
+        dvmDumpObject((Object *)ptr);
     }
 }
 
-static void dumpReferencesRootVisitor(void *ptr, void *arg)
+/*
+ * Visitor applied to each root to search for things that point to an
+ * object.  Logs a message when a match is found.
+ */
+static void dumpReferencesRootVisitor(void *ptr,
+                                      void *arg)
 {
     Object *obj = *(Object **)ptr;
     Object *lookingFor = *(Object **)arg;
@@ -79,7 +93,7 @@ static void verifyReference(void *addr, void *arg)
         isValid = dvmIsValidObject(obj);
     }
     if (!isValid) {
-        Object **parent = arg;
+        Object **parent = (Object **)arg;
         if (*parent != NULL) {
             ALOGE("Verify of object %p failed", *parent);
             dvmDumpObject(*parent);
@@ -95,8 +109,8 @@ static void verifyReference(void *addr, void *arg)
  */
 void dvmVerifyObject(const Object *obj)
 {
-    Object *arg = (Object *)obj;
-    dvmVisitObject(verifyReference, (Object *)obj, &arg);
+    Object *arg = const_cast<Object*>(obj);
+    dvmVisitObject(verifyReference, arg, &arg);
     if (arg == NULL) {
         dumpReferences(obj);
         dvmAbort();
@@ -108,7 +122,7 @@ void dvmVerifyObject(const Object *obj)
  */
 static void verifyBitmapCallback(void *ptr, void *arg)
 {
-    dvmVerifyObject(ptr);
+    dvmVerifyObject((Object *)ptr);
 }
 
 /*
@@ -123,7 +137,7 @@ void dvmVerifyBitmap(const HeapBitmap *bitmap)
 /*
  * Verifies references in the roots.
  */
-void dvmVerifyRoots(void)
+void dvmVerifyRoots()
 {
     dvmVisitRoots(verifyReference, NULL);
 }

@@ -119,8 +119,8 @@ LOCAL_SRC_FILES := \
 	StdioConverter.cpp \
 	Sync.cpp \
 	TestCompability.c \
-	Thread.c \
-	UtfString.c \
+	Thread.cpp \
+	UtfString.cpp \
 	alloc/clz.c.arm \
 	alloc/Alloc.cpp \
 	alloc/CardTable.cpp \
@@ -130,8 +130,8 @@ LOCAL_SRC_FILES := \
 	alloc/HeapTable.c \
 	alloc/HeapWorker.c \
 	alloc/DdmHeap.cpp \
-	alloc/Verify.c \
-	alloc/Visit.c \
+	alloc/Verify.cpp \
+	alloc/Visit.cpp \
 	analysis/CodeVerify.c \
 	analysis/DexPrepare.c \
 	analysis/DexVerify.c \
