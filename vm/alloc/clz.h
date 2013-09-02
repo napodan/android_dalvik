@@ -28,6 +28,10 @@
  */
 #ifndef _DALVIK_CLZ
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if defined(__arm__) && !defined(__thumb__)
 # include <machine/cpu-features.h>
 # if defined(__ARM_HAVE_CLZ)
@@ -39,6 +43,10 @@
 #ifndef HAVE_BUILTIN_CLZ
 # define CLZ(x) dvmClzImpl(x)
 int dvmClzImpl(unsigned int x);
+#endif
+
+#ifdef __cplusplus
+};
 #endif
 
 #endif // _DALVIK_CLZ

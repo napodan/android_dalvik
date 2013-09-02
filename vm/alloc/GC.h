@@ -151,7 +151,7 @@ void dvmGcMarkDebuggerRefs(void);
 #define HPROF_SET_GC_SCAN_STATE(tag_, thread_) \
     dvmHeapSetHprofGcScanState((tag_), (thread_))
 #define HPROF_CLEAR_GC_SCAN_STATE() \
-    dvmHeapSetHprofGcScanState(0, 0)
+    dvmHeapSetHprofGcScanState((hprof_heap_tag_t)0, 0)
 #else
 #define HPROF_SET_GC_SCAN_STATE(tag_, thread_)  do {} while (false)
 #define HPROF_CLEAR_GC_SCAN_STATE()  do {} while (false)

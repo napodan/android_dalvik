@@ -34,14 +34,13 @@ void dvmVisitObject(Visitor *visitor, Object *obj, void *arg)
 /*
  * Applies a verification function to all present values in the hash table.
  */
-static void visitHashTable(Visitor *visitor, HashTable *table, void *arg)
+static void visitHashTable(Visitor *visitor, HashTable *table,
+                           void *arg)
 {
-    int i;
-
     assert(visitor != NULL);
     assert(table != NULL);
     dvmHashTableLock(table);
-    for (i = 0; i < table->tableSize; ++i) {
+    for (int i = 0; i < table->tableSize; ++i) {
         HashEntry *entry = &table->pEntries[i];
         if (entry->data != NULL && entry->data != HASH_TOMBSTONE) {
             (*visitor)(&entry->data, arg);
@@ -56,19 +55,16 @@ static void visitHashTable(Visitor *visitor, HashTable *table, void *arg)
 static void visitReferenceTable(Visitor *visitor, const ReferenceTable *table,
                                 void *arg)
 {
-    Object **entry;
-
     assert(visitor != NULL);
     assert(table != NULL);
-    for (entry = table->table; entry < table->nextEntry; ++entry) {
+    for (Object **entry = table->table; entry < table->nextEntry; ++entry) {
         assert(entry != NULL);
         (*visitor)(entry, arg);
     }
 }
 
 /*
- * Visits a large heap reference table.  These objects are list heads.
- * As such, it is valid for table to be NULL.
+ * Visits all entries in the indirect reference table.
  */
 static void visitLargeHeapRefTable(Visitor *visitor, LargeHeapRefTable *table,
                                    void *arg)
@@ -80,25 +76,23 @@ static void visitLargeHeapRefTable(Visitor *visitor, LargeHeapRefTable *table,
 }
 
 /*
- * Visits all stack slots. TODO: visit native methods.
+ * Visits all stack slots except those belonging to native method
+ * arguments.
  */
 static void visitThreadStack(Visitor *visitor, Thread *thread, void *arg)
 {
-    const StackSaveArea *saveArea;
-    u4 *framePtr;
-
     assert(visitor != NULL);
     assert(thread != NULL);
-    framePtr = (u4 *)thread->curFrame;
-    for (; framePtr != NULL; framePtr = saveArea->prevFrame) {
+    const StackSaveArea *saveArea;
+    for (u4 *fp = (u4 *)thread->curFrame;
+         fp != NULL;
+         fp = (u4 *)saveArea->prevFrame) {
         Method *method;
-        saveArea = SAVEAREA_FROM_FP(framePtr);
+        saveArea = SAVEAREA_FROM_FP(fp);
         method = (Method *)saveArea->method;
         if (method != NULL && !dvmIsNativeMethod(method)) {
             const RegisterMap* pMap = dvmGetExpandedRegisterMap(method);
             const u1* regVector = NULL;
-            size_t i;
-
             if (pMap != NULL) {
                 /* found map, get registers for this address */
                 int addr = saveArea->xtra.currentPc - method->insns;
@@ -110,9 +104,9 @@ static void visitThreadStack(Visitor *visitor, Thread *thread, void *arg)
                  * info for the current PC.  Perform a conservative
                  * scan.
                  */
-                for (i = 0; i < method->registersSize; ++i) {
-                    if (dvmIsValidObject((Object *)framePtr[i])) {
-                        (*visitor)(&framePtr[i], arg);
+                for (size_t i = 0; i < method->registersSize; ++i) {
+                    if (dvmIsValidObject((Object *)fp[i])) {
+                        (*visitor)(&fp[i], arg);
                     }
                 }
             } else {
@@ -125,7 +119,7 @@ static void visitThreadStack(Visitor *visitor, Thread *thread, void *arg)
                  * A '1' bit indicates a live reference.
                  */
                 u2 bits = 1 << 1;
-                for (i = 0; i < method->registersSize; ++i) {
+                for (size_t i = 0; i < method->registersSize; ++i) {
                     bits >>= 1;
                     if (bits == 1) {
                         /* set bit 9 so we can tell when we're empty */
@@ -135,7 +129,7 @@ static void visitThreadStack(Visitor *visitor, Thread *thread, void *arg)
                         /*
                          * Register is marked as live, it's a valid root.
                          */
-                        (*visitor)(&framePtr[i], arg);
+                        (*visitor)(&fp[i], arg);
                     }
                 }
                 dvmReleaseRegisterMapLine(pMap, regVector);
@@ -144,7 +138,7 @@ static void visitThreadStack(Visitor *visitor, Thread *thread, void *arg)
         /*
          * Don't fall into an infinite loop if things get corrupted.
          */
-        assert((uintptr_t)saveArea->prevFrame > (uintptr_t)framePtr ||
+        assert((uintptr_t)saveArea->prevFrame > (uintptr_t)fp ||
                saveArea->prevFrame == NULL);
     }
 }
@@ -184,7 +178,7 @@ static void visitThreads(Visitor *visitor, void *arg)
 }
 
 /*
- * Visits roots.  TODO: visit all roots.
+ * Visits roots.  TODO: visit cached global references.
  */
 void dvmVisitRoots(Visitor *visitor, void *arg)
 {
@@ -201,5 +195,4 @@ void dvmVisitRoots(Visitor *visitor, void *arg)
     (*visitor)(&gDvm.outOfMemoryObj, arg);
     (*visitor)(&gDvm.internalErrorObj, arg);
     (*visitor)(&gDvm.noClassDefFoundErrorObj, arg);
-    /* TODO: visit cached global references. */
 }
