@@ -132,8 +132,8 @@ LOCAL_SRC_FILES := \
 	alloc/DdmHeap.cpp \
 	alloc/Verify.cpp \
 	alloc/Visit.cpp \
-	analysis/CodeVerify.c \
-	analysis/DexPrepare.c \
+	analysis/CodeVerify.cpp \
+	analysis/DexPrepare.cpp \
 	analysis/DexVerify.c \
 	analysis/Optimize.c \
 	analysis/RegisterMap.c \

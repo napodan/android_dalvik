@@ -36,11 +36,11 @@
  * we either only need it at branch points (for verification) or GC points
  * and branches (for verification + type-precise register analysis).
  */
-typedef enum RegisterTrackingMode {
+enum RegisterTrackingMode {
     kTrackRegsBranches,
     kTrackRegsGcPoints,
     kTrackRegsAll
-} RegisterTrackingMode;
+};
 
 /*
  * Set this to enable dead code scanning.  This is not required, but it's
@@ -353,6 +353,9 @@ static RegType primitiveTypeToRegType(PrimitiveType primType)
  *
  * Very few methods have 10 or more new-instance instructions; the
  * majority have 0 or 1.  Occasionally a static initializer will have 200+.
+ *
+ * TODO: merge this into the static pass or initRegisterTable; want to
+ * avoid walking through the instructions yet again just to set up this table
  */
 UninitInstanceMap* dvmCreateUninitInstanceMap(const Method* meth,
     const InsnFlags* insnFlags, int newInstanceCount)
@@ -378,7 +381,7 @@ UninitInstanceMap* dvmCreateUninitInstanceMap(const Method* meth,
      */
     int size = offsetof(UninitInstanceMap, map) +
                 newInstanceCount * sizeof(uninitMap->map[0]);
-    uninitMap = calloc(1, size);
+    uninitMap = (UninitInstanceMap*)calloc(1, size);
     if (uninitMap == NULL)
         return NULL;
     uninitMap->numEntries = newInstanceCount;
@@ -436,7 +439,7 @@ int dvmSetUninitInstance(UninitInstanceMap* uninitMap, int addr,
             if (uninitMap->map[idx].clazz != NULL &&
                 uninitMap->map[idx].clazz != clazz)
             {
-                LOG_VFY("VFY: addr %d already set to %p, not setting to %p\n",
+                LOG_VFY("VFY: addr %d already set to %p, not setting to %p",
                     addr, uninitMap->map[idx].clazz, clazz);
                 return -1;          // already set to something else??
             }
@@ -680,7 +683,7 @@ static ClassObject* lookupSignatureArrayClass(const Method* meth,
         while (*++endp != ';' && *endp != '\0')
             ;
         if (*endp != ';') {
-            LOG_VFY("VFY: bad signature component '%s' (missing ';')\n", sig);
+            LOG_VFY("VFY: bad signature component '%s' (missing ';')", sig);
             *pFailure = VERIFY_ERROR_GENERIC;
             return NULL;
         }
@@ -710,6 +713,7 @@ static bool setTypesFromSignature(const Method* meth, RegType* regTypes,
     DexParameterIterator iterator;
     int actualArgs, expectedArgs, argStart;
     VerifyError failure = VERIFY_ERROR_NONE;
+    const char* descriptor;
 
     dexParameterIteratorInit(&iterator, &meth->prototype);
     argStart = meth->registersSize - meth->insSize;
@@ -739,14 +743,14 @@ static bool setTypesFromSignature(const Method* meth, RegType* regTypes,
     }
 
     for (;;) {
-        const char* descriptor = dexParameterIteratorNextDescriptor(&iterator);
+        descriptor = dexParameterIteratorNextDescriptor(&iterator);
 
         if (descriptor == NULL) {
             break;
         }
 
         if (actualArgs >= expectedArgs) {
-            LOG_VFY("VFY: expected %d args, found more (%s)\n",
+            LOG_VFY("VFY: expected %d args, found more (%s)",
                 expectedArgs, descriptor);
             goto bad_sig;
         }
@@ -806,17 +810,17 @@ static bool setTypesFromSignature(const Method* meth, RegType* regTypes,
             actualArgs += 2;
             break;
         default:
-            LOG_VFY("VFY: unexpected signature type char '%c'\n", *descriptor);
+            LOG_VFY("VFY: unexpected signature type char '%c'", *descriptor);
             goto bad_sig;
         }
     }
 
     if (actualArgs != expectedArgs) {
-        LOG_VFY("VFY: expected %d args, found %d\n", expectedArgs, actualArgs);
+        LOG_VFY("VFY: expected %d args, found %d", expectedArgs, actualArgs);
         goto bad_sig;
     }
 
-    const char* descriptor = dexProtoGetReturnType(&meth->prototype);
+    descriptor = dexProtoGetReturnType(&meth->prototype);
 
     /*
      * Validate return type.  We don't do the type lookup; just want to make
@@ -864,13 +868,13 @@ static bool setTypesFromSignature(const Method* meth, RegType* regTypes,
     return true;
 
 //fail:
-//    LOG_VFY_METH(meth, "VFY:  bad sig\n");
+//    LOG_VFY_METH(meth, "VFY:  bad sig");
 //    return false;
 
 bad_sig:
     {
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        LOG_VFY("VFY: bad signature '%s' for %s.%s\n",
+        LOG_VFY("VFY: bad signature '%s' for %s.%s",
             desc, meth->clazz->descriptor, meth->name);
         free(desc);
     }
@@ -1036,6 +1040,9 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
 {
     Method* resMethod;
     char* sigOriginal = NULL;
+    const char* sig;
+    int expectedArgs;
+    int actualArgs;
 
     /*
      * Resolve the method.  This could be an abstract or concrete method
@@ -1050,15 +1057,11 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
     if (resMethod == NULL) {
         /* failed; print a meaningful failure message */
         DexFile* pDexFile = meth->clazz->pDvmDex->pDexFile;
-        const DexMethodId* pMethodId;
-        const char* methodName;
-        char* methodDesc;
-        const char* classDescriptor;
 
-        pMethodId = dexGetMethodId(pDexFile, pDecInsn->vB);
-        methodName = dexStringById(pDexFile, pMethodId->nameIdx);
-        methodDesc = dexCopyDescriptorFromMethodId(pDexFile, pMethodId);
-        classDescriptor = dexStringByTypeIdx(pDexFile, pMethodId->classIdx);
+        const DexMethodId* pMethodId = dexGetMethodId(pDexFile, pDecInsn->vB);
+        const char* methodName = dexStringById(pDexFile, pMethodId->nameIdx);
+        char* methodDesc = dexCopyDescriptorFromMethodId(pDexFile, pMethodId);
+        const char* classDescriptor = dexStringByTypeIdx(pDexFile, pMethodId->classIdx);
 
         if (!gDvm.optimizing) {
             char* dotMissingClass = dvmDescriptorToDot(classDescriptor);
@@ -1075,7 +1078,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
             //free(curMethodDesc);
         }
 
-        LOG_VFY("VFY: unable to resolve %s method %u: %s.%s %s\n",
+        LOG_VFY("VFY: unable to resolve %s method %u: %s.%s %s",
             dvmMethodTypeStr(methodType), pDecInsn->vB,
             classDescriptor, methodName, methodDesc);
         free(methodDesc);
@@ -1091,7 +1094,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
      */
     if (resMethod->name[0] == '<') {
         if (methodType != METHOD_DIRECT || !isInitMethod(resMethod)) {
-            LOG_VFY("VFY: invalid call to %s.%s\n",
+            LOG_VFY("VFY: invalid call to %s.%s",
                     resMethod->clazz->descriptor, resMethod->name);
             goto bad_sig;
         }
@@ -1102,7 +1105,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
      * access flags for the target method.
      */
     if (!isCorrectInvokeKind(methodType, resMethod)) {
-        LOG_VFY("VFY: invoke type does not match method type of %s.%s\n",
+        LOG_VFY("VFY: invoke type does not match method type of %s.%s",
             resMethod->clazz->descriptor, resMethod->name);
         goto fail;
     }
@@ -1116,7 +1119,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
         ClassObject* super = meth->clazz->super;
         if (super == NULL || resMethod->methodIndex > super->vtableCount) {
             char* desc = dexProtoCopyMethodDescriptor(&resMethod->prototype);
-            LOG_VFY("VFY: invalid invoke-super from %s.%s to super %s.%s %s\n",
+            LOG_VFY("VFY: invalid invoke-super from %s.%s to super %s.%s %s",
                     meth->clazz->descriptor, meth->name,
                     (super == NULL) ? "-" : super->descriptor,
                     resMethod->name, desc);
@@ -1133,17 +1136,15 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
      * have register count values).
      */
     sigOriginal = dexProtoCopyMethodDescriptor(&resMethod->prototype);
-    const char* sig = sigOriginal;
-    int expectedArgs = pDecInsn->vA;
-    int actualArgs = 0;
+    sig = sigOriginal;
+    expectedArgs = pDecInsn->vA;
+    actualArgs = 0;
 
-    if (!isRange && expectedArgs > 5) {
-        LOG_VFY("VFY: invalid arg count in non-range invoke (%d)\n",
-            pDecInsn->vA);
-        goto fail;
-    }
+    /* caught by static verifier */
+    assert(isRange || expectedArgs <= 5);
+
     if (expectedArgs > meth->outsSize) {
-        LOG_VFY("VFY: invalid arg count (%d) exceeds outsSize (%d)\n",
+        LOG_VFY("VFY: invalid arg count (%d) exceeds outsSize (%d)",
             expectedArgs, meth->outsSize);
         goto fail;
     }
@@ -1161,8 +1162,7 @@ static Method* verifyInvocationArgs(const Method* meth, const RegType* insnRegs,
         ClassObject* actualThisRef;
         RegType actualArgType;
 
-        actualArgType = getInvocationThis(insnRegs, insnRegCount, pDecInsn,
-                            pFailure);
+        actualArgType = getInvocationThis(insnRegs, insnRegCount, pDecInsn, pFailure);
         if (!VERIFY_OK(*pFailure))
             goto fail;
 
@@ -2946,8 +2946,8 @@ static void verifyFilledNewArrayRegs(const Method* meth,
  * receive a "nop".  The instruction's length will be left unchanged
  * in "insnFlags".
  *
- * The verifier explicitly locks out breakpoint activity, so there should
- * be no clashes with the debugger.
+ * The VM postpones setting of debugger breakpoints in unverified classes,
+ * so there should be no clashes with the debugger.
  *
  * Returns "true" on success.
  */
@@ -2955,9 +2955,8 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
     int insnIdx, VerifyError failure)
 {
     VerifyErrorRefType refType;
-    const u2* oldInsns = meth->insns + insnIdx;
+    u2* oldInsns = (u2*) meth->insns + insnIdx;
     u2 oldInsn = *oldInsns;
-    bool result = false;
 
     if (gDvm.optimizing)
         ALOGD("Weird: RFI during dexopt?");
@@ -3027,9 +3026,8 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
 
     default:
         /* could handle this in a generic way, but this is probably safer */
-        LOG_VFY("GLITCH: verifier asked to replace opcode 0x%02x\n",
-            oldInsn & 0xff);
-        goto bail;
+        LOG_VFY("GLITCH: verifier asked to replace opcode 0x%02x\n", oldInsn & 0xff);
+        return false;
     }
 
     /* write a NOP over the third code unit, if necessary */
@@ -3044,7 +3042,7 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
         break;
     default:
         /* whoops */
-        ALOGE("ERROR: stomped a %d-unit instruction with a verifier error\n",
+        ALOGE("ERROR: stomped a %d-unit instruction with a verifier error",
             width);
         dvmAbort();
     }
@@ -3055,10 +3053,7 @@ static bool replaceFailingInstruction(const Method* meth, InsnFlags* insnFlags,
     //newInsns[0] = newVal;
     dvmDexChangeDex2(meth->clazz->pDvmDex, newInsns, newVal);
 
-    result = true;
-
-bail:
-    return result;
+    return true;
 }
 
 

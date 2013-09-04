@@ -111,22 +111,21 @@ retry:
      * working on it, we'll block here until they complete.  Because
      * we're waiting on an external resource, we go into VMWAIT mode.
      */
-    int oldStatus;
-    ALOGV("DexOpt: locking cache file %s (fd=%d, boot=%d)\n",
+    ALOGV("DexOpt: locking cache file %s (fd=%d, boot=%d)",
         cacheFileName, fd, isBootstrap);
-    oldStatus = dvmChangeStatus(NULL, THREAD_VMWAIT);
+    ThreadStatus oldStatus = dvmChangeStatus(NULL, THREAD_VMWAIT);
     cc = flock(fd, LOCK_EX | LOCK_NB);
     if (cc != 0) {
-        ALOGD("DexOpt: sleeping on flock(%s)\n", cacheFileName);
+        ALOGD("DexOpt: sleeping on flock(%s)", cacheFileName);
         cc = flock(fd, LOCK_EX);
     }
     dvmChangeStatus(NULL, oldStatus);
     if (cc != 0) {
-        ALOGE("Can't lock dex cache '%s': %d\n", cacheFileName, cc);
+        ALOGE("Can't lock dex cache '%s': %d", cacheFileName, cc);
         close(fd);
         return -1;
     }
-    ALOGV("DexOpt:  locked cache file\n");
+    ALOGV("DexOpt:  locked cache file");
 
     /*
      * Check to see if the fd we opened and locked matches the file in
@@ -137,16 +136,16 @@ retry:
      */
     cc = fstat(fd, &fdStat);
     if (cc != 0) {
-        ALOGE("Can't stat open file '%s'\n", cacheFileName);
-        LOGVV("DexOpt: unlocking cache file %s\n", cacheFileName);
+        ALOGE("Can't stat open file '%s'", cacheFileName);
+        LOGVV("DexOpt: unlocking cache file %s", cacheFileName);
         goto close_fail;
     }
     cc = stat(cacheFileName, &fileStat);
     if (cc != 0 ||
         fdStat.st_dev != fileStat.st_dev || fdStat.st_ino != fileStat.st_ino)
     {
-        ALOGD("DexOpt: our open cache file is stale; sleeping and retrying\n");
-        LOGVV("DexOpt: unlocking cache file %s\n", cacheFileName);
+        ALOGD("DexOpt: our open cache file is stale; sleeping and retrying");
+        LOGVV("DexOpt: unlocking cache file %s", cacheFileName);
         flock(fd, LOCK_UN);
         close(fd);
         usleep(250 * 1000);     /* if something is hosed, don't peg machine */
@@ -162,32 +161,34 @@ retry:
      */
     if (fdStat.st_size == 0) {
         if (readOnly) {
-            ALOGW("DexOpt: file has zero length and isn't writable\n");
+            ALOGW("DexOpt: file has zero length and isn't writable");
             goto close_fail;
         }
         cc = dexOptCreateEmptyHeader(fd);
         if (cc != 0)
             goto close_fail;
         *pNewFile = true;
-        ALOGV("DexOpt: successfully initialized new cache file\n");
+        ALOGV("DexOpt: successfully initialized new cache file");
     } else {
         bool expectVerify, expectOpt;
 
-        if (gDvm.classVerifyMode == VERIFY_MODE_NONE)
+        if (gDvm.classVerifyMode == VERIFY_MODE_NONE) {
             expectVerify = false;
-        else if (gDvm.classVerifyMode == VERIFY_MODE_REMOTE)
+        } else if (gDvm.classVerifyMode == VERIFY_MODE_REMOTE) {
             expectVerify = !isBootstrap;
-        else /*if (gDvm.classVerifyMode == VERIFY_MODE_ALL)*/
+        } else /*if (gDvm.classVerifyMode == VERIFY_MODE_ALL)*/ {
             expectVerify = true;
+        }
 
-        if (gDvm.dexOptMode == OPTIMIZE_MODE_NONE)
+        if (gDvm.dexOptMode == OPTIMIZE_MODE_NONE) {
             expectOpt = false;
-        else if (gDvm.dexOptMode == OPTIMIZE_MODE_VERIFIED)
+        } else if (gDvm.dexOptMode == OPTIMIZE_MODE_VERIFIED) {
             expectOpt = expectVerify;
-        else /*if (gDvm.dexOptMode == OPTIMIZE_MODE_ALL)*/
+        } else /*if (gDvm.dexOptMode == OPTIMIZE_MODE_ALL)*/ {
             expectOpt = true;
+        }
 
-        ALOGV("checking deps, expecting vfy=%d opt=%d\n",
+        ALOGV("checking deps, expecting vfy=%d opt=%d",
             expectVerify, expectOpt);
 
         if (!dvmCheckOptHeaderAndDependencies(fd, true, modWhen, crc,
@@ -201,7 +202,7 @@ retry:
                  * give up now.
                  */
                 if (createIfMissing) {
-                    ALOGW("Cached DEX '%s' (%s) is stale and not writable\n",
+                    ALOGW("Cached DEX '%s' (%s) is stale and not writable",
                         fileName, cacheFileName);
                 }
                 goto close_fail;
@@ -228,24 +229,24 @@ retry:
              * changes doing anything" purposes its best if we just make
              * everything crash when a DEX they're using gets updated.
              */
-            ALOGD("ODEX file is stale or bad; removing and retrying (%s)\n",
+            ALOGD("ODEX file is stale or bad; removing and retrying (%s)",
                 cacheFileName);
             if (ftruncate(fd, 0) != 0) {
-                ALOGW("Warning: unable to truncate cache file '%s': %s\n",
+                ALOGW("Warning: unable to truncate cache file '%s': %s",
                     cacheFileName, strerror(errno));
                 /* keep going */
             }
             if (unlink(cacheFileName) != 0) {
-                ALOGW("Warning: unable to remove cache file '%s': %d %s\n",
+                ALOGW("Warning: unable to remove cache file '%s': %d %s",
                     cacheFileName, errno, strerror(errno));
                 /* keep going; permission failure should probably be fatal */
             }
-            LOGVV("DexOpt: unlocking cache file %s\n", cacheFileName);
+            LOGVV("DexOpt: unlocking cache file %s", cacheFileName);
             flock(fd, LOCK_UN);
             close(fd);
             goto retry;
         } else {
-            ALOGV("DexOpt: good deps in cache file\n");
+            ALOGV("DexOpt: good deps in cache file");
         }
     }
 
@@ -265,7 +266,7 @@ close_fail:
  */
 bool dvmUnlockCachedDexFile(int fd)
 {
-    LOGVV("DexOpt: unlocking cache file fd=%d\n", fd);
+    LOGVV("DexOpt: unlocking cache file fd=%d", fd);
     return (flock(fd, LOCK_UN) == 0);
 }
 
@@ -303,7 +304,7 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLength,
     else
         lastPart = fileName;
 
-    ALOGD("DexOpt: --- BEGIN '%s' (bootstrap=%d) ---\n", lastPart, isBootstrap);
+    ALOGD("DexOpt: --- BEGIN '%s' (bootstrap=%d) ---", lastPart, isBootstrap);
 
     pid_t pid;
 
@@ -312,7 +313,7 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLength,
      * was all optimized, got rejected.
      */
     if (gDvm.optimizing) {
-        ALOGW("Rejecting recursive optimization attempt on '%s'\n", fileName);
+        ALOGW("Rejecting recursive optimization attempt on '%s'", fileName);
         return false;
     }
 
@@ -327,10 +328,10 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLength,
         int bcpSize = dvmGetBootPathSize();
         int argc = kFixedArgCount + bcpSize
             + (kValgrindArgCount * kUseValgrind);
-        char* argv[argc+1];             // last entry is NULL
+        const char* argv[argc+1];             // last entry is NULL
         char values[argc][kMaxIntLen];
         char* execFile;
-        char* androidRoot;
+        const char* androidRoot;
         int flags;
 
         /* change process groups, so we don't clash with ProcessManager */
@@ -339,10 +340,10 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLength,
         /* full path to optimizer */
         androidRoot = getenv("ANDROID_ROOT");
         if (androidRoot == NULL) {
-            ALOGW("ANDROID_ROOT not set, defaulting to /system\n");
+            ALOGW("ANDROID_ROOT not set, defaulting to /system");
             androidRoot = "/system";
         }
-        execFile = malloc(strlen(androidRoot) + strlen(kDexOptBin) + 1);
+        execFile = (char*)alloca(strlen(androidRoot) + strlen(kDexOptBin) + 1);
         strcpy(execFile, androidRoot);
         strcat(execFile, kDexOptBin);
 
@@ -414,44 +415,43 @@ bool dvmOptimizeDexFile(int fd, off_t dexOffset, long dexLength,
         argv[curArg] = NULL;
 
         if (kUseValgrind)
-            execv(kValgrinder, argv);
+            execv(kValgrinder, const_cast<char**>(argv));
         else
-            execv(execFile, argv);
+            execv(execFile, const_cast<char**>(argv));
 
-        ALOGE("execv '%s'%s failed: %s\n", execFile,
+        ALOGE("execv '%s'%s failed: %s", execFile,
             kUseValgrind ? " [valgrind]" : "", strerror(errno));
         exit(1);
     } else {
-        ALOGV("DexOpt: waiting for verify+opt, pid=%d\n", (int) pid);
+        ALOGV("DexOpt: waiting for verify+opt, pid=%d", (int) pid);
         int status;
         pid_t gotPid;
-        int oldStatus;
 
         /*
          * Wait for the optimization process to finish.  We go into VMWAIT
          * mode here so GC suspension won't have to wait for us.
          */
-        oldStatus = dvmChangeStatus(NULL, THREAD_VMWAIT);
+        ThreadStatus oldStatus = dvmChangeStatus(NULL, THREAD_VMWAIT);
         while (true) {
             gotPid = waitpid(pid, &status, 0);
             if (gotPid == -1 && errno == EINTR) {
-                ALOGD("waitpid interrupted, retrying\n");
+                ALOGD("waitpid interrupted, retrying");
             } else {
                 break;
             }
         }
         dvmChangeStatus(NULL, oldStatus);
         if (gotPid != pid) {
-            ALOGE("waitpid failed: wanted %d, got %d: %s\n",
+            ALOGE("waitpid failed: wanted %d, got %d: %s",
                 (int) pid, (int) gotPid, strerror(errno));
             return false;
         }
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-            ALOGD("DexOpt: --- END '%s' (success) ---\n", lastPart);
+            ALOGD("DexOpt: --- END '%s' (success) ---", lastPart);
             return true;
         } else {
-            ALOGW("DexOpt: --- END '%s' --- status=0x%04x, process failed\n",
+            ALOGW("DexOpt: --- END '%s' --- status=0x%04x, process failed",
                 lastPart, status);
             return false;
         }
@@ -487,11 +487,11 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
 
     /* quick test so we don't blow up on empty file */
     if (dexLength < (int) sizeof(DexHeader)) {
-        ALOGE("too small to be DEX\n");
+        ALOGE("too small to be DEX");
         return false;
     }
     if (dexOffset < (int) sizeof(DexOptHeader)) {
-        ALOGE("not enough room for opt header\n");
+        ALOGE("not enough room for opt header");
         return false;
     }
 
@@ -515,7 +515,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
         mapAddr = mmap(NULL, dexOffset + dexLength, PROT_READ|PROT_WRITE,
                     MAP_SHARED, fd, 0);
         if (mapAddr == MAP_FAILED) {
-            ALOGE("unable to mmap DEX cache: %s\n", strerror(errno));
+            ALOGE("unable to mmap DEX cache: %s", strerror(errno));
             goto bail;
         }
 
@@ -528,8 +528,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
          * In practice this would be annoying to deal with, so the file
          * layout is designed so that it can always be rewritten in place.
          *
-         * This sets "headerFlags" and creates the class lookup table as
-         * part of doing the processing.
+         * This creates the class lookup table as part of doing the processing.
          */
         success = rewriteDex(((u1*) mapAddr) + dexOffset, dexLength,
                     &headerFlags, &pClassLookup);
@@ -539,7 +538,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
             u1* dexAddr = ((u1*) mapAddr) + dexOffset;
 
             if (dvmDexFileOpenPartial(dexAddr, dexLength, &pDvmDex) != 0) {
-                ALOGE("Unable to create DexFile\n");
+                ALOGE("Unable to create DexFile");
                 success = false;
             } else {
                 /*
@@ -550,7 +549,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
                 if (gDvm.generateRegisterMaps) {
                     pRegMapBuilder = dvmGenerateRegisterMaps(pDvmDex);
                     if (pRegMapBuilder == NULL) {
-                        ALOGE("Failed generating register maps\n");
+                        ALOGE("Failed generating register maps");
                         success = false;
                     }
                 }
@@ -564,7 +563,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
 
         /* unmap the read-write version, forcing writes to disk */
         if (msync(mapAddr, dexOffset + dexLength, MS_SYNC) != 0) {
-            ALOGW("msync failed: %s\n", strerror(errno));
+            ALOGW("msync failed: %s", strerror(errno));
             // weird, but keep going
         }
 #if 1
@@ -575,7 +574,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
          * Exclude this code when doing clean shutdown for valgrind.
          */
         if (munmap(mapAddr, dexOffset + dexLength) != 0) {
-            ALOGE("munmap failed: %s\n", strerror(errno));
+            ALOGE("munmap failed: %s", strerror(errno));
             goto bail;
         }
 #endif
@@ -591,12 +590,12 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
 
     depsOffset = lseek(fd, 0, SEEK_END);
     if (depsOffset < 0) {
-        ALOGE("lseek to EOF failed: %s\n", strerror(errno));
+        ALOGE("lseek to EOF failed: %s", strerror(errno));
         goto bail;
     }
     adjOffset = (depsOffset + 7) & ~(0x07);
     if (adjOffset != depsOffset) {
-        ALOGV("Adjusting deps start from %d to %d\n",
+        ALOGV("Adjusting deps start from %d to %d",
             (int) depsOffset, (int) adjOffset);
         depsOffset = adjOffset;
         lseek(fd, depsOffset, SEEK_SET);
@@ -606,7 +605,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
      * Append the dependency list.
      */
     if (writeDependencies(fd, modWhen, crc) != 0) {
-        ALOGW("Failed writing dependencies\n");
+        ALOGW("Failed writing dependencies");
         goto bail;
     }
 
@@ -616,7 +615,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
 
     adjOffset = (optOffset + 7) & ~(0x07);
     if (adjOffset != optOffset) {
-        ALOGV("Adjusting opt start from %d to %d\n",
+        ALOGV("Adjusting opt start from %d to %d",
             (int) optOffset, (int) adjOffset);
         optOffset = adjOffset;
         lseek(fd, optOffset, SEEK_SET);
@@ -626,7 +625,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
      * Append any optimized pre-computed data structures.
      */
     if (!writeOptData(fd, pClassLookup, pRegMapBuilder)) {
-        ALOGW("Failed writing opt data\n");
+        ALOGW("Failed writing opt data");
         goto bail;
     }
 
@@ -664,7 +663,7 @@ bool dvmContinueOptimization(int fd, off_t dexOffset, long dexLength,
     if (sysWriteFully(fd, &optHdr, sizeof(optHdr), "DexOpt opt header") != 0)
         goto bail;
 
-    ALOGV("Successfully wrote DEX header\n");
+    ALOGV("Successfully wrote DEX header");
     result = true;
 
     //dvmRegisterMapDumpStats();
@@ -689,6 +688,7 @@ static bool rewriteDex(u1* addr, int len, u4* pHeaderFlags,
     DvmDex* pDvmDex = NULL;
     bool doVerify, doOpt;
     bool result = false;
+    const char* msgStr = "???";
 
     *pHeaderFlags = 0;
 
@@ -724,13 +724,16 @@ static bool rewriteDex(u1* addr, int len, u4* pHeaderFlags,
      * for it.
      */
     if (dvmDexFileOpenPartial(addr, len, &pDvmDex) != 0) {
-        ALOGE("Unable to create DexFile\n");
+        ALOGE("Unable to create DexFile");
         goto bail;
     }
 
     /*
      * Create the class lookup table.  This will eventually be appended
      * to the end of the .odex.
+     *
+     * We create a temporary link from the DexFile for the benefit of
+     * class loading, below.
      */
     *ppClassLookup = dexCreateClassLookup(pDvmDex->pDexFile);
     if (*ppClassLookup == NULL)
@@ -768,14 +771,13 @@ static bool rewriteDex(u1* addr, int len, u4* pHeaderFlags,
     verifyAndOptimizeClasses(pDvmDex->pDexFile, doVerify, doOpt);
     verifyOptWhen = dvmGetRelativeTimeUsec();
 
-    const char* msgStr = "???";
     if (doVerify && doOpt)
         msgStr = "verify+opt";
     else if (doVerify)
         msgStr = "verify";
     else if (doOpt)
         msgStr = "opt";
-    ALOGD("DexOpt: load %dms, %s %dms\n",
+    ALOGD("DexOpt: load %dms, %s %dms",
         (int) (loadWhen - prepWhen) / 1000,
         msgStr,
         (int) (verifyOptWhen - loadWhen) / 1000);
@@ -813,17 +815,18 @@ static bool loadAllClasses(DvmDex* pDvmDex)
     u4 idx;
     int loaded = 0;
 
-    ALOGV("DexOpt: +++ trying to load %d classes\n", count);
+    ALOGV("DexOpt: +++ trying to load %d classes", count);
 
     dvmSetBootPathExtraDex(pDvmDex);
 
     /*
-     * We have some circularity issues with Class and Object that are most
-     * easily avoided by ensuring that Object is never the first thing we
-     * try to find.  Take care of that here.  (We only need to do this when
-     * loading classes from the DEX file that contains Object, and only
-     * when Object comes first in the list, but it costs very little to
-     * do it in all cases.)
+     * At this point, it is safe -- and necessary! -- to look up the
+     * VM's required classes and members, even when what we are in the
+     * process of processing is the core library that defines these
+     * classes itself. (The reason it is necessary is that in the act
+     * of initializing the class Class, below, the system will end up
+     * referring to many of the class references that got set up by
+     * this call.)
      */
     if (dvmFindSystemClass("Ljava/lang/Class;") == NULL) {
         ALOGE("ERROR: java.lang.Class does not exist!\n");
@@ -844,7 +847,7 @@ static bool loadAllClasses(DvmDex* pDvmDex)
         //        NULL);
         newClass = dvmFindSystemClassNoInit(classDescriptor);
         if (newClass == NULL) {
-            ALOGV("DexOpt: failed loading '%s'\n", classDescriptor);
+            ALOGV("DexOpt: failed loading '%s'", classDescriptor);
             dvmClearOptException(dvmThreadSelf());
         } else if (newClass->pDvmDex != pDvmDex) {
             /*
@@ -852,14 +855,14 @@ static bool loadAllClasses(DvmDex* pDvmDex)
              * with the "multiple def" flag so the resolver doesn't try
              * to make it available.
              */
-            ALOGD("DexOpt: '%s' has an earlier definition; blocking out\n",
+            ALOGD("DexOpt: '%s' has an earlier definition; blocking out",
                 classDescriptor);
             SET_CLASS_FLAG(newClass, CLASS_MULTIPLE_DEFS);
         } else {
             loaded++;
         }
     }
-    ALOGV("DexOpt: +++ successfully loaded %d classes\n", loaded);
+    ALOGV("DexOpt: +++ successfully loaded %d classes", loaded);
 
     dvmSetBootPathExtraDex(NULL);
     return true;
@@ -905,7 +908,7 @@ static void verifyAndOptimizeClasses(DexFile* pDexFile, bool doVerify,
 
         } else {
             // TODO: log when in verbose mode
-            ALOGV("DexOpt: not optimizing unavailable class '%s'\n",
+            ALOGV("DexOpt: not optimizing unavailable class '%s'",
                 classDescriptor);
         }
     }
@@ -977,7 +980,7 @@ static const char* getCacheFileName(const ClassPathEntry* cpe)
     case kCpeDex:
         return dvmGetRawDexFileCacheFileName((RawDexFile*) cpe->ptr);
     default:
-        ALOGE("DexOpt: unexpected cpe kind %d\n", cpe->kind);
+        ALOGE("DexOpt: unexpected cpe kind %d", cpe->kind);
         dvmAbort();
         return NULL;
     }
@@ -998,7 +1001,7 @@ static const u1* getSignature(const ClassPathEntry* cpe)
         pDvmDex = dvmGetRawDexFileDex((RawDexFile*) cpe->ptr);
         break;
     default:
-        ALOGE("unexpected cpe kind %d\n", cpe->kind);
+        ALOGE("unexpected cpe kind %d", cpe->kind);
         dvmAbort();
         pDvmDex = NULL;         // make gcc happy
     }
@@ -1051,7 +1054,7 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
      * the first thing in the file.
      */
     if (lseek(fd, 0, SEEK_SET) != 0) {
-        ALOGE("DexOpt: failed to seek to start of file: %s\n", strerror(errno));
+        ALOGE("DexOpt: failed to seek to start of file: %s", strerror(errno));
         goto bail;
     }
 
@@ -1061,10 +1064,10 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
      */
     actual = read(fd, &optHdr, sizeof(optHdr));
     if (actual < 0) {
-        ALOGE("DexOpt: failed reading opt header: %s\n", strerror(errno));
+        ALOGE("DexOpt: failed reading opt header: %s", strerror(errno));
         goto bail;
     } else if (actual != sizeof(optHdr)) {
-        ALOGE("DexOpt: failed reading opt header (got %d of %zd)\n",
+        ALOGE("DexOpt: failed reading opt header (got %d of %zd)",
             (int) actual, sizeof(optHdr));
         goto bail;
     }
@@ -1072,59 +1075,49 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
     magic = optHdr.magic;
     if (memcmp(magic, DEX_MAGIC, 4) == 0) {
         /* somebody probably pointed us at the wrong file */
-        ALOGD("DexOpt: expected optimized DEX, found unoptimized\n");
+        ALOGD("DexOpt: expected optimized DEX, found unoptimized");
         goto bail;
     } else if (memcmp(magic, DEX_OPT_MAGIC, 4) != 0) {
         /* not a DEX file, or previous attempt was interrupted */
-        ALOGD("DexOpt: incorrect opt magic number (0x%02x %02x %02x %02x)\n",
+        ALOGD("DexOpt: incorrect opt magic number (0x%02x %02x %02x %02x)",
             magic[0], magic[1], magic[2], magic[3]);
         goto bail;
     }
     if (memcmp(magic+4, DEX_OPT_MAGIC_VERS, 4) != 0) {
-        ALOGW("DexOpt: stale opt version (0x%02x %02x %02x %02x)\n",
+        ALOGW("DexOpt: stale opt version (0x%02x %02x %02x %02x)",
             magic[4], magic[5], magic[6], magic[7]);
         goto bail;
     }
     if (optHdr.depsLength < kMinDepSize || optHdr.depsLength > kMaxDepSize) {
-        ALOGW("DexOpt: weird deps length %d, bailing\n", optHdr.depsLength);
+        ALOGW("DexOpt: weird deps length %d, bailing", optHdr.depsLength);
         goto bail;
     }
 
     /*
      * Do the header flags match up with what we want?
      *
-     * This is useful because it allows us to automatically regenerate
-     * a file when settings change (e.g. verification is now mandatory),
-     * but can cause difficulties if the bootstrap classes we depend upon
-     * were handled differently than the current options specify.  We get
-     * upset because they're not verified or optimized, but we're not able
-     * to regenerate them because the installer won't let us.
-     *
-     * (This is also of limited value when !sourceAvail.)
-     *
-     * So, for now, we essentially ignore "expectVerify" and "expectOpt"
-     * by limiting the match mask.
-     *
-     * The only thing we really can't handle is incorrect byte-ordering.
+     * The only thing we really can't handle is incorrect byte ordering.
      */
-    const u4 matchMask = DEX_OPT_FLAG_BIG;
-    u4 expectedFlags = 0;
+    {
+        const u4 matchMask = DEX_OPT_FLAG_BIG;
+        u4 expectedFlags = 0;
 #if __BYTE_ORDER != __LITTLE_ENDIAN
-    expectedFlags |= DEX_OPT_FLAG_BIG;
+        expectedFlags |= DEX_OPT_FLAG_BIG;
 #endif
-    if (expectVerify)
-        expectedFlags |= DEX_FLAG_VERIFIED;
-    if (expectOpt)
-        expectedFlags |= DEX_OPT_FLAG_FIELDS | DEX_OPT_FLAG_INVOCATIONS;
-    if ((expectedFlags & matchMask) != (optHdr.flags & matchMask)) {
-        ALOGI("DexOpt: header flag mismatch (0x%02x vs 0x%02x, mask=0x%02x)\n",
-            expectedFlags, optHdr.flags, matchMask);
-        goto bail;
+        if (expectVerify)
+            expectedFlags |= DEX_FLAG_VERIFIED;
+        if (expectOpt)
+            expectedFlags |= DEX_OPT_FLAG_FIELDS | DEX_OPT_FLAG_INVOCATIONS;
+        if ((expectedFlags & matchMask) != (optHdr.flags & matchMask)) {
+            ALOGI("DexOpt: header flag mismatch (0x%02x vs 0x%02x, mask=0x%02x)",
+                expectedFlags, optHdr.flags, matchMask);
+            goto bail;
+        }
     }
 
     posn = lseek(fd, optHdr.depsOffset, SEEK_SET);
     if (posn < 0) {
-        ALOGW("DexOpt: seek to deps failed: %s\n", strerror(errno));
+        ALOGW("DexOpt: seek to deps failed: %s", strerror(errno));
         goto bail;
     }
 
@@ -1133,16 +1126,16 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
      */
     depData = (u1*) malloc(optHdr.depsLength);
     if (depData == NULL) {
-        ALOGW("DexOpt: unable to allocate %d bytes for deps\n",
+        ALOGW("DexOpt: unable to allocate %d bytes for deps",
             optHdr.depsLength);
         goto bail;
     }
     actual = read(fd, depData, optHdr.depsLength);
     if (actual < 0) {
-        ALOGW("DexOpt: failed reading deps: %s\n", strerror(errno));
+        ALOGW("DexOpt: failed reading deps: %s", strerror(errno));
         goto bail;
     } else if (actual != (ssize_t) optHdr.depsLength) {
-        ALOGW("DexOpt: failed reading deps: got %d of %d\n",
+        ALOGW("DexOpt: failed reading deps: got %d of %d",
             (int) actual, optHdr.depsLength);
         goto bail;
     }
@@ -1156,18 +1149,18 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
     ptr = depData;
     val = read4LE(&ptr);
     if (sourceAvail && val != modWhen) {
-        ALOGI("DexOpt: source file mod time mismatch (%08x vs %08x)\n",
+        ALOGI("DexOpt: source file mod time mismatch (%08x vs %08x)",
             val, modWhen);
         goto bail;
     }
     val = read4LE(&ptr);
     if (sourceAvail && val != crc) {
-        ALOGI("DexOpt: source file CRC mismatch (%08x vs %08x)\n", val, crc);
+        ALOGI("DexOpt: source file CRC mismatch (%08x vs %08x)", val, crc);
         goto bail;
     }
     val = read4LE(&ptr);
     if (val != DALVIK_VM_BUILD) {
-        ALOGD("DexOpt: VM build version mismatch (%d vs %d)\n",
+        ALOGD("DexOpt: VM build version mismatch (%d vs %d)",
             val, DALVIK_VM_BUILD);
         goto bail;
     }
@@ -1180,7 +1173,7 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
     u4 numDeps;
 
     numDeps = read4LE(&ptr);
-    ALOGV("+++ DexOpt: numDeps = %d\n", numDeps);
+    ALOGV("+++ DexOpt: numDeps = %d", numDeps);
     for (cpe = gDvm.bootClassPath; cpe->ptr != NULL; cpe++) {
         const char* cacheFileName =
             dvmPathToAbsolutePortion(getCacheFileName(cpe));
@@ -1192,7 +1185,7 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
 
         if (numDeps == 0) {
             /* more entries in bootclasspath than in deps list */
-            ALOGI("DexOpt: not all deps represented\n");
+            ALOGI("DexOpt: not all deps represented");
             goto bail;
         }
 
@@ -1200,7 +1193,7 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
         if (len != storedStrLen ||
             strcmp(cacheFileName, (const char*) ptr) != 0)
         {
-            ALOGI("DexOpt: mismatch dep name: '%s' vs. '%s'\n",
+            ALOGI("DexOpt: mismatch dep name: '%s' vs. '%s'",
                 cacheFileName, ptr);
             goto bail;
         }
@@ -1208,25 +1201,25 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
         ptr += storedStrLen;
 
         if (memcmp(signature, ptr, kSHA1DigestLen) != 0) {
-            ALOGI("DexOpt: mismatch dep signature for '%s'\n", cacheFileName);
+            ALOGI("DexOpt: mismatch dep signature for '%s'", cacheFileName);
             goto bail;
         }
         ptr += kSHA1DigestLen;
 
-        ALOGV("DexOpt: dep match on '%s'\n", cacheFileName);
+        ALOGV("DexOpt: dep match on '%s'", cacheFileName);
 
         numDeps--;
     }
 
     if (numDeps != 0) {
         /* more entries in deps list than in classpath */
-        ALOGI("DexOpt: Some deps went away\n");
+        ALOGI("DexOpt: Some deps went away");
         goto bail;
     }
 
     // consumed all data and no more?
     if (ptr != depData + optHdr.depsLength) {
-        ALOGW("DexOpt: Spurious dep data? %d vs %d\n",
+        ALOGW("DexOpt: Spurious dep data? %d vs %d",
             (int) (ptr - depData), optHdr.depsLength);
         assert(false);
     }
@@ -1259,7 +1252,7 @@ static int writeDependencies(int fd, u4 modWhen, u4 crc)
             dvmPathToAbsolutePortion(getCacheFileName(cpe));
         assert(cacheFileName != NULL); /* guaranteed by Class.c */
 
-        ALOGV("+++ DexOpt: found dep '%s'\n", cacheFileName);
+        ALOGV("+++ DexOpt: found dep '%s'", cacheFileName);
 
         numDeps++;
         bufLen += strlen(cacheFileName) +1;
@@ -1267,7 +1260,7 @@ static int writeDependencies(int fd, u4 modWhen, u4 crc)
 
     bufLen += 4*4 + numDeps * (4+kSHA1DigestLen);
 
-    buf = malloc(bufLen);
+    buf = (u1*)malloc(bufLen);
 
     set4LE(buf+0, modWhen);
     set4LE(buf+4, crc);
@@ -1288,7 +1281,7 @@ static int writeDependencies(int fd, u4 modWhen, u4 crc)
         int len = strlen(cacheFileName) +1;
 
         if (ptr + 4 + len + kSHA1DigestLen > buf + bufLen) {
-            ALOGE("DexOpt: overran buffer\n");
+            ALOGE("DexOpt: overran buffer");
             dvmAbort();
         }
 
@@ -1327,7 +1320,7 @@ static bool writeChunk(int fd, u4 type, const void* data, size_t size)
 
     assert(sizeof(header) == 8);
 
-    ALOGV("Writing chunk, type=%.4s size=%d\n", (char*) &type, size);
+    ALOGV("Writing chunk, type=%.4s size=%d", (char*) &type, size);
 
     header.ts.type = type;
     header.ts.size = (u4) size;
@@ -1345,7 +1338,7 @@ static bool writeChunk(int fd, u4 type, const void* data, size_t size)
     /* if necessary, pad to 64-bit alignment */
     if ((size & 7) != 0) {
         int padSize = 8 - (size & 7);
-        ALOGV("size was %d, inserting %d pad bytes\n", size, padSize);
+        ALOGV("size was %d, inserting %d pad bytes", size, padSize);
         lseek(fd, padSize, SEEK_CUR);
     }
 
@@ -1403,7 +1396,7 @@ static bool computeFileChecksum(int fd, off_t start, size_t length, u4* pSum)
     uLong adler;
 
     if (lseek(fd, start, SEEK_SET) != start) {
-        ALOGE("Unable to seek to start of checksum area (%ld): %s\n",
+        ALOGE("Unable to seek to start of checksum area (%ld): %s",
             (long) start, strerror(errno));
         return false;
     }
@@ -1414,7 +1407,7 @@ static bool computeFileChecksum(int fd, off_t start, size_t length, u4* pSum)
         size_t wanted = (length < sizeof(readBuf)) ? length : sizeof(readBuf);
         actual = read(fd, readBuf, wanted);
         if (actual <= 0) {
-            ALOGE("Read failed (%d) while computing checksum (len=%zu): %s\n",
+            ALOGE("Read failed (%d) while computing checksum (len=%zu): %s",
                 (int) actual, length, strerror(errno));
             return false;
         }
