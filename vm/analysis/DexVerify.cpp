@@ -57,19 +57,19 @@ bool dvmVerifyClass(ClassObject* clazz)
     int i;
 
     if (dvmIsClassVerified(clazz)) {
-        ALOGD("Ignoring duplicate verify attempt on %s\n", clazz->descriptor);
+        ALOGD("Ignoring duplicate verify attempt on %s", clazz->descriptor);
         return true;
     }
 
     for (i = 0; i < clazz->directMethodCount; i++) {
         if (!verifyMethod(&clazz->directMethods[i])) {
-            LOG_VFY("Verifier rejected class %s\n", clazz->descriptor);
+            LOG_VFY("Verifier rejected class %s", clazz->descriptor);
             return false;
         }
     }
     for (i = 0; i < clazz->virtualMethodCount; i++) {
         if (!verifyMethod(&clazz->virtualMethods[i])) {
-            LOG_VFY("Verifier rejected class %s\n", clazz->descriptor);
+            LOG_VFY("Verifier rejected class %s", clazz->descriptor);
             return false;
         }
     }
@@ -131,7 +131,7 @@ static bool verifyMethod(Method* meth)
     if (vdata.insnsSize == 0) {
         if (!dvmIsNativeMethod(meth) && !dvmIsAbstractMethod(meth)) {
             LOG_VFY_METH(meth,
-                "VFY: zero-length code in concrete non-native method\n");
+                "VFY: zero-length code in concrete non-native method");
             goto bail;
         }
 
@@ -143,7 +143,7 @@ static bool verifyMethod(Method* meth)
      * sure that ins <= registers.
      */
     if (meth->insSize > meth->registersSize) {
-        LOG_VFY_METH(meth, "VFY: bad register counts (ins=%d regs=%d)\n",
+        LOG_VFY_METH(meth, "VFY: bad register counts (ins=%d regs=%d)",
             meth->insSize, meth->registersSize);
         goto bail;
     }
@@ -154,8 +154,7 @@ static bool verifyMethod(Method* meth)
      * TODO: Consider keeping a reusable pre-allocated array sitting
      * around for smaller methods.
      */
-    vdata.insnFlags = (InsnFlags*)
-        calloc(dvmGetMethodInsnsSize(meth), sizeof(InsnFlags));
+    vdata.insnFlags = (InsnFlags*) calloc(dvmGetMethodInsnsSize(meth), sizeof(InsnFlags));
     if (vdata.insnFlags == NULL)
         goto bail;
 
@@ -177,26 +176,26 @@ static bool verifyMethod(Method* meth)
 
     /*
      * Set the "in try" flags for all instructions guarded by a "try" block.
+     * Also sets the "branch target" flag on exception handlers.
      */
     if (!dvmSetTryFlags(meth, vdata.insnFlags))
         goto bail;
 
     /*
-     * Perform static instruction verification.
+     * Perform static instruction verification.  Also sets the "branch
+     * target" flags.
      */
     if (!verifyInstructions(&vdata))
         goto bail;
 
     /*
-     * Do code-flow analysis.  Do this after verifying the branch targets
-     * so we don't need to worry about it here.
+     * Do code-flow analysis.
      *
-     * If there are no registers, we don't need to do much in the way of
-     * analysis, but we still need to verify that nothing actually tries
-     * to use a register.
+     * We could probably skip this for a method with no registers, but
+     * that's so rare that there's little point in checking.
      */
     if (!dvmVerifyCodeFlow(&vdata)) {
-        //ALOGD("+++ %s failed code flow\n", meth->name);
+        //ALOGD("+++ %s failed code flow", meth->name);
         goto bail;
     }
 
@@ -211,8 +210,8 @@ bail:
 
 
 /*
- * Verify an array data table.  "curOffset" is the offset of the fill-array-data
- * instruction.
+ * Verify an array data table.  "curOffset" is the offset of the
+ * fill-array-data instruction.
  */
 static bool checkArrayData(const Method* meth, int curOffset)
 {
@@ -496,7 +495,7 @@ static bool verifyInstructions(VerifierData* vdata)
             kInstrCanThrow | kInstrCanReturn;
 
         int width = dvmInsnGetWidth(insnFlags, i);
-        Opcode opcode = *insns & 0xff;
+        Opcode opcode = dexOpcodeFromCodeUnit(*insns);
         OpcodeFlags opFlags = dexGetFlagsFromOpcode(opcode);
 
         if ((opFlags & gcMask) != 0) {
