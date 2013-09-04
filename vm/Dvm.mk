@@ -134,7 +134,7 @@ LOCAL_SRC_FILES := \
 	alloc/Visit.cpp \
 	analysis/CodeVerify.cpp \
 	analysis/DexPrepare.cpp \
-	analysis/DexVerify.c \
+	analysis/DexVerify.cpp \
 	analysis/Optimize.c \
 	analysis/RegisterMap.c \
 	analysis/VerifySubs.c \
