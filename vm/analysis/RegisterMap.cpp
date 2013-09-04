@@ -21,6 +21,7 @@
  * interpreter thread stacks.
  */
 #include "Dalvik.h"
+#include "UniquePtr.h"
 #include "analysis/CodeVerify.h"
 #include "analysis/RegisterMap.h"
 #include "libdex/DexCatch.h"
@@ -57,7 +58,7 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap);
 #define kUpdatePosnMinRegs  24
 #define kNumUpdatePosns     8
 #define kMaxDiffBits        20
-typedef struct MapStats {
+struct MapStats {
     /*
      * Buckets measuring the distance between GC points.  This tells us how
      * many bits we need to encode the advancing program counter.  We ignore
@@ -102,13 +103,13 @@ typedef struct MapStats {
      */
     int numExpandedMaps;
     int totalExpandedMapSize;
-} MapStats;
+};
 #endif
 
 /*
  * Prepare some things.
  */
-bool dvmRegisterMapStartup(void)
+bool dvmRegisterMapStartup()
 {
 #ifdef REGISTER_MAP_STATS
     MapStats* pStats = calloc(1, sizeof(MapStats));
@@ -120,7 +121,7 @@ bool dvmRegisterMapStartup(void)
 /*
  * Clean up.
  */
-void dvmRegisterMapShutdown(void)
+void dvmRegisterMapShutdown()
 {
 #ifdef REGISTER_MAP_STATS
     free(gDvm.registerMapStats);
@@ -130,7 +131,7 @@ void dvmRegisterMapShutdown(void)
 /*
  * Write stats to log file.
  */
-void dvmRegisterMapDumpStats(void)
+void dvmRegisterMapDumpStats()
 {
 #ifdef REGISTER_MAP_STATS
     MapStats* pStats = (MapStats*) gDvm.registerMapStats;
@@ -141,11 +142,11 @@ void dvmRegisterMapDumpStats(void)
             break;
     }
 
-    ALOGI("Register Map gcPointGap stats (diff count=%d, total=%d):\n",
+    ALOGI("Register Map gcPointGap stats (diff count=%d, total=%d):",
         pStats->gcGapCount, pStats->totalGcPointCount);
     assert(pStats->gcPointGap[0] == 0);
     for (i = 1; i <= end; i++) {
-        ALOGI(" %2d %d\n", i, pStats->gcPointGap[i]);
+        ALOGI(" %2d %d", i, pStats->gcPointGap[i]);
     }
 
 
@@ -154,16 +155,16 @@ void dvmRegisterMapDumpStats(void)
             break;
     }
 
-    ALOGI("Register Map bit difference stats:\n");
+    ALOGI("Register Map bit difference stats:");
     for (i = 0; i <= end; i++) {
-        ALOGI(" %2d %d\n", i, pStats->numDiffBits[i]);
+        ALOGI(" %2d %d", i, pStats->numDiffBits[i]);
     }
 
 
-    ALOGI("Register Map update position stats (lt16=%d ge16=%d):\n",
+    ALOGI("Register Map update position stats (lt16=%d ge16=%d):",
         pStats->updateLT16, pStats->updateGE16);
     for (i = 0; i < kNumUpdatePosns; i++) {
-        ALOGI(" %2d %d\n", i, pStats->updatePosn[i]);
+        ALOGI(" %2d %d", i, pStats->updatePosn[i]);
     }
 #endif
 }
@@ -196,7 +197,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
     int bufSize;
 
     if (vdata->method->registersSize >= 2048) {
-        ALOGE("ERROR: register map can't handle %d registers\n",
+        ALOGE("ERROR: register map can't handle %d registers",
             vdata->method->registersSize);
         goto bail;
     }
@@ -230,7 +231,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
     }
     if (gcPointCount >= 65536) {
         /* we could handle this, but in practice we don't get near this */
-        ALOGE("ERROR: register map can't handle %d gc points in one method\n",
+        ALOGE("ERROR: register map can't handle %d gc points in one method",
             gcPointCount);
         goto bail;
     }
@@ -240,7 +241,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
      */
     bufSize = kHeaderSize + gcPointCount * (bytesForAddr + regWidth);
 
-    ALOGV("+++ grm: %s.%s (adr=%d gpc=%d rwd=%d bsz=%d)\n",
+    ALOGV("+++ grm: %s.%s (adr=%d gpc=%d rwd=%d bsz=%d)",
         vdata->method->clazz->descriptor, vdata->method->name,
         bytesForAddr, gcPointCount, regWidth, bufSize);
 
@@ -263,12 +264,13 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
                 *mapData++ = i & 0xff;
                 *mapData++ = i >> 8;
             }
-            outputTypeVector(vdata->addrRegs[i], vdata->insnRegCount, mapData);
+            outputTypeVector(vdata->addrRegs[i],
+                vdata->insnRegCount, mapData);
             mapData += regWidth;
         }
     }
 
-    ALOGV("mapData=%p pMap=%p bufSize=%d\n", mapData, pMap, bufSize);
+    ALOGV("mapData=%p pMap=%p bufSize=%d", mapData, pMap, bufSize);
     assert(mapData - (const u1*) pMap == bufSize);
 
     if (REGISTER_MAP_VERIFY && !verifyMap(vdata, pMap))
@@ -292,7 +294,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
             RegisterMap* pUncompMap;
             pUncompMap = uncompressMapDifferential(pCompMap);
             if (pUncompMap == NULL) {
-                ALOGE("Map failed to uncompress - %s.%s\n",
+                ALOGE("Map failed to uncompress - %s.%s",
                     vdata->method->clazz->descriptor,
                     vdata->method->name);
                 free(pCompMap);
@@ -300,7 +302,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
                 dvmAbort();
             } else {
                 if (compareMaps(pMap, pUncompMap) != 0) {
-                    ALOGE("Map comparison failed - %s.%s\n",
+                    ALOGE("Map comparison failed - %s.%s",
                         vdata->method->clazz->descriptor,
                         vdata->method->name);
                     free(pCompMap);
@@ -314,7 +316,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
         }
 
         if (REGISTER_MAP_VERBOSE) {
-            ALOGD("Good compress on %s.%s\n",
+            ALOGD("Good compress on %s.%s",
                 vdata->method->clazz->descriptor,
                 vdata->method->name);
         }
@@ -322,7 +324,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata)
         pMap = pCompMap;
     } else {
         if (REGISTER_MAP_VERBOSE) {
-            ALOGD("Unable to compress %s.%s (ent=%d rw=%d)\n",
+            ALOGD("Unable to compress %s.%s (ent=%d rw=%d)",
                 vdata->method->clazz->descriptor,
                 vdata->method->name,
                 dvmRegisterMapGetNumEntries(pMap),
@@ -411,7 +413,7 @@ static void dumpRegisterMap(const RegisterMap* pMap, int registersSize)
         break;
     default:
         /* can't happen */
-        ALOGE("Can only dump Compact8 / Compact16 maps (not %d)\n", format);
+        ALOGE("Can only dump Compact8 / Compact16 maps (not %d)", format);
         return;
     }
 
@@ -451,7 +453,7 @@ static void dumpRegisterMap(const RegisterMap* pMap, int registersSize)
         }
         hexBuf[i * 3] = '\0';
 
-        ALOGD("  %04x %s %s\n", addr, outBuf, hexBuf);
+        ALOGD("  %04x %s %s", addr, outBuf, hexBuf);
     }
 }
 
@@ -477,7 +479,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
         {
             char* desc;
             desc = dexProtoCopyMethodDescriptor(&vdata->method->prototype);
-            ALOGI("Map for %s.%s %s\n", vdata->method->clazz->descriptor,
+            ALOGI("Map for %s.%s %s", vdata->method->clazz->descriptor,
                 vdata->method->name, desc);
             free(desc);
 
@@ -486,7 +488,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
     }
 
     if ((vdata->method->registersSize + 7) / 8 != pMap->regWidth) {
-        ALOGE("GLITCH: registersSize=%d, regWidth=%d\n",
+        ALOGE("GLITCH: registersSize=%d, regWidth=%d",
             vdata->method->registersSize, pMap->regWidth);
         return false;
     }
@@ -510,7 +512,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
 
         const RegType* regs = vdata->addrRegs[addr];
         if (regs == NULL) {
-            ALOGE("GLITCH: addr %d has no data\n", addr);
+            ALOGE("GLITCH: addr %d has no data", addr);
             return false;
         }
 
@@ -532,7 +534,7 @@ static bool verifyMap(VerifierData* vdata, const RegisterMap* pMap)
             regIsRef = isReferenceType(type);
 
             if (bitIsRef != regIsRef) {
-                ALOGE("GLITCH: addr %d reg %d: bit=%d reg=%d(%d)\n",
+                ALOGE("GLITCH: addr %d reg %d: bit=%d reg=%d(%d)",
                     addr, i, bitIsRef, regIsRef, type);
                 return false;
             }
@@ -588,7 +590,7 @@ static size_t computeRegisterMapSize(const RegisterMap* pMap)
             return len + (ptr - (u1*) pMap);
         }
     default:
-        ALOGE("Bad register map format %d\n", format);
+        ALOGE("Bad register map format %d", format);
         dvmAbort();
         return 0;
     }
@@ -607,7 +609,7 @@ static bool writeMapForMethod(const Method* meth, u1** pPtr)
 {
     if (meth->registerMap == NULL) {
         if (!dvmIsAbstractMethod(meth) && !dvmIsNativeMethod(meth)) {
-            ALOGW("Warning: no map available for %s.%s\n",
+            ALOGW("Warning: no map available for %s.%s",
                 meth->clazz->descriptor, meth->name);
             /* weird, but keep going */
         }
@@ -642,7 +644,7 @@ static bool writeMapsAllMethods(DvmDex* pDvmDex, const ClassObject* clazz,
 
     /* artificial limit */
     if (clazz->virtualMethodCount + clazz->directMethodCount >= 65536) {
-        ALOGE("Too many methods in %s\n", clazz->descriptor);
+        ALOGE("Too many methods in %s", clazz->descriptor);
         return false;
     }
 
@@ -741,7 +743,7 @@ static size_t writeMapsAllClasses(DvmDex* pDvmDex, u1* basePtr, size_t length)
 
         if (clazz != NULL) {
             offsetTable[idx] = ptr - basePtr;
-            LOGVV("%d -> offset %d (%p-%p)\n",
+            LOGVV("%d -> offset %d (%p-%p)",
                 idx, offsetTable[idx], ptr, basePtr);
 
             if (!writeMapsAllMethods(pDvmDex, clazz, &ptr,
@@ -751,18 +753,18 @@ static size_t writeMapsAllClasses(DvmDex* pDvmDex, u1* basePtr, size_t length)
             }
 
             ptr = align32(ptr);
-            LOGVV("Size %s (%d+%d methods): %d\n", clazz->descriptor,
+            LOGVV("Size %s (%d+%d methods): %d", clazz->descriptor,
                 clazz->directMethodCount, clazz->virtualMethodCount,
                 (ptr - basePtr) - offsetTable[idx]);
         } else {
-            ALOGV("%4d NOT mapadding '%s'\n", idx, classDescriptor);
+            ALOGV("%4d NOT mapadding '%s'", idx, classDescriptor);
             assert(offsetTable[idx] == 0);
         }
     }
 
     if (ptr - basePtr >= (int)length) {
         /* a bit late */
-        ALOGE("Buffer overrun\n");
+        ALOGE("Buffer overrun");
         dvmAbort();
     }
 
@@ -811,7 +813,7 @@ RegisterMapBuilder* dvmGenerateRegisterMaps(DvmDex* pDvmDex)
         return NULL;
     }
 
-    ALOGV("TOTAL size of register maps: %d\n", actual);
+    ALOGV("TOTAL size of register maps: %d", actual);
 
     pBuilder->data = pBuilder->memMap.addr;
     pBuilder->size = actual;
@@ -847,13 +849,13 @@ const void* dvmRegisterMapGetClassData(const DexFile* pDexFile, u4 classIdx,
         return NULL;
 
     if (classIdx >= pClassPool->numClasses) {
-        ALOGE("bad class index (%d vs %d)\n", classIdx, pClassPool->numClasses);
+        ALOGE("bad class index (%d vs %d)", classIdx, pClassPool->numClasses);
         dvmAbort();
     }
 
     u4 classOffset = pClassPool->classDataOffset[classIdx];
     if (classOffset == 0) {
-        ALOGV("+++ no map for classIdx=%d\n", classIdx);
+        ALOGV("+++ no map for classIdx=%d", classIdx);
         return NULL;
     }
 
@@ -869,10 +871,10 @@ const void* dvmRegisterMapGetClassData(const DexFile* pDexFile, u4 classIdx,
  */
 const RegisterMap* dvmRegisterMapGetNext(const void** pPtr)
 {
-    const RegisterMap* pMap = *pPtr;
+    const RegisterMap* pMap = (const RegisterMap*) *pPtr;
 
     *pPtr = /*align32*/(((u1*) pMap) + computeRegisterMapSize(pMap));
-    LOGVV("getNext: %p -> %p (f=0x%x w=%d e=%d)\n",
+    LOGVV("getNext: %p -> %p (f=%#x w=%d e=%d)",
         pMap, *pPtr, pMap->format, pMap->regWidth,
         dvmRegisterMapGetNumEntries(pMap));
     return pMap;
@@ -908,7 +910,7 @@ const u1* dvmRegisterMapGetLine(const RegisterMap* pMap, int addr)
         addrWidth = 2;
         break;
     default:
-        ALOGE("Unknown format %d\n", format);
+        ALOGE("Unknown format %d", format);
         dvmAbort();
         return NULL;
     }
@@ -975,12 +977,12 @@ static int compareMaps(const RegisterMap* pMap1, const RegisterMap* pMap2)
     size1 = computeRegisterMapSize(pMap1);
     size2 = computeRegisterMapSize(pMap2);
     if (size1 != size2) {
-        ALOGI("compareMaps: size mismatch (%zd vs %zd)\n", size1, size2);
+        ALOGI("compareMaps: size mismatch (%zd vs %zd)", size1, size2);
         return -1;
     }
 
     if (memcmp(pMap1, pMap2, size1) != 0) {
-        ALOGI("compareMaps: content mismatch\n");
+        ALOGI("compareMaps: content mismatch");
         return -1;
     }
 
@@ -1010,7 +1012,7 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
     /* (if we use this at a time other than during GC, fix/remove this test) */
     if (true) {
         if (!gDvm.zygote && dvmTryLockMutex(&gDvm.gcHeapLock) == 0) {
-            ALOGE("GLITCH: dvmGetExpandedRegisterMap not called at GC time\n");
+            ALOGE("GLITCH: dvmGetExpandedRegisterMap not called at GC time");
             dvmAbort();
         }
     }
@@ -1021,10 +1023,10 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
     case kRegMapFormatCompact16:
         if (REGISTER_MAP_VERBOSE) {
             if (dvmRegisterMapGetOnHeap(curMap)) {
-                ALOGD("RegMap: already expanded: %s.%s\n",
+                ALOGD("RegMap: already expanded: %s.%s",
                     method->clazz->descriptor, method->name);
             } else {
-                ALOGD("RegMap: stored w/o compression: %s.%s\n",
+                ALOGD("RegMap: stored w/o compression: %s.%s",
                     method->clazz->descriptor, method->name);
             }
         }
@@ -1033,13 +1035,13 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
         newMap = uncompressMapDifferential(curMap);
         break;
     default:
-        ALOGE("Unknown format %d in dvmGetExpandedRegisterMap\n", format);
+        ALOGE("Unknown format %d in dvmGetExpandedRegisterMap", format);
         dvmAbort();
         newMap = NULL;      // make gcc happy
     }
 
     if (newMap == NULL) {
-        ALOGE("Map failed to uncompress (fmt=%d) %s.%s\n",
+        ALOGE("Map failed to uncompress (fmt=%d) %s.%s",
             format, method->clazz->descriptor, method->name);
         return NULL;
     }
@@ -1052,14 +1054,14 @@ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method)
         MapStats* pStats = (MapStats*) gDvm.registerMapStats;
         pStats->numExpandedMaps++;
         pStats->totalExpandedMapSize += computeRegisterMapSize(newMap);
-        ALOGD("RMAP: count=%d size=%d\n",
+        ALOGD("RMAP: count=%d size=%d",
             pStats->numExpandedMaps, pStats->totalExpandedMapSize);
     }
 #endif
 
     IF_ALOGV() {
         char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
-        ALOGV("Expanding map -> %s.%s:%s\n",
+        ALOGV("Expanding map -> %s.%s:%s",
             method->clazz->descriptor, method->name, desc);
         free(desc);
     }
@@ -1280,11 +1282,11 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
             int addrDiff = addr - prevAddr;
 
             if (addrDiff < 0) {
-                ALOGE("GLITCH: address went backward (0x%04x->0x%04x, %s.%s)\n",
+                ALOGE("GLITCH: address went backward (0x%04x->0x%04x, %s.%s)",
                     prevAddr, addr, method->clazz->descriptor, method->name);
             } else if (addrDiff > kMaxGcPointGap) {
                 if (REGISTER_MAP_VERBOSE) {
-                    ALOGI("HEY: addrDiff is %d, max %d (0x%04x->0x%04x %s.%s)\n",
+                    ALOGI("HEY: addrDiff is %d, max %d (0x%04x->0x%04x %s.%s)",
                         addrDiff, kMaxGcPointGap, prevAddr, addr,
                         method->clazz->descriptor, method->name);
                 }
@@ -1329,14 +1331,14 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
 
                         if (bitNum >= method->registersSize) {
                             /* stuff off the end should be zero in both */
-                            ALOGE("WEIRD: bit=%d (%d/%d), prev=%02x cur=%02x\n",
+                            ALOGE("WEIRD: bit=%d (%d/%d), prev=%02x cur=%02x",
                                 bit, regByte, method->registersSize,
                                 prev, cur);
                             assert(false);
                         }
                         int idx = (int) (bitNum * div);
                         if (!(idx >= 0 && idx < kNumUpdatePosns)) {
-                            ALOGE("FAIL: bitNum=%d (of %d) div=%.3f idx=%d\n",
+                            ALOGE("FAIL: bitNum=%d (of %d) div=%.3f idx=%d",
                                 bitNum, method->registersSize, div, idx);
                             assert(false);
                         }
@@ -1347,7 +1349,7 @@ static void computeMapStats(RegisterMap* pMap, const Method* method)
 
             if (numDiff > kMaxDiffBits) {
                 if (REGISTER_MAP_VERBOSE) {
-                    ALOGI("WOW: numDiff is %d, max %d\n", numDiff, kMaxDiffBits);
+                    ALOGI("WOW: numDiff is %d, max %d", numDiff, kMaxDiffBits);
                 }
             } else {
                 pStats->numDiffBits[numDiff]++;
@@ -1442,7 +1444,6 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
 {
     RegisterMap* pNewMap = NULL;
     int origSize = computeRegisterMapSize(pMap);
-    u1* tmpBuf = NULL;
     u1* tmpPtr;
     int addrWidth, regWidth, numEntries;
     bool debug = false;
@@ -1463,23 +1464,23 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
         addrWidth = 2;
         break;
     default:
-        ALOGE("ERROR: can't compress map with format=%d\n", format);
-        goto bail;
+        ALOGE("ERROR: can't compress map with format=%d", format);
+        return NULL;
     }
 
     regWidth = dvmRegisterMapGetRegWidth(pMap);
     numEntries = dvmRegisterMapGetNumEntries(pMap);
 
     if (debug) {
-        ALOGI("COMPRESS: %s.%s aw=%d rw=%d ne=%d\n",
+        ALOGI("COMPRESS: %s.%s aw=%d rw=%d ne=%d",
             meth->clazz->descriptor, meth->name,
             addrWidth, regWidth, numEntries);
         dumpRegisterMap(pMap, -1);
     }
 
     if (numEntries <= 1) {
-        ALOGV("Can't compress map with 0 or 1 entries\n");
-        goto bail;
+        ALOGV("Can't compress map with 0 or 1 entries");
+        return NULL;
     }
 
     /*
@@ -1499,11 +1500,11 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
      * or equal to the amount of space required when uncompressed -- large
      * initial offsets are rejected.
      */
-    tmpBuf = (u1*) malloc(origSize + (1 + 3 + regWidth));
-    if (tmpBuf == NULL)
-        goto bail;
+    UniquePtr<u1[]> tmpBuf(new u1[origSize + (1 + 3 + regWidth)]);
+    if (tmpBuf.get() == NULL)
+        return NULL;
 
-    tmpPtr = tmpBuf;
+    tmpPtr = tmpBuf.get();
 
     const u1* mapData = pMap->data;
     const u1* prevBits;
@@ -1514,8 +1515,8 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
         addr |= (*mapData++) << 8;
 
     if (addr >= 128) {
-        ALOGV("Can't compress map with starting address >= 128\n");
-        goto bail;
+        ALOGV("Can't compress map with starting address >= 128");
+        return NULL;
     }
 
     /*
@@ -1536,8 +1537,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
     /*
      * Loop over all following entries.
      */
-    int entry;
-    for (entry = 1; entry < numEntries; entry++) {
+    for (int entry = 1; entry < numEntries; entry++) {
         int addrDiff;
         u1 key;
 
@@ -1549,7 +1549,7 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             addr |= (*mapData++) << 8;
 
         if (debug)
-            ALOGI(" addr=0x%04x ent=%d (aw=%d)\n", addr, entry, addrWidth);
+            ALOGI(" addr=0x%04x ent=%d (aw=%d)", addr, entry, addrWidth);
 
         addrDiff = addr - prevAddr;
         assert(addrDiff > 0);
@@ -1557,12 +1557,12 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             /* small difference, encode in 3 bits */
             key = addrDiff -1;          /* set 00000AAA */
             if (debug)
-                ALOGI(" : small %d, key=0x%02x\n", addrDiff, key);
+                ALOGI(" : small %d, key=0x%02x", addrDiff, key);
         } else {
             /* large difference, output escape code */
             key = 0x07;                 /* escape code for AAA */
             if (debug)
-                ALOGI(" : large %d, key=0x%02x\n", addrDiff, key);
+                ALOGI(" : large %d, key=0x%02x", addrDiff, key);
         }
 
         int numBitsChanged, firstBitChanged, lebSize;
@@ -1571,26 +1571,26 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
             &firstBitChanged, &numBitsChanged, NULL);
 
         if (debug) {
-            ALOGI(" : diff fbc=%d nbc=%d ls=%d (rw=%d)\n",
+            ALOGI(" : diff fbc=%d nbc=%d ls=%d (rw=%d)",
                 firstBitChanged, numBitsChanged, lebSize, regWidth);
         }
 
         if (numBitsChanged == 0) {
             /* set B to 1 and CCCC to zero to indicate no bits were changed */
             key |= 0x08;
-            if (debug) ALOGI(" : no bits changed\n");
+            if (debug) ALOGI(" : no bits changed");
         } else if (numBitsChanged == 1 && firstBitChanged < 16) {
             /* set B to 0 and CCCC to the index of the changed bit */
             key |= firstBitChanged << 4;
-            if (debug) ALOGI(" : 1 low bit changed\n");
+            if (debug) ALOGI(" : 1 low bit changed");
         } else if (numBitsChanged < 15 && lebSize < regWidth) {
             /* set B to 1 and CCCC to the number of bits */
             key |= 0x08 | (numBitsChanged << 4);
-            if (debug) ALOGI(" : some bits changed\n");
+            if (debug) ALOGI(" : some bits changed");
         } else {
             /* set B to 1 and CCCC to 0x0f so we store the entire vector */
             key |= 0x08 | 0xf0;
-            if (debug) ALOGI(" : encode original\n");
+            if (debug) ALOGI(" : encode original");
         }
 
         /*
@@ -1626,13 +1626,13 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
         /*
          * See if we've run past the original size.
          */
-        if (tmpPtr - tmpBuf >= origSize) {
+        if (tmpPtr - tmpBuf.get() >= origSize) {
             if (debug) {
-                ALOGD("Compressed size >= original (%d vs %d): %s.%s\n",
-                    tmpPtr - tmpBuf, origSize,
+                ALOGD("Compressed size >= original (%d vs %d): %s.%s",
+                    tmpPtr - tmpBuf.get(), origSize,
                     meth->clazz->descriptor, meth->name);
             }
-            goto bail;
+            return NULL;
         }
     }
 
@@ -1643,21 +1643,21 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
      * get poorer compression but potentially use less native heap space.
      */
     static const int kHeaderSize = offsetof(RegisterMap, data);
-    int newDataSize = tmpPtr - tmpBuf;
+    int newDataSize = tmpPtr - tmpBuf.get();
     int newMapSize;
 
     newMapSize = kHeaderSize + unsignedLeb128Size(newDataSize) + newDataSize;
     if (newMapSize >= origSize) {
         if (debug) {
-            ALOGD("Final comp size >= original (%d vs %d): %s.%s\n",
+            ALOGD("Final comp size >= original (%d vs %d): %s.%s",
                 newMapSize, origSize, meth->clazz->descriptor, meth->name);
         }
-        goto bail;
+        return NULL;
     }
 
     pNewMap = (RegisterMap*) malloc(newMapSize);
     if (pNewMap == NULL)
-        goto bail;
+        return NULL;
     dvmRegisterMapSetFormat(pNewMap, kRegMapFormatDifferential);
     dvmRegisterMapSetOnHeap(pNewMap, true);
     dvmRegisterMapSetRegWidth(pNewMap, regWidth);
@@ -1665,16 +1665,14 @@ static RegisterMap* compressMapDifferential(const RegisterMap* pMap,
 
     tmpPtr = pNewMap->data;
     tmpPtr = writeUnsignedLeb128(tmpPtr, newDataSize);
-    memcpy(tmpPtr, tmpBuf, newDataSize);
+    memcpy(tmpPtr, tmpBuf.get(), newDataSize);
 
     if (REGISTER_MAP_VERBOSE) {
-        ALOGD("Compression successful (%d -> %d) from aw=%d rw=%d ne=%d\n",
+        ALOGD("Compression successful (%d -> %d) from aw=%d rw=%d ne=%d",
             computeRegisterMapSize(pMap), computeRegisterMapSize(pNewMap),
             addrWidth, regWidth, numEntries);
     }
 
-bail:
-    free(tmpBuf);
     return pNewMap;
 }
 
@@ -1696,15 +1694,14 @@ static inline void toggleBit(u1* ptr, int idx)
  */
 static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
 {
-    RegisterMap* pNewMap = NULL;
     static const int kHeaderSize = offsetof(RegisterMap, data);
     u1 format = dvmRegisterMapGetFormat(pMap);
     RegisterMapFormat newFormat;
     int regWidth, numEntries, newAddrWidth, newMapSize;
 
     if (format != kRegMapFormatDifferential) {
-        ALOGE("Not differential (%d)\n", format);
-        goto bail;
+        ALOGE("Not differential (%d)", format);
+        return NULL;
     }
 
     regWidth = dvmRegisterMapGetRegWidth(pMap);
@@ -1728,13 +1725,14 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
 
     /* now we know enough to allocate the new map */
     if (REGISTER_MAP_VERBOSE) {
-        ALOGI("Expanding to map aw=%d rw=%d ne=%d\n",
+        ALOGI("Expanding to map aw=%d rw=%d ne=%d",
             newAddrWidth, regWidth, numEntries);
     }
     newMapSize = kHeaderSize + (newAddrWidth + regWidth) * numEntries;
-    pNewMap = (RegisterMap*) malloc(newMapSize);
+    RegisterMap* pNewMap = (RegisterMap*) malloc(newMapSize);
+
     if (pNewMap == NULL)
-        goto bail;
+      return NULL;
 
     dvmRegisterMapSetFormat(pNewMap, newFormat);
     dvmRegisterMapSetOnHeap(pNewMap, true);
@@ -1813,1460 +1811,23 @@ static RegisterMap* uncompressMapDifferential(const RegisterMap* pMap)
     }
 
     if (dstPtr - (u1*) pNewMap != newMapSize) {
-        ALOGE("ERROR: output %d bytes, expected %d\n",
+        ALOGE("ERROR: output %d bytes, expected %d",
             dstPtr - (u1*) pNewMap, newMapSize);
-        goto bail;
+        free(pNewMap);
+        return NULL;
     }
 
     if (srcPtr - srcStart != expectedSrcLen) {
-        ALOGE("ERROR: consumed %d bytes, expected %d\n",
+        ALOGE("ERROR: consumed %d bytes, expected %d",
             srcPtr - srcStart, expectedSrcLen);
-        goto bail;
+        free(pNewMap);
+        return NULL;
     }
 
     if (REGISTER_MAP_VERBOSE) {
-        ALOGD("Expansion successful (%d -> %d)\n",
+        ALOGD("Expansion successful (%d -> %d)",
             computeRegisterMapSize(pMap), computeRegisterMapSize(pNewMap));
     }
 
     return pNewMap;
-
-bail:
-    free(pNewMap);
-    return NULL;
 }
-
-
-/*
- * ===========================================================================
- *      Just-in-time generation
- * ===========================================================================
- */
-
-#if 0   /* incomplete implementation; may be removed entirely in the future */
-
-/*
-Notes on just-in-time RegisterMap generation
-
-Generating RegisterMap tables as part of verification is convenient because
-we generate most of what we need to know as part of doing the verify.
-The negative aspect of doing it this way is that we must store the
-result in the DEX file (if we're verifying ahead of time) or in memory
-(if verifying during class load) for every concrete non-native method,
-even if we never actually need the map during a GC.
-
-A simple but compact encoding of register map data increases the size of
-optimized DEX files by about 25%, so size considerations are important.
-
-We can instead generate the RegisterMap at the point where it is needed.
-In a typical application we only need to convert about 2% of the loaded
-methods, and we can generate type-precise roots reasonably quickly because
-(a) we know the method has already been verified and hence can make a
-lot of assumptions, and (b) we don't care what type of object a register
-holds, just whether or not it holds a reference, and hence can skip a
-lot of class resolution gymnastics.
-
-There are a couple of problems with this approach however.  First, to
-get good performance we really want an implementation that is largely
-independent from the verifier, which means some duplication of effort.
-Second, we're dealing with post-dexopt code, which contains "quickened"
-instructions.  We can't process those without either tracking type
-information (which slows us down) or storing additional data in the DEX
-file that allows us to reconstruct the original instructions (adds ~5%
-to the size of the ODEX).
-
-
-Implementation notes...
-
-Both type-precise and live-precise information can be generated knowing
-only whether or not a register holds a reference.  We don't need to
-know what kind of reference or whether the object has been initialized.
-Not only can we skip many of the fancy steps in the verifier, we can
-initialize from simpler sources, e.g. the initial registers and return
-type are set from the "shorty" signature rather than the full signature.
-
-The short-term storage needs for just-in-time register map generation can
-be much lower because we can use a 1-byte SRegType instead of a 4-byte
-RegType.  On the other hand, if we're not doing type-precise analysis
-in the verifier we only need to store register contents at every branch
-target, rather than every GC point (which are much more frequent).
-
-Whether it happens in the verifier or independently, because this is done
-with native heap allocations that may be difficult to return to the system,
-an effort should be made to minimize memory use.
-*/
-
-/*
- * This is like RegType in the verifier, but simplified.  It holds a value
- * from the reg type enum, or kRegTypeReference.
- */
-typedef u1 SRegType;
-#define kRegTypeReference kRegTypeMAX
-
-/*
- * We need an extra "pseudo register" to hold the return type briefly.  It
- * can be category 1 or 2, so we need two slots.
- */
-#define kExtraRegs  2
-#define RESULT_REGISTER(_insnRegCountPlus)  (_insnRegCountPlus - kExtraRegs)
-
-/*
- * Working state.
- */
-typedef struct WorkState {
-    /*
-     * The method we're working on.
-     */
-    const Method* method;
-
-    /*
-     * Number of instructions in the method.
-     */
-    int         insnsSize;
-
-    /*
-     * Number of registers we track for each instruction.  This is equal
-     * to the method's declared "registersSize" plus kExtraRegs.
-     */
-    int         insnRegCountPlus;
-
-    /*
-     * Instruction widths and flags, one entry per code unit.
-     */
-    InsnFlags*  insnFlags;
-
-    /*
-     * Array of SRegType arrays, one entry per code unit.  We only need
-     * to create an entry when an instruction starts at this address.
-     * We can further reduce this to instructions that are GC points.
-     *
-     * We could just go ahead and allocate one per code unit, but for
-     * larger methods that can represent a significant bit of short-term
-     * storage.
-     */
-    SRegType**  addrRegs;
-
-    /*
-     * A single large alloc, with all of the storage needed for addrRegs.
-     */
-    SRegType*   regAlloc;
-} WorkState;
-
-// fwd
-static bool generateMap(WorkState* pState, RegisterMap* pMap);
-static bool analyzeMethod(WorkState* pState);
-static bool handleInstruction(WorkState* pState, SRegType* workRegs,\
-    int insnIdx, int* pStartGuess);
-static void updateRegisters(WorkState* pState, int nextInsn,\
-    const SRegType* workRegs);
-
-
-/*
- * Set instruction flags.
- */
-static bool setInsnFlags(WorkState* pState, int* pGcPointCount)
-{
-    const Method* meth = pState->method;
-    InsnFlags* insnFlags = pState->insnFlags;
-    int insnsSize = pState->insnsSize;
-    const u2* insns = meth->insns;
-    int gcPointCount = 0;
-    int offset;
-
-    /* set the widths */
-    if (!dvmComputeCodeWidths(meth, pState->insnFlags, NULL))
-        return false;
-
-    /* mark "try" regions and exception handler branch targets */
-    if (!dvmSetTryFlags(meth, pState->insnFlags))
-        return false;
-
-    /* the start of the method is a "branch target" */
-    dvmInsnSetBranchTarget(insnFlags, 0, true);
-
-    /*
-     * Run through the instructions, looking for switches and branches.
-     * Mark their targets.
-     *
-     * We don't really need to "check" these instructions -- the verifier
-     * already did that -- but the additional overhead isn't significant
-     * enough to warrant making a second copy of the "Check" function.
-     *
-     * Mark and count GC points while we're at it.
-     */
-    for (offset = 0; offset < insnsSize; offset++) {
-        static int gcMask = kInstrCanBranch | kInstrCanSwitch |
-            kInstrCanThrow | kInstrCanReturn;
-        u1 opcode = insns[offset] & 0xff;
-        InstructionFlags opFlags = dexGetInstrFlags(gDvm.instrFlags, opcode);
-
-        if (opFlags & kInstrCanBranch) {
-            if (!dvmCheckBranchTarget(meth, insnFlags, offset, true))
-                return false;
-        }
-        if (opFlags & kInstrCanSwitch) {
-            if (!dvmCheckSwitchTargets(meth, insnFlags, offset))
-                return false;
-        }
-
-        if ((opFlags & gcMask) != 0) {
-            dvmInsnSetGcPoint(pState->insnFlags, offset, true);
-            gcPointCount++;
-        }
-    }
-
-    *pGcPointCount = gcPointCount;
-    return true;
-}
-
-/*
- * Generate the register map for a method.
- *
- * Returns a pointer to newly-allocated storage.
- */
-RegisterMap* dvmGenerateRegisterMap(const Method* meth)
-{
-    WorkState* pState = NULL;
-    RegisterMap* pMap = NULL;
-    RegisterMap* result = NULL;
-    SRegType* regPtr;
-
-    pState = (WorkState*) calloc(1, sizeof(WorkState));
-    if (pState == NULL)
-        goto bail;
-
-    pMap = (RegisterMap*) calloc(1, sizeof(RegisterMap));
-    if (pMap == NULL)
-        goto bail;
-
-    pState->method = meth;
-    pState->insnsSize = dvmGetMethodInsnsSize(meth);
-    pState->insnRegCountPlus = meth->registersSize + kExtraRegs;
-
-    pState->insnFlags = calloc(sizeof(InsnFlags), pState->insnsSize);
-    pState->addrRegs = calloc(sizeof(SRegType*), pState->insnsSize);
-
-    /*
-     * Set flags on instructions, and calculate the number of code units
-     * that happen to be GC points.
-     */
-    int gcPointCount;
-    if (!setInsnFlags(pState, &gcPointCount))
-        goto bail;
-
-    if (gcPointCount == 0) {
-        /* the method doesn't allocate or call, and never returns? unlikely */
-        LOG_VFY_METH(meth, "Found do-nothing method\n");
-        goto bail;
-    }
-
-    pState->regAlloc = (SRegType*)
-        calloc(sizeof(SRegType), pState->insnsSize * gcPointCount);
-    regPtr = pState->regAlloc;
-
-    /*
-     * For each instruction that is a GC point, set a pointer into the
-     * regAlloc buffer.
-     */
-    int offset;
-    for (offset = 0; offset < pState->insnsSize; offset++) {
-        if (dvmInsnIsGcPoint(pState->insnFlags, offset)) {
-            pState->addrRegs[offset] = regPtr;
-            regPtr += pState->insnRegCountPlus;
-        }
-    }
-    assert(regPtr - pState->regAlloc == pState->insnsSize * gcPointCount);
-    assert(pState->addrRegs[0] != NULL);
-
-    /*
-     * Compute the register map.
-     */
-    if (!generateMap(pState, pMap))
-        goto bail;
-
-    /* success */
-    result = pMap;
-    pMap = NULL;
-
-bail:
-    if (pState != NULL) {
-        free(pState->insnFlags);
-        free(pState->addrRegs);
-        free(pState->regAlloc);
-        free(pState);
-    }
-    if (pMap != NULL)
-        dvmFreeRegisterMap(pMap);
-    return result;
-}
-
-/*
- * Release the storage associated with a RegisterMap.
- */
-void dvmFreeRegisterMap(RegisterMap* pMap)
-{
-    if (pMap == NULL)
-        return;
-}
-
-
-/*
- * Create the RegisterMap using the provided state.
- */
-static bool generateMap(WorkState* pState, RegisterMap* pMap)
-{
-    bool result = false;
-
-    /*
-     * Analyze the method and store the results in WorkState.
-     */
-    if (!analyzeMethod(pState))
-        goto bail;
-
-    /*
-     * Convert the analyzed data into a RegisterMap.
-     */
-    // TODO
-
-    result = true;
-
-bail:
-    return result;
-}
-
-/*
- * Set the register types for the method arguments.  We can pull the values
- * out of the "shorty" signature.
- */
-static bool setTypesFromSignature(WorkState* pState)
-{
-    const Method* meth = pState->method;
-    int argReg = meth->registersSize - meth->insSize;   /* first arg */
-    SRegType* pRegs = pState->addrRegs[0];
-    SRegType* pCurReg = &pRegs[argReg];
-    const char* ccp;
-
-    /*
-     * Include "this" pointer, if appropriate.
-     */
-    if (!dvmIsStaticMethod(meth)) {
-        *pCurReg++ = kRegTypeReference;
-    }
-
-    ccp = meth->shorty +1;      /* skip first byte, which holds return type */
-    while (*ccp != 0) {
-        switch (*ccp) {
-        case 'L':
-        //case '[':
-            *pCurReg++ = kRegTypeReference;
-            break;
-        case 'Z':
-            *pCurReg++ = kRegTypeBoolean;
-            break;
-        case 'C':
-            *pCurReg++ = kRegTypeChar;
-            break;
-        case 'B':
-            *pCurReg++ = kRegTypeByte;
-            break;
-        case 'I':
-            *pCurReg++ = kRegTypeInteger;
-            break;
-        case 'S':
-            *pCurReg++ = kRegTypeShort;
-            break;
-        case 'F':
-            *pCurReg++ = kRegTypeFloat;
-            break;
-        case 'D':
-            *pCurReg++ = kRegTypeDoubleLo;
-            *pCurReg++ = kRegTypeDoubleHi;
-            break;
-        case 'J':
-            *pCurReg++ = kRegTypeLongLo;
-            *pCurReg++ = kRegTypeLongHi;
-            break;
-        default:
-            assert(false);
-            return false;
-        }
-    }
-
-    assert(pCurReg - pRegs == meth->insSize);
-    return true;
-}
-
-/*
- * Find the start of the register set for the specified instruction in
- * the current method.
- */
-static inline SRegType* getRegisterLine(const WorkState* pState, int insnIdx)
-{
-    return pState->addrRegs[insnIdx];
-}
-
-/*
- * Copy a set of registers.
- */
-static inline void copyRegisters(SRegType* dst, const SRegType* src,
-    int numRegs)
-{
-    memcpy(dst, src, numRegs * sizeof(SRegType));
-}
-
-/*
- * Compare a set of registers.  Returns 0 if they match.
- */
-static inline int compareRegisters(const SRegType* src1, const SRegType* src2,
-    int numRegs)
-{
-    return memcmp(src1, src2, numRegs * sizeof(SRegType));
-}
-
-/*
- * Run through the instructions repeatedly until we have exercised all
- * possible paths.
- */
-static bool analyzeMethod(WorkState* pState)
-{
-    const Method* meth = pState->method;
-    SRegType workRegs[pState->insnRegCountPlus];
-    InsnFlags* insnFlags = pState->insnFlags;
-    int insnsSize = pState->insnsSize;
-    int insnIdx, startGuess;
-    bool result = false;
-
-    /*
-     * Initialize the types of the registers that correspond to method
-     * arguments.
-     */
-    if (!setTypesFromSignature(pState))
-        goto bail;
-
-    /*
-     * Mark the first instruction as "changed".
-     */
-    dvmInsnSetChanged(insnFlags, 0, true);
-    startGuess = 0;
-
-    if (true) {
-        IF_ALOGI() {
-            char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-            ALOGI("Now mapping: %s.%s %s (ins=%d regs=%d)\n",
-                meth->clazz->descriptor, meth->name, desc,
-                meth->insSize, meth->registersSize);
-            ALOGI(" ------ [0    4    8    12   16   20   24   28   32   36\n");
-            free(desc);
-        }
-    }
-
-    /*
-     * Continue until no instructions are marked "changed".
-     */
-    while (true) {
-        /*
-         * Find the first marked one.  Use "startGuess" as a way to find
-         * one quickly.
-         */
-        for (insnIdx = startGuess; insnIdx < insnsSize; insnIdx++) {
-            if (dvmInsnIsChanged(insnFlags, insnIdx))
-                break;
-        }
-
-        if (insnIdx == insnsSize) {
-            if (startGuess != 0) {
-                /* try again, starting from the top */
-                startGuess = 0;
-                continue;
-            } else {
-                /* all flags are clear */
-                break;
-            }
-        }
-
-        /*
-         * We carry the working set of registers from instruction to
-         * instruction.  If this address can be the target of a branch
-         * (or throw) instruction, or if we're skipping around chasing
-         * "changed" flags, we need to load the set of registers from
-         * the table.
-         *
-         * Because we always prefer to continue on to the next instruction,
-         * we should never have a situation where we have a stray
-         * "changed" flag set on an instruction that isn't a branch target.
-         */
-        if (dvmInsnIsBranchTarget(insnFlags, insnIdx)) {
-            SRegType* insnRegs = getRegisterLine(pState, insnIdx);
-            assert(insnRegs != NULL);
-            copyRegisters(workRegs, insnRegs, pState->insnRegCountPlus);
-
-        } else {
-#ifndef NDEBUG
-            /*
-             * Sanity check: retrieve the stored register line (assuming
-             * a full table) and make sure it actually matches.
-             */
-            SRegType* insnRegs = getRegisterLine(pState, insnIdx);
-            if (insnRegs != NULL &&
-                compareRegisters(workRegs, insnRegs,
-                                 pState->insnRegCountPlus) != 0)
-            {
-                char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-                LOG_VFY("HUH? workRegs diverged in %s.%s %s\n",
-                        meth->clazz->descriptor, meth->name, desc);
-                free(desc);
-            }
-#endif
-        }
-
-        /*
-         * Update the register sets altered by this instruction.
-         */
-        if (!handleInstruction(pState, workRegs, insnIdx, &startGuess)) {
-            goto bail;
-        }
-
-        dvmInsnSetVisited(insnFlags, insnIdx, true);
-        dvmInsnSetChanged(insnFlags, insnIdx, false);
-    }
-
-    // TODO - add dead code scan to help validate this code?
-
-    result = true;
-
-bail:
-    return result;
-}
-
-/*
- * Get a pointer to the method being invoked.
- *
- * Returns NULL on failure.
- */
-static Method* getInvokedMethod(const Method* meth,
-    const DecodedInstruction* pDecInsn, MethodType methodType)
-{
-    Method* resMethod;
-    char* sigOriginal = NULL;
-
-    /*
-     * Resolve the method.  This could be an abstract or concrete method
-     * depending on what sort of call we're making.
-     */
-    if (methodType == METHOD_INTERFACE) {
-        resMethod = dvmOptResolveInterfaceMethod(meth->clazz, pDecInsn->vB);
-    } else {
-        resMethod = dvmOptResolveMethod(meth->clazz, pDecInsn->vB, methodType);
-    }
-    if (resMethod == NULL) {
-        /* failed; print a meaningful failure message */
-        DexFile* pDexFile = meth->clazz->pDvmDex->pDexFile;
-        const DexMethodId* pMethodId;
-        const char* methodName;
-        char* methodDesc;
-        const char* classDescriptor;
-
-        pMethodId = dexGetMethodId(pDexFile, pDecInsn->vB);
-        methodName = dexStringById(pDexFile, pMethodId->nameIdx);
-        methodDesc = dexCopyDescriptorFromMethodId(pDexFile, pMethodId);
-        classDescriptor = dexStringByTypeIdx(pDexFile, pMethodId->classIdx);
-
-        LOG_VFY("VFY: unable to resolve %s method %u: %s.%s %s\n",
-            dvmMethodTypeStr(methodType), pDecInsn->vB,
-            classDescriptor, methodName, methodDesc);
-        free(methodDesc);
-        return NULL;
-    }
-
-    return resMethod;
-}
-
-/*
- * Return the register type for the method.  Since we don't care about
- * the actual type, we can just look at the "shorty" signature.
- *
- * Returns kRegTypeUnknown for "void".
- */
-static SRegType getMethodReturnType(const Method* meth)
-{
-    SRegType type;
-
-    switch (meth->shorty[0]) {
-    case 'I':
-        type = kRegTypeInteger;
-        break;
-    case 'C':
-        type = kRegTypeChar;
-        break;
-    case 'S':
-        type = kRegTypeShort;
-        break;
-    case 'B':
-        type = kRegTypeByte;
-        break;
-    case 'Z':
-        type = kRegTypeBoolean;
-        break;
-    case 'V':
-        type = kRegTypeUnknown;
-        break;
-    case 'F':
-        type = kRegTypeFloat;
-        break;
-    case 'D':
-        type = kRegTypeDoubleLo;
-        break;
-    case 'J':
-        type = kRegTypeLongLo;
-        break;
-    case 'L':
-    //case '[':
-        type = kRegTypeReference;
-        break;
-    default:
-        /* we verified signature return type earlier, so this is impossible */
-        assert(false);
-        type = kRegTypeConflict;
-        break;
-    }
-
-    return type;
-}
-
-/*
- * Copy a category 1 register.
- */
-static inline void copyRegister1(SRegType* insnRegs, u4 vdst, u4 vsrc)
-{
-    insnRegs[vdst] = insnRegs[vsrc];
-}
-
-/*
- * Copy a category 2 register.  Note the source and destination may overlap.
- */
-static inline void copyRegister2(SRegType* insnRegs, u4 vdst, u4 vsrc)
-{
-    //memmove(&insnRegs[vdst], &insnRegs[vsrc], sizeof(SRegType) * 2);
-    SRegType r1 = insnRegs[vsrc];
-    SRegType r2 = insnRegs[vsrc+1];
-    insnRegs[vdst] = r1;
-    insnRegs[vdst+1] = r2;
-}
-
-/*
- * Set the type of a category 1 register.
- */
-static inline void setRegisterType(SRegType* insnRegs, u4 vdst, SRegType type)
-{
-    insnRegs[vdst] = type;
-}
-
-/*
- * Decode the specified instruction and update the register info.
- */
-static bool handleInstruction(WorkState* pState, SRegType* workRegs,
-    int insnIdx, int* pStartGuess)
-{
-    const Method* meth = pState->method;
-    const u2* insns = meth->insns + insnIdx;
-    InsnFlags* insnFlags = pState->insnFlags;
-    bool result = false;
-
-    /*
-     * Once we finish decoding the instruction, we need to figure out where
-     * we can go from here.  There are three possible ways to transfer
-     * control to another statement:
-     *
-     * (1) Continue to the next instruction.  Applies to all but
-     *     unconditional branches, method returns, and exception throws.
-     * (2) Branch to one or more possible locations.  Applies to branches
-     *     and switch statements.
-     * (3) Exception handlers.  Applies to any instruction that can
-     *     throw an exception that is handled by an encompassing "try"
-     *     block.  (We simplify this to be any instruction that can
-     *     throw any exception.)
-     *
-     * We can also return, in which case there is no successor instruction
-     * from this point.
-     *
-     * The behavior can be determined from the InstrFlags.
-     */
-    DecodedInstruction decInsn;
-    SRegType entryRegs[pState->insnRegCountPlus];
-    const int insnRegCountPlus = pState->insnRegCountPlus;
-    bool justSetResult = false;
-    int branchTarget = 0;
-    SRegType tmpType;
-
-    dexDecodeInstruction(gDvm.instrFormat, insns, &decInsn);
-    const int nextFlags = dexGetInstrFlags(gDvm.instrFlags, decInsn.opcode);
-
-    /*
-     * Make a copy of the previous register state.  If the instruction
-     * throws an exception, we merge *this* into the destination rather
-     * than workRegs, because we don't want the result from the "successful"
-     * code path (e.g. a check-cast that "improves" a type) to be visible
-     * to the exception handler.
-     */
-    if ((nextFlags & kInstrCanThrow) != 0 && dvmInsnIsInTry(insnFlags, insnIdx))
-    {
-        copyRegisters(entryRegs, workRegs, insnRegCountPlus);
-    }
-
-    switch (decInsn.opcode) {
-    case OP_NOP:
-        break;
-
-    case OP_MOVE:
-    case OP_MOVE_FROM16:
-    case OP_MOVE_16:
-    case OP_MOVE_OBJECT:
-    case OP_MOVE_OBJECT_FROM16:
-    case OP_MOVE_OBJECT_16:
-        copyRegister1(workRegs, decInsn.vA, decInsn.vB);
-        break;
-    case OP_MOVE_WIDE:
-    case OP_MOVE_WIDE_FROM16:
-    case OP_MOVE_WIDE_16:
-        copyRegister2(workRegs, decInsn.vA, decInsn.vB);
-        break;
-
-    /*
-     * The move-result instructions copy data out of a "pseudo-register"
-     * with the results from the last method invocation.  In practice we
-     * might want to hold the result in an actual CPU register, so the
-     * Dalvik spec requires that these only appear immediately after an
-     * invoke or filled-new-array.
-     *
-     * These calls invalidate the "result" register.  (This is now
-     * redundant with the reset done below, but it can make the debug info
-     * easier to read in some cases.)
-     */
-    case OP_MOVE_RESULT:
-    case OP_MOVE_RESULT_OBJECT:
-        copyRegister1(workRegs, decInsn.vA, RESULT_REGISTER(insnRegCountPlus));
-        break;
-    case OP_MOVE_RESULT_WIDE:
-        copyRegister2(workRegs, decInsn.vA, RESULT_REGISTER(insnRegCountPlus));
-        break;
-
-    case OP_MOVE_EXCEPTION:
-        /*
-         * This statement can only appear as the first instruction in an
-         * exception handler (though not all exception handlers need to
-         * have one of these).  We verify that as part of extracting the
-         * exception type from the catch block list.
-         */
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-
-    case OP_RETURN_VOID:
-    case OP_RETURN:
-    case OP_RETURN_WIDE:
-    case OP_RETURN_OBJECT:
-        break;
-
-    case OP_CONST_4:
-    case OP_CONST_16:
-    case OP_CONST:
-        /* could be boolean, int, float, or a null reference */
-        setRegisterType(workRegs, decInsn.vA,
-            dvmDetermineCat1Const((s4)decInsn.vB));
-        break;
-    case OP_CONST_HIGH16:
-        /* could be boolean, int, float, or a null reference */
-        setRegisterType(workRegs, decInsn.vA,
-            dvmDetermineCat1Const((s4) decInsn.vB << 16));
-        break;
-    case OP_CONST_WIDE_16:
-    case OP_CONST_WIDE_32:
-    case OP_CONST_WIDE:
-    case OP_CONST_WIDE_HIGH16:
-        /* could be long or double; default to long and allow conversion */
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_CONST_STRING:
-    case OP_CONST_STRING_JUMBO:
-    case OP_CONST_CLASS:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-
-    case OP_MONITOR_ENTER:
-    case OP_MONITOR_EXIT:
-        break;
-
-    case OP_CHECK_CAST:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-    case OP_INSTANCE_OF:
-        /* result is boolean */
-        setRegisterType(workRegs, decInsn.vA, kRegTypeBoolean);
-        break;
-
-    case OP_ARRAY_LENGTH:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-
-    case OP_NEW_INSTANCE:
-    case OP_NEW_ARRAY:
-        /* add the new uninitialized reference to the register ste */
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-    case OP_FILLED_NEW_ARRAY:
-    case OP_FILLED_NEW_ARRAY_RANGE:
-        setRegisterType(workRegs, RESULT_REGISTER(insnRegCountPlus),
-            kRegTypeReference);
-        justSetResult = true;
-        break;
-
-    case OP_CMPL_FLOAT:
-    case OP_CMPG_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeBoolean);
-        break;
-    case OP_CMPL_DOUBLE:
-    case OP_CMPG_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeBoolean);
-        break;
-    case OP_CMP_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeBoolean);
-        break;
-
-    case OP_THROW:
-    case OP_GOTO:
-    case OP_GOTO_16:
-    case OP_GOTO_32:
-    case OP_PACKED_SWITCH:
-    case OP_SPARSE_SWITCH:
-        break;
-
-    case OP_FILL_ARRAY_DATA:
-        break;
-
-    case OP_IF_EQ:
-    case OP_IF_NE:
-    case OP_IF_LT:
-    case OP_IF_GE:
-    case OP_IF_GT:
-    case OP_IF_LE:
-    case OP_IF_EQZ:
-    case OP_IF_NEZ:
-    case OP_IF_LTZ:
-    case OP_IF_GEZ:
-    case OP_IF_GTZ:
-    case OP_IF_LEZ:
-        break;
-
-    case OP_AGET:
-        tmpType = kRegTypeInteger;
-        goto aget_1nr_common;
-    case OP_AGET_BOOLEAN:
-        tmpType = kRegTypeBoolean;
-        goto aget_1nr_common;
-    case OP_AGET_BYTE:
-        tmpType = kRegTypeByte;
-        goto aget_1nr_common;
-    case OP_AGET_CHAR:
-        tmpType = kRegTypeChar;
-        goto aget_1nr_common;
-    case OP_AGET_SHORT:
-        tmpType = kRegTypeShort;
-        goto aget_1nr_common;
-aget_1nr_common:
-        setRegisterType(workRegs, decInsn.vA, tmpType);
-        break;
-
-    case OP_AGET_WIDE:
-        /*
-         * We know this is either long or double, and we don't really
-         * discriminate between those during verification, so we
-         * call it a long.
-         */
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-
-    case OP_AGET_OBJECT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-
-    case OP_APUT:
-    case OP_APUT_BOOLEAN:
-    case OP_APUT_BYTE:
-    case OP_APUT_CHAR:
-    case OP_APUT_SHORT:
-    case OP_APUT_WIDE:
-    case OP_APUT_OBJECT:
-        break;
-
-    case OP_IGET:
-        tmpType = kRegTypeInteger;
-        goto iget_1nr_common;
-    case OP_IGET_BOOLEAN:
-        tmpType = kRegTypeBoolean;
-        goto iget_1nr_common;
-    case OP_IGET_BYTE:
-        tmpType = kRegTypeByte;
-        goto iget_1nr_common;
-    case OP_IGET_CHAR:
-        tmpType = kRegTypeChar;
-        goto iget_1nr_common;
-    case OP_IGET_SHORT:
-        tmpType = kRegTypeShort;
-        goto iget_1nr_common;
-iget_1nr_common:
-        setRegisterType(workRegs, decInsn.vA, tmpType);
-        break;
-
-    case OP_IGET_WIDE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-
-    case OP_IGET_OBJECT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-
-    case OP_IPUT:
-    case OP_IPUT_BOOLEAN:
-    case OP_IPUT_BYTE:
-    case OP_IPUT_CHAR:
-    case OP_IPUT_SHORT:
-    case OP_IPUT_WIDE:
-    case OP_IPUT_OBJECT:
-        break;
-
-    case OP_SGET:
-        tmpType = kRegTypeInteger;
-        goto sget_1nr_common;
-    case OP_SGET_BOOLEAN:
-        tmpType = kRegTypeBoolean;
-        goto sget_1nr_common;
-    case OP_SGET_BYTE:
-        tmpType = kRegTypeByte;
-        goto sget_1nr_common;
-    case OP_SGET_CHAR:
-        tmpType = kRegTypeChar;
-        goto sget_1nr_common;
-    case OP_SGET_SHORT:
-        tmpType = kRegTypeShort;
-        goto sget_1nr_common;
-sget_1nr_common:
-        setRegisterType(workRegs, decInsn.vA, tmpType);
-        break;
-
-    case OP_SGET_WIDE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-
-    case OP_SGET_OBJECT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeReference);
-        break;
-
-    case OP_SPUT:
-    case OP_SPUT_BOOLEAN:
-    case OP_SPUT_BYTE:
-    case OP_SPUT_CHAR:
-    case OP_SPUT_SHORT:
-    case OP_SPUT_WIDE:
-    case OP_SPUT_OBJECT:
-        break;
-
-    case OP_INVOKE_VIRTUAL:
-    case OP_INVOKE_VIRTUAL_RANGE:
-    case OP_INVOKE_SUPER:
-    case OP_INVOKE_SUPER_RANGE:
-        {
-            Method* calledMethod;
-
-            calledMethod = getInvokedMethod(meth, &decInsn, METHOD_VIRTUAL);
-            if (calledMethod == NULL)
-                goto bail;
-            setRegisterType(workRegs, RESULT_REGISTER(insnRegCountPlus),
-                getMethodReturnType(calledMethod));
-            justSetResult = true;
-        }
-        break;
-    case OP_INVOKE_DIRECT:
-    case OP_INVOKE_DIRECT_RANGE:
-        {
-            Method* calledMethod;
-
-            calledMethod = getInvokedMethod(meth, &decInsn, METHOD_DIRECT);
-            if (calledMethod == NULL)
-                goto bail;
-            setRegisterType(workRegs, RESULT_REGISTER(insnRegCountPlus),
-                getMethodReturnType(calledMethod));
-            justSetResult = true;
-        }
-        break;
-    case OP_INVOKE_STATIC:
-    case OP_INVOKE_STATIC_RANGE:
-        {
-            Method* calledMethod;
-
-            calledMethod = getInvokedMethod(meth, &decInsn, METHOD_STATIC);
-            if (calledMethod == NULL)
-                goto bail;
-            setRegisterType(workRegs, RESULT_REGISTER(insnRegCountPlus),
-                getMethodReturnType(calledMethod));
-            justSetResult = true;
-        }
-        break;
-    case OP_INVOKE_INTERFACE:
-    case OP_INVOKE_INTERFACE_RANGE:
-        {
-            Method* absMethod;
-
-            absMethod = getInvokedMethod(meth, &decInsn, METHOD_INTERFACE);
-            if (absMethod == NULL)
-                goto bail;
-            setRegisterType(workRegs, RESULT_REGISTER(insnRegCountPlus),
-                getMethodReturnType(absMethod));
-            justSetResult = true;
-        }
-        break;
-
-    case OP_NEG_INT:
-    case OP_NOT_INT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_NEG_LONG:
-    case OP_NOT_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_NEG_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_NEG_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_INT_TO_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_INT_TO_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_INT_TO_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_LONG_TO_INT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_LONG_TO_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_LONG_TO_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_FLOAT_TO_INT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_FLOAT_TO_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_FLOAT_TO_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_DOUBLE_TO_INT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_DOUBLE_TO_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_DOUBLE_TO_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_INT_TO_BYTE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeByte);
-        break;
-    case OP_INT_TO_CHAR:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeChar);
-        break;
-    case OP_INT_TO_SHORT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeShort);
-        break;
-
-    case OP_ADD_INT:
-    case OP_SUB_INT:
-    case OP_MUL_INT:
-    case OP_REM_INT:
-    case OP_DIV_INT:
-    case OP_SHL_INT:
-    case OP_SHR_INT:
-    case OP_USHR_INT:
-    case OP_AND_INT:
-    case OP_OR_INT:
-    case OP_XOR_INT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_ADD_LONG:
-    case OP_SUB_LONG:
-    case OP_MUL_LONG:
-    case OP_DIV_LONG:
-    case OP_REM_LONG:
-    case OP_AND_LONG:
-    case OP_OR_LONG:
-    case OP_XOR_LONG:
-    case OP_SHL_LONG:
-    case OP_SHR_LONG:
-    case OP_USHR_LONG:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_ADD_FLOAT:
-    case OP_SUB_FLOAT:
-    case OP_MUL_FLOAT:
-    case OP_DIV_FLOAT:
-    case OP_REM_FLOAT:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_ADD_DOUBLE:
-    case OP_SUB_DOUBLE:
-    case OP_MUL_DOUBLE:
-    case OP_DIV_DOUBLE:
-    case OP_REM_DOUBLE:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_ADD_INT_2ADDR:
-    case OP_SUB_INT_2ADDR:
-    case OP_MUL_INT_2ADDR:
-    case OP_REM_INT_2ADDR:
-    case OP_SHL_INT_2ADDR:
-    case OP_SHR_INT_2ADDR:
-    case OP_USHR_INT_2ADDR:
-    case OP_AND_INT_2ADDR:
-    case OP_OR_INT_2ADDR:
-    case OP_XOR_INT_2ADDR:
-    case OP_DIV_INT_2ADDR:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-    case OP_ADD_LONG_2ADDR:
-    case OP_SUB_LONG_2ADDR:
-    case OP_MUL_LONG_2ADDR:
-    case OP_DIV_LONG_2ADDR:
-    case OP_REM_LONG_2ADDR:
-    case OP_AND_LONG_2ADDR:
-    case OP_OR_LONG_2ADDR:
-    case OP_XOR_LONG_2ADDR:
-    case OP_SHL_LONG_2ADDR:
-    case OP_SHR_LONG_2ADDR:
-    case OP_USHR_LONG_2ADDR:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeLongLo);
-        break;
-    case OP_ADD_FLOAT_2ADDR:
-    case OP_SUB_FLOAT_2ADDR:
-    case OP_MUL_FLOAT_2ADDR:
-    case OP_DIV_FLOAT_2ADDR:
-    case OP_REM_FLOAT_2ADDR:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeFloat);
-        break;
-    case OP_ADD_DOUBLE_2ADDR:
-    case OP_SUB_DOUBLE_2ADDR:
-    case OP_MUL_DOUBLE_2ADDR:
-    case OP_DIV_DOUBLE_2ADDR:
-    case OP_REM_DOUBLE_2ADDR:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeDoubleLo);
-        break;
-    case OP_ADD_INT_LIT16:
-    case OP_RSUB_INT:
-    case OP_MUL_INT_LIT16:
-    case OP_DIV_INT_LIT16:
-    case OP_REM_INT_LIT16:
-    case OP_AND_INT_LIT16:
-    case OP_OR_INT_LIT16:
-    case OP_XOR_INT_LIT16:
-    case OP_ADD_INT_LIT8:
-    case OP_RSUB_INT_LIT8:
-    case OP_MUL_INT_LIT8:
-    case OP_DIV_INT_LIT8:
-    case OP_REM_INT_LIT8:
-    case OP_SHL_INT_LIT8:
-    case OP_SHR_INT_LIT8:
-    case OP_USHR_INT_LIT8:
-    case OP_AND_INT_LIT8:
-    case OP_OR_INT_LIT8:
-    case OP_XOR_INT_LIT8:
-        setRegisterType(workRegs, decInsn.vA, kRegTypeInteger);
-        break;
-
-
-    /*
-     * See comments in analysis/CodeVerify.c re: why some of these are
-     * annoying to deal with.  It's worse in this implementation, because
-     * we're not keeping any information about the classes held in each
-     * reference register.
-     *
-     * Handling most of these would require retaining the field/method
-     * reference info that we discarded when the instructions were
-     * quickened.  This is feasible but not currently supported.
-     */
-    case OP_EXECUTE_INLINE:
-    case OP_EXECUTE_INLINE_RANGE:
-    case OP_INVOKE_DIRECT_EMPTY:
-    case OP_IGET_QUICK:
-    case OP_IGET_WIDE_QUICK:
-    case OP_IGET_OBJECT_QUICK:
-    case OP_IPUT_QUICK:
-    case OP_IPUT_WIDE_QUICK:
-    case OP_IPUT_OBJECT_QUICK:
-    case OP_IGET_WIDE_VOLATILE:
-    case OP_IPUT_WIDE_VOLATILE:
-    case OP_SGET_WIDE_VOLATILE:
-    case OP_SPUT_WIDE_VOLATILE:
-    case OP_INVOKE_VIRTUAL_QUICK:
-    case OP_INVOKE_VIRTUAL_QUICK_RANGE:
-    case OP_INVOKE_SUPER_QUICK:
-    case OP_INVOKE_SUPER_QUICK_RANGE:
-        dvmAbort();     // not implemented, shouldn't be here
-        break;
-
-
-    /* these should never appear */
-    case OP_UNUSED_3E:
-    case OP_UNUSED_3F:
-    case OP_UNUSED_40:
-    case OP_UNUSED_41:
-    case OP_UNUSED_42:
-    case OP_UNUSED_43:
-    case OP_UNUSED_73:
-    case OP_UNUSED_79:
-    case OP_UNUSED_7A:
-    case OP_UNUSED_E3:
-    case OP_UNUSED_E4:
-    case OP_UNUSED_E5:
-    case OP_UNUSED_E6:
-    case OP_UNUSED_E7:
-    case OP_BREAKPOINT:
-    case OP_UNUSED_ED:
-    case OP_UNUSED_F1:
-    case OP_UNUSED_FC:
-    case OP_UNUSED_FD:
-    case OP_UNUSED_FE:
-    case OP_UNUSED_FF:
-        dvmAbort();
-        break;
-
-    /*
-     * DO NOT add a "default" clause here.  Without it the compiler will
-     * complain if an instruction is missing (which is desirable).
-     */
-    }
-
-
-    /*
-     * If we didn't just set the result register, clear it out.  This
-     * isn't so important here, but does help ensure that our output matches
-     * the verifier.
-     */
-    if (!justSetResult) {
-        int reg = RESULT_REGISTER(pState->insnRegCountPlus);
-        workRegs[reg] = workRegs[reg+1] = kRegTypeUnknown;
-    }
-
-    /*
-     * Handle "continue".  Tag the next consecutive instruction.
-     */
-    if ((nextFlags & kInstrCanContinue) != 0) {
-        int insnWidth = dvmInsnGetWidth(insnFlags, insnIdx);
-
-        /*
-         * We want to update the registers and set the "changed" flag on the
-         * next instruction (if necessary).  We aren't storing register
-         * changes for all addresses, so for non-GC-point targets we just
-         * compare "entry" vs. "work" to see if we've changed anything.
-         */
-        if (getRegisterLine(pState, insnIdx+insnWidth) != NULL) {
-            updateRegisters(pState, insnIdx+insnWidth, workRegs);
-        } else {
-            /* if not yet visited, or regs were updated, set "changed" */
-            if (!dvmInsnIsVisited(insnFlags, insnIdx+insnWidth) ||
-                compareRegisters(workRegs, entryRegs,
-                    pState->insnRegCountPlus) != 0)
-            {
-                dvmInsnSetChanged(insnFlags, insnIdx+insnWidth, true);
-            }
-        }
-    }
-
-    /*
-     * Handle "branch".  Tag the branch target.
-     */
-    if ((nextFlags & kInstrCanBranch) != 0) {
-        bool isConditional;
-
-        dvmGetBranchTarget(meth, insnFlags, insnIdx, &branchTarget,
-                &isConditional);
-        assert(isConditional || (nextFlags & kInstrCanContinue) == 0);
-        assert(!isConditional || (nextFlags & kInstrCanContinue) != 0);
-
-        updateRegisters(pState, insnIdx+branchTarget, workRegs);
-    }
-
-    /*
-     * Handle "switch".  Tag all possible branch targets.
-     */
-    if ((nextFlags & kInstrCanSwitch) != 0) {
-        int offsetToSwitch = insns[1] | (((s4)insns[2]) << 16);
-        const u2* switchInsns = insns + offsetToSwitch;
-        int switchCount = switchInsns[1];
-        int offsetToTargets, targ;
-
-        if ((*insns & 0xff) == OP_PACKED_SWITCH) {
-            /* 0=sig, 1=count, 2/3=firstKey */
-            offsetToTargets = 4;
-        } else {
-            /* 0=sig, 1=count, 2..count*2 = keys */
-            assert((*insns & 0xff) == OP_SPARSE_SWITCH);
-            offsetToTargets = 2 + 2*switchCount;
-        }
-
-        /* verify each switch target */
-        for (targ = 0; targ < switchCount; targ++) {
-            int offset, absOffset;
-
-            /* offsets are 32-bit, and only partly endian-swapped */
-            offset = switchInsns[offsetToTargets + targ*2] |
-                     (((s4) switchInsns[offsetToTargets + targ*2 +1]) << 16);
-            absOffset = insnIdx + offset;
-            assert(absOffset >= 0 && absOffset < pState->insnsSize);
-
-            updateRegisters(pState, absOffset, workRegs);
-        }
-    }
-
-    /*
-     * Handle instructions that can throw and that are sitting in a
-     * "try" block.  (If they're not in a "try" block when they throw,
-     * control transfers out of the method.)
-     */
-    if ((nextFlags & kInstrCanThrow) != 0 && dvmInsnIsInTry(insnFlags, insnIdx))
-    {
-        DexFile* pDexFile = meth->clazz->pDvmDex->pDexFile;
-        const DexCode* pcode = dvmGetMethodCode(meth);
-        DexCatchIterator iterator;
-
-        if (dexFindCatchHandler(&iterator, pcode, insnIdx)) {
-            while (true) {
-                DexCatchHandler* handler = dexCatchIteratorNext(&iterator);
-                if (handler == NULL)
-                    break;
-
-                /* note we use entryRegs, not workRegs */
-                updateRegisters(pState, handler->address, entryRegs);
-            }
-        }
-    }
-
-    /*
-     * Update startGuess.  Advance to the next instruction of that's
-     * possible, otherwise use the branch target if one was found.  If
-     * neither of those exists we're in a return or throw; leave startGuess
-     * alone and let the caller sort it out.
-     */
-    if ((nextFlags & kInstrCanContinue) != 0) {
-        *pStartGuess = insnIdx + dvmInsnGetWidth(insnFlags, insnIdx);
-    } else if ((nextFlags & kInstrCanBranch) != 0) {
-        /* we're still okay if branchTarget is zero */
-        *pStartGuess = insnIdx + branchTarget;
-    }
-
-    assert(*pStartGuess >= 0 && *pStartGuess < pState->insnsSize &&
-        dvmInsnGetWidth(insnFlags, *pStartGuess) != 0);
-
-    result = true;
-
-bail:
-    return result;
-}
-
-
-/*
- * Merge two SRegType values.
- *
- * Sets "*pChanged" to "true" if the result doesn't match "type1".
- */
-static SRegType mergeTypes(SRegType type1, SRegType type2, bool* pChanged)
-{
-    SRegType result;
-
-    /*
-     * Check for trivial case so we don't have to hit memory.
-     */
-    if (type1 == type2)
-        return type1;
-
-    /*
-     * Use the table if we can, and reject any attempts to merge something
-     * from the table with a reference type.
-     *
-     * The uninitialized table entry at index zero *will* show up as a
-     * simple kRegTypeUninit value.  Since this cannot be merged with
-     * anything but itself, the rules do the right thing.
-     */
-    if (type1 < kRegTypeMAX) {
-        if (type2 < kRegTypeMAX) {
-            result = gDvmMergeTab[type1][type2];
-        } else {
-            /* simple + reference == conflict, usually */
-            if (type1 == kRegTypeZero)
-                result = type2;
-            else
-                result = kRegTypeConflict;
-        }
-    } else {
-        if (type2 < kRegTypeMAX) {
-            /* reference + simple == conflict, usually */
-            if (type2 == kRegTypeZero)
-                result = type1;
-            else
-                result = kRegTypeConflict;
-        } else {
-            /* merging two references */
-            assert(type1 == type2);
-            result = type1;
-        }
-    }
-
-    if (result != type1)
-        *pChanged = true;
-    return result;
-}
-
-/*
- * Control can transfer to "nextInsn".
- *
- * Merge the registers from "workRegs" into "addrRegs" at "nextInsn", and
- * set the "changed" flag on the target address if the registers have changed.
- */
-static void updateRegisters(WorkState* pState, int nextInsn,
-    const SRegType* workRegs)
-{
-    const Method* meth = pState->method;
-    InsnFlags* insnFlags = pState->insnFlags;
-    const int insnRegCountPlus = pState->insnRegCountPlus;
-    SRegType* targetRegs = getRegisterLine(pState, nextInsn);
-
-    if (!dvmInsnIsVisitedOrChanged(insnFlags, nextInsn)) {
-        /*
-         * We haven't processed this instruction before, and we haven't
-         * touched the registers here, so there's nothing to "merge".  Copy
-         * the registers over and mark it as changed.  (This is the only
-         * way a register can transition out of "unknown", so this is not
-         * just an optimization.)
-         */
-        LOGVV("COPY into 0x%04x\n", nextInsn);
-        copyRegisters(targetRegs, workRegs, insnRegCountPlus);
-        dvmInsnSetChanged(insnFlags, nextInsn, true);
-    } else {
-        /* merge registers, set Changed only if different */
-        LOGVV("MERGE into 0x%04x\n", nextInsn);
-        bool changed = false;
-        int i;
-
-        for (i = 0; i < insnRegCountPlus; i++) {
-            targetRegs[i] = mergeTypes(targetRegs[i], workRegs[i], &changed);
-        }
-
-        if (changed)
-            dvmInsnSetChanged(insnFlags, nextInsn, true);
-    }
-}
-
-#endif /*#if 0*/

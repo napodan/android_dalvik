@@ -25,21 +25,12 @@
 # Compiler defines.
 #
 LOCAL_CFLAGS += -fstrict-aliasing -Wstrict-aliasing=2 -fno-align-jumps
-#LOCAL_CFLAGS += -DUSE_INDIRECT_REF
 LOCAL_CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LOCAL_CFLAGS += -DARCH_VARIANT=\"$(dvm_arch_variant)\"
 
 #
 # Optional features.  These may impact the size or performance of the VM.
 #
-
-ifeq ($(WITH_DEADLOCK_PREDICTION),true)
-  LOCAL_CFLAGS += -DWITH_DEADLOCK_PREDICTION
-  WITH_MONITOR_TRACKING := true
-endif
-ifeq ($(WITH_MONITOR_TRACKING),true)
-  LOCAL_CFLAGS += -DWITH_MONITOR_TRACKING
-endif
 
 # Make a debugging version when building the simulator (if not told
 # otherwise) and when explicitly asked.
@@ -135,8 +126,8 @@ LOCAL_SRC_FILES := \
 	analysis/CodeVerify.cpp \
 	analysis/DexPrepare.cpp \
 	analysis/DexVerify.cpp \
-	analysis/Optimize.c \
-	analysis/RegisterMap.c \
+	analysis/Optimize.cpp \
+	analysis/RegisterMap.cpp \
 	analysis/VerifySubs.c \
 	interp/Interp.c.arm \
 	interp/Stack.c \
@@ -218,42 +209,12 @@ ifeq ($(WITH_JIT),true)
 	interp/Jit.c
 endif
 
-WITH_HPROF := $(strip $(WITH_HPROF))
-ifeq ($(WITH_HPROF),)
-  WITH_HPROF := true
-endif
-ifeq ($(WITH_HPROF),true)
-  LOCAL_SRC_FILES += \
-	hprof/Hprof.c \
-	hprof/HprofClass.c \
-	hprof/HprofHeap.c \
-	hprof/HprofOutput.c \
-	hprof/HprofString.c
-  LOCAL_CFLAGS += -DWITH_HPROF=1
-
-  ifeq ($(strip $(WITH_HPROF_STACK)),true)
-    LOCAL_SRC_FILES += \
-	hprof/HprofStack.c \
-	hprof/HprofStackFrame.c
-    LOCAL_CFLAGS += -DWITH_HPROF_STACK=1
-  endif # WITH_HPROF_STACK
-endif   # WITH_HPROF
-
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE) \
 	dalvik \
 	dalvik/vm \
 	external/zlib \
-	$(KERNEL_HEADERS)
-
-
-ifeq ($(dvm_simulator),true)
-  LOCAL_LDLIBS += -lpthread -ldl
-  ifeq ($(HOST_OS),linux)
-    # need this for clock_gettime() in profiling
-    LOCAL_LDLIBS += -lrt
-  endif
-endif
+	libcore/include \
 
 MTERP_ARCH_KNOWN := false
 
@@ -262,7 +223,7 @@ ifeq ($(dvm_arch),arm)
   #LOCAL_CFLAGS += -march=armv7-a -mfloat-abi=softfp -mfpu=vfp
   LOCAL_CFLAGS += -Werror
   MTERP_ARCH_KNOWN := true
-  # Select architecture-specific sources (armv4t, armv5te etc.)
+  # Select architecture-specific sources (armv5te, armv7-a, etc.)
   LOCAL_SRC_FILES += \
 		arch/arm/CallOldABI.S \
 		arch/arm/CallEABI.S \
@@ -283,24 +244,71 @@ ifeq ($(dvm_arch),arm)
   endif
 endif
 
-ifeq ($(dvm_arch),x86)
-  ifeq ($(dvm_os),linux)
-    MTERP_ARCH_KNOWN := true
+ifeq ($(dvm_arch),mips)
+  MTERP_ARCH_KNOWN := true
+  LOCAL_C_INCLUDES += external/libffi/$(TARGET_OS)-$(TARGET_ARCH)
+  LOCAL_SHARED_LIBRARIES += libffi
+  LOCAL_SRC_FILES += \
+		arch/mips/CallO32.S \
+		arch/mips/HintsO32.cpp \
+		arch/generic/Call.cpp \
+		mterp/out/InterpC-mips.cpp \
+		mterp/out/InterpAsm-mips.S
+
+  ifeq ($(WITH_JIT),true)
+    dvm_arch_variant := mips
     LOCAL_SRC_FILES += \
-		arch/$(dvm_arch_variant)/Call386ABI.S \
-		arch/$(dvm_arch_variant)/Hints386ABI.c \
-		mterp/out/InterpC-$(dvm_arch_variant).c \
-		mterp/out/InterpAsm-$(dvm_arch_variant).S
+		compiler/codegen/mips/RallocUtil.cpp \
+		compiler/codegen/mips/$(dvm_arch_variant)/Codegen.cpp \
+		compiler/codegen/mips/$(dvm_arch_variant)/CallingConvention.S \
+		compiler/codegen/mips/Assemble.cpp \
+		compiler/codegen/mips/ArchUtility.cpp \
+		compiler/codegen/mips/LocalOptimizations.cpp \
+		compiler/codegen/mips/GlobalOptimizations.cpp \
+		compiler/template/out/CompilerTemplateAsm-$(dvm_arch_variant).S
   endif
 endif
 
-ifeq ($(dvm_arch),sh)
-  MTERP_ARCH_KNOWN := true
-  LOCAL_SRC_FILES += \
-		arch/sh/CallSH4ABI.S \
-		arch/generic/Hints.c \
-		mterp/out/InterpC-allstubs.c \
-		mterp/out/InterpAsm-allstubs.S
+ifeq ($(dvm_arch),x86)
+  ifeq ($(dvm_os),linux)
+    MTERP_ARCH_KNOWN := true
+    LOCAL_CFLAGS += -DDVM_JMP_TABLE_MTERP=1 \
+                    -DMTERP_STUB
+    LOCAL_SRC_FILES += \
+		arch/$(dvm_arch_variant)/Call386ABI.S \
+		arch/$(dvm_arch_variant)/Hints386ABI.cpp \
+		mterp/out/InterpC-$(dvm_arch_variant).cpp \
+		mterp/out/InterpAsm-$(dvm_arch_variant).S
+    ifeq ($(WITH_JIT),true)
+      LOCAL_CFLAGS += -DARCH_IA32
+      LOCAL_SRC_FILES += \
+                compiler/codegen/x86/LowerAlu.cpp \
+                compiler/codegen/x86/LowerConst.cpp \
+                compiler/codegen/x86/LowerMove.cpp \
+                compiler/codegen/x86/Lower.cpp \
+                compiler/codegen/x86/LowerHelper.cpp \
+                compiler/codegen/x86/LowerJump.cpp \
+                compiler/codegen/x86/LowerObject.cpp \
+                compiler/codegen/x86/AnalysisO1.cpp \
+                compiler/codegen/x86/BytecodeVisitor.cpp \
+                compiler/codegen/x86/NcgAot.cpp \
+                compiler/codegen/x86/CodegenInterface.cpp \
+                compiler/codegen/x86/LowerInvoke.cpp \
+                compiler/codegen/x86/LowerReturn.cpp \
+                compiler/codegen/x86/NcgHelper.cpp \
+                compiler/codegen/x86/LowerGetPut.cpp
+
+      # need apache harmony x86 encoder/decoder
+      LOCAL_C_INCLUDES += \
+                dalvik/vm/compiler/codegen/x86/libenc
+      LOCAL_SRC_FILES += \
+                compiler/codegen/x86/libenc/enc_base.cpp \
+                compiler/codegen/x86/libenc/dec_base.cpp \
+                compiler/codegen/x86/libenc/enc_wrapper.cpp \
+                compiler/codegen/x86/libenc/enc_tabl.cpp
+
+    endif
+  endif
 endif
 
 ifeq ($(MTERP_ARCH_KNOWN),false)
@@ -315,9 +323,9 @@ ifeq ($(MTERP_ARCH_KNOWN),false)
   endif
 
   LOCAL_SRC_FILES += \
-		arch/generic/Call.c \
-		arch/generic/Hints.c \
-		mterp/out/InterpC-allstubs.c
+		arch/generic/Call.cpp \
+		arch/generic/Hints.cpp \
+		mterp/out/InterpC-allstubs.cpp
 
   # The following symbols are usually defined in the asm file, but
   # since we don't have an asm file in this case, we instead just
@@ -325,8 +333,4 @@ ifeq ($(MTERP_ARCH_KNOWN),false)
   # measure, too.
   LOCAL_CFLAGS += -DdvmAsmInstructionStart=0 -DdvmAsmInstructionEnd=0 \
 	-DdvmAsmSisterStart=0 -DdvmAsmSisterEnd=0 -DDVM_NO_ASM_INTERP=1
-endif
-
-ifeq ($(TEST_VM_IN_ECLAIR),true)
-  LOCAL_CFLAGS += -DTEST_VM_IN_ECLAIR
 endif
