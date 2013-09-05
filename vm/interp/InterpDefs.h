@@ -72,15 +72,15 @@ typedef enum InterpEntry {
  *    into the same basic block.
  */
 struct JitToInterpEntries {
-    void *dvmJitToInterpNormal;
-    void *dvmJitToInterpNoChain;
-    void *dvmJitToInterpPunt;
-    void *dvmJitToInterpSingleStep;
-    void *dvmJitToInterpTraceSelectNoChain;
-    void *dvmJitToInterpTraceSelect;
-    void *dvmJitToPatchPredictedChain;
+    void (*dvmJitToInterpNormal)(void);
+    void (*dvmJitToInterpNoChain)(void);
+    void (*dvmJitToInterpPunt)(void);
+    void (*dvmJitToInterpSingleStep)(void);
+    void (*dvmJitToInterpTraceSelectNoChain)(void);
+    void (*dvmJitToInterpTraceSelect)(void);
+    void (*dvmJitToPatchPredictedChain)(void);
 #if defined(WITH_SELF_VERIFICATION)
-    void *dvmJitToInterpBackwardBranch;
+    void (*dvmJitToInterpBackwardBranch)(void);
 #endif
 };
 

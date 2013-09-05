@@ -34,13 +34,30 @@
  */
 
 // fwd
-static BreakpointSet* dvmBreakpointSetAlloc(void);
+static BreakpointSet* dvmBreakpointSetAlloc();
 static void dvmBreakpointSetFree(BreakpointSet* pSet);
+
+#if defined(WITH_JIT)
+/* Target-specific save/restore */
+extern "C" void dvmJitCalleeSave(double *saveArea);
+extern "C" void dvmJitCalleeRestore(double *saveArea);
+/* Interpreter entry points from compiled code */
+extern "C" void dvmJitToInterpNormal();
+extern "C" void dvmJitToInterpNoChain();
+extern "C" void dvmJitToInterpPunt();
+extern "C" void dvmJitToInterpSingleStep();
+extern "C" void dvmJitToInterpTraceSelectNoChain();
+extern "C" void dvmJitToInterpTraceSelect();
+extern "C" void dvmJitToPatchPredictedChain();
+#if defined(WITH_SELF_VERIFICATION)
+extern "C" void dvmJitToInterpBackwardBranch();
+#endif
+#endif
 
 /*
  * Initialize global breakpoint structures.
  */
-bool dvmBreakpointStartup(void)
+bool dvmBreakpointStartup()
 {
     gDvm.breakpointSet = dvmBreakpointSetAlloc();
     return (gDvm.breakpointSet != NULL);
@@ -49,7 +66,7 @@ bool dvmBreakpointStartup(void)
 /*
  * Free resources.
  */
-void dvmBreakpointShutdown(void)
+void dvmBreakpointShutdown()
 {
     dvmBreakpointSetFree(gDvm.breakpointSet);
 }
@@ -61,12 +78,12 @@ void dvmBreakpointShutdown(void)
  * The debugger may ask us to create the same breakpoint multiple times.
  * We only remove the breakpoint when the last instance is cleared.
  */
-typedef struct {
+struct Breakpoint {
     Method*     method;                 /* method we're associated with */
     u2*         addr;                   /* absolute memory address */
     u1          originalOpcode;         /* original 8-bit opcode value */
     int         setCount;               /* #of times this breakpoint was set */
-} Breakpoint;
+};
 
 /*
  * Set of breakpoints.
@@ -84,7 +101,7 @@ struct BreakpointSet {
 /*
  * Initialize a BreakpointSet.  Initially empty.
  */
-static BreakpointSet* dvmBreakpointSetAlloc(void)
+static BreakpointSet* dvmBreakpointSetAlloc()
 {
     BreakpointSet* pSet = (BreakpointSet*) calloc(1, sizeof(*pSet));
 
@@ -198,7 +215,7 @@ static bool dvmBreakpointSetOriginalOpcode(const BreakpointSet* pSet,
 static bool instructionIsMagicNop(const u2* addr)
 {
     u2 curVal = *addr;
-    return ((curVal & 0xff) == OP_NOP && (curVal >> 8) != 0);
+    return ((GET_OPCODE(curVal)) == OP_NOP && (curVal >> 8) != 0);
 }
 
 /*
@@ -225,10 +242,10 @@ static bool dvmBreakpointSetAdd(BreakpointSet* pSet, Method* method,
             int newSize = pSet->alloc + kBreakpointGrowth;
             Breakpoint* newVec;
 
-            ALOGV("+++ increasing breakpoint set size to %d\n", newSize);
+            ALOGV("+++ increasing breakpoint set size to %d", newSize);
 
             /* pSet->breakpoints will be NULL on first entry */
-            newVec = realloc(pSet->breakpoints, newSize * sizeof(Breakpoint));
+            newVec = (Breakpoint*)realloc(pSet->breakpoints, newSize * sizeof(Breakpoint));
             if (newVec == NULL)
                 return false;
 
@@ -257,10 +274,10 @@ static bool dvmBreakpointSetAdd(BreakpointSet* pSet, Method* method,
          */
         assert(*(u1*)addr != OP_BREAKPOINT);
         if (dvmIsClassVerified(method->clazz)) {
-            ALOGV("Class %s verified, adding breakpoint at %p\n",
+            ALOGV("Class %s verified, adding breakpoint at %p",
                 method->clazz->descriptor, addr);
             if (instructionIsMagicNop(addr)) {
-                ALOGV("Refusing to set breakpoint on %04x at %s.%s + 0x%x\n",
+                ALOGV("Refusing to set breakpoint on %04x at %s.%s + %#x",
                     *addr, method->clazz->descriptor, method->name,
                     instrOffset);
             } else {
@@ -269,7 +286,7 @@ static bool dvmBreakpointSetAdd(BreakpointSet* pSet, Method* method,
                     OP_BREAKPOINT);
             }
         } else {
-            ALOGV("Class %s NOT verified, deferring breakpoint at %p\n",
+            ALOGV("Class %s NOT verified, deferring breakpoint at %p",
                 method->clazz->descriptor, addr);
         }
     } else {
@@ -299,11 +316,11 @@ static void dvmBreakpointSetRemove(BreakpointSet* pSet, Method* method,
     if (idx < 0) {
         /* breakpoint not found in set -- unexpected */
         if (*(u1*)addr == OP_BREAKPOINT) {
-            ALOGE("Unable to restore breakpoint opcode (%s.%s +0x%x)\n",
+            ALOGE("Unable to restore breakpoint opcode (%s.%s +%#x)",
                 method->clazz->descriptor, method->name, instrOffset);
             dvmAbort();
         } else {
-            ALOGW("Breakpoint was already restored? (%s.%s +0x%x)\n",
+            ALOGW("Breakpoint was already restored? (%s.%s +%#x)",
                 method->clazz->descriptor, method->name, instrOffset);
         }
     } else {
@@ -354,10 +371,10 @@ static void dvmBreakpointSetFlush(BreakpointSet* pSet, ClassObject* clazz)
              * It might already be there or it might not; either way,
              * flush it out.
              */
-            ALOGV("Flushing breakpoint at %p for %s\n",
+            ALOGV("Flushing breakpoint at %p for %s",
                 pBreak->addr, clazz->descriptor);
             if (instructionIsMagicNop(pBreak->addr)) {
-                ALOGV("Refusing to flush breakpoint on %04x at %s.%s + 0x%x\n",
+                ALOGV("Refusing to flush breakpoint on %04x at %s.%s + %#x",
                     *pBreak->addr, pBreak->method->clazz->descriptor,
                     pBreak->method->name, pBreak->addr - pBreak->method->insns);
             } else {
@@ -372,13 +389,13 @@ static void dvmBreakpointSetFlush(BreakpointSet* pSet, ClassObject* clazz)
 /*
  * Do any debugger-attach-time initialization.
  */
-void dvmInitBreakpoints(void)
+void dvmInitBreakpoints()
 {
     /* quick sanity check */
     BreakpointSet* pSet = gDvm.breakpointSet;
     dvmBreakpointSetLock(pSet);
     if (dvmBreakpointSetCount(pSet) != 0) {
-        ALOGW("WARNING: %d leftover breakpoints\n", dvmBreakpointSetCount(pSet));
+        ALOGW("WARNING: %d leftover breakpoints", dvmBreakpointSetCount(pSet));
         /* generally not good, but we can keep going */
     }
     dvmBreakpointSetUnlock(pSet);
@@ -444,7 +461,7 @@ u1 dvmGetOriginalOpcode(const u2* addr)
     if (!dvmBreakpointSetOriginalOpcode(pSet, addr, &orig)) {
         orig = *(u1*)addr;
         if (orig == OP_BREAKPOINT) {
-            ALOGE("GLITCH: can't find breakpoint, opcode is still set\n");
+            ALOGE("GLITCH: can't find breakpoint, opcode is still set");
             dvmAbort();
         }
     }
@@ -487,7 +504,7 @@ bool dvmAddSingleStep(Thread* thread, int size, int depth)
     StepControl* pCtrl = &gDvm.stepControl;
 
     if (pCtrl->active && thread != pCtrl->thread) {
-        ALOGW("WARNING: single-step active for %p; adding %p\n",
+        ALOGW("WARNING: single-step active for %p; adding %p",
             pCtrl->thread, thread);
 
         /*
@@ -501,8 +518,8 @@ bool dvmAddSingleStep(Thread* thread, int size, int depth)
          */
     }
 
-    pCtrl->size = size;
-    pCtrl->depth = depth;
+    pCtrl->size = static_cast<JdwpStepSize>(size);
+    pCtrl->depth = static_cast<JdwpStepDepth>(depth);
     pCtrl->thread = thread;
 
     /*
@@ -519,21 +536,22 @@ bool dvmAddSingleStep(Thread* thread, int size, int depth)
      * on by PushLocalFrame, we want to use the topmost native method.
      */
     const StackSaveArea* saveArea;
-    void* fp;
-    void* prevFp = NULL;
+    u4* fp;
+    u4* prevFp = NULL;
 
-    for (fp = thread->curFrame; fp != NULL; fp = saveArea->prevFrame) {
+    for (fp = (u4*) thread->curFrame; fp != NULL;
+         fp = (u4*) saveArea->prevFrame) {
         const Method* method;
 
         saveArea = SAVEAREA_FROM_FP(fp);
         method = saveArea->method;
 
-        if (!dvmIsBreakFrame(fp) && !dvmIsNativeMethod(method))
+        if (!dvmIsBreakFrame((u4*)fp) && !dvmIsNativeMethod(method))
             break;
         prevFp = fp;
     }
     if (fp == NULL) {
-        ALOGW("Unexpected: step req in native-only threadid=%d\n",
+        ALOGW("Unexpected: step req in native-only threadid=%d",
             thread->threadId);
         return false;
     }
@@ -543,9 +561,9 @@ bool dvmAddSingleStep(Thread* thread, int size, int depth)
          * frames are only inserted when calling from native->interp, so we
          * don't need to worry about one being here.
          */
-        ALOGV("##### init step while in native method\n");
+        ALOGV("##### init step while in native method");
         fp = prevFp;
-        assert(!dvmIsBreakFrame(fp));
+        assert(!dvmIsBreakFrame((u4*)fp));
         assert(dvmIsNativeMethod(SAVEAREA_FROM_FP(fp)->method));
         saveArea = SAVEAREA_FROM_FP(fp);
     }
@@ -569,10 +587,11 @@ bool dvmAddSingleStep(Thread* thread, int size, int depth)
         pCtrl->pAddressSet
                 = dvmAddressSetForLine(saveArea->method, pCtrl->line);
     }
-    pCtrl->frameDepth = dvmComputeVagueFrameDepth(thread, thread->curFrame);
+    pCtrl->frameDepth =
+        dvmComputeVagueFrameDepth(thread, thread->curFrame);
     pCtrl->active = true;
 
-    ALOGV("##### step init: thread=%p meth=%p '%s' line=%d frameDepth=%d depth=%s size=%s\n",
+    ALOGV("##### step init: thread=%p meth=%p '%s' line=%d frameDepth=%d depth=%s size=%s",
         pCtrl->thread, pCtrl->method, pCtrl->method->name,
         pCtrl->line, pCtrl->frameDepth,
         dvmJdwpStepDepthStr(pCtrl->depth),
@@ -637,15 +656,15 @@ void dvmInterpCheckTrackedRefs(Thread* self, const Method* method,
 
         count = dvmReferenceTableEntries(&self->internalLocalRefTable);
 
-        ALOGE("TRACK: unreleased internal reference (prev=%d total=%d)\n",
+        ALOGE("TRACK: unreleased internal reference (prev=%d total=%d)",
             debugTrackedRefStart, count);
         desc = dexProtoCopyMethodDescriptor(&method->prototype);
-        ALOGE("       current method is %s.%s %s\n", method->clazz->descriptor,
+        ALOGE("       current method is %s.%s %s", method->clazz->descriptor,
             method->name, desc);
         free(desc);
         top = self->internalLocalRefTable.table + debugTrackedRefStart;
         while (top < self->internalLocalRefTable.nextEntry) {
-            ALOGE("  %p (%s)\n",
+            ALOGE("  %p (%s)",
                  *top,
                  ((*top)->clazz != NULL) ? (*top)->clazz->descriptor : "");
             top++;
@@ -654,7 +673,7 @@ void dvmInterpCheckTrackedRefs(Thread* self, const Method* method,
 
         dvmAbort();
     }
-    //ALOGI("TRACK OK\n");
+    //ALOGI("TRACK OK");
 }
 #endif
 
@@ -669,14 +688,14 @@ void dvmDumpRegs(const Method* method, const u4* framePtr, bool inOnly)
 
     localCount = method->registersSize - method->insSize;
 
-    LOG(LOG_VERBOSE, LOG_TAG"i", "Registers (fp=%p):\n", framePtr);
+    ALOG(LOG_VERBOSE, LOG_TAG"i", "Registers (fp=%p):", framePtr);
     for (i = method->registersSize-1; i >= 0; i--) {
         if (i >= localCount) {
-            LOG(LOG_VERBOSE, LOG_TAG"i", "  v%-2d in%-2d : 0x%08x\n",
+            ALOG(LOG_VERBOSE, LOG_TAG"i", "  v%-2d in%-2d : 0x%08x",
                 i, i-localCount, framePtr[i]);
         } else {
             if (inOnly) {
-                LOG(LOG_VERBOSE, LOG_TAG"i", "  [...]\n");
+                ALOG(LOG_VERBOSE, LOG_TAG"i", "  [...]");
                 break;
             }
             const char* name = "";
@@ -693,7 +712,7 @@ void dvmDumpRegs(const Method* method, const u4* framePtr, bool inOnly)
                 }
             }
 #endif
-            LOG(LOG_VERBOSE, LOG_TAG"i", "  v%-2d      : 0x%08x %s\n",
+            ALOG(LOG_VERBOSE, LOG_TAG"i", "  v%-2d      : 0x%08x %s",
                 i, framePtr[i], name);
         }
     }
@@ -734,9 +753,6 @@ static inline s4 s4FromSwitchData(const void* switchData) {
 s4 dvmInterpHandlePackedSwitch(const u2* switchData, s4 testVal)
 {
     const int kInstrLen = 3;
-    u2 size;
-    s4 firstKey;
-    const s4* entries;
 
     /*
      * Packed switch data format:
@@ -754,14 +770,15 @@ s4 dvmInterpHandlePackedSwitch(const u2* switchData, s4 testVal)
         return kInstrLen;
     }
 
-    size = *switchData++;
+    u2 size = *switchData++;
     assert(size > 0);
 
-    firstKey = *switchData++;
+    s4 firstKey = *switchData++;
     firstKey |= (*switchData++) << 16;
 
-    if (testVal < firstKey || testVal >= firstKey + size) {
-        LOGVV("Value %d not found in switch (%d-%d)\n",
+    int index = testVal - firstKey;
+    if (index < 0 || index >= size) {
+        LOGVV("Value %d not found in switch (%d-%d)",
             testVal, firstKey, firstKey+size-1);
         return kInstrLen;
     }
@@ -769,14 +786,14 @@ s4 dvmInterpHandlePackedSwitch(const u2* switchData, s4 testVal)
     /* The entries are guaranteed to be aligned on a 32-bit boundary;
      * we can treat them as a native int array.
      */
-    entries = (const s4*) switchData;
+    const s4* entries = (const s4*) switchData;
     assert(((u4)entries & 0x3) == 0);
 
-    assert(testVal - firstKey >= 0 && testVal - firstKey < size);
-    LOGVV("Value %d found in slot %d (goto 0x%02x)\n",
-        testVal, testVal - firstKey,
-        s4FromSwitchData(&entries[testVal - firstKey]));
-    return s4FromSwitchData(&entries[testVal - firstKey]);
+    assert(index >= 0 && index < size);
+    LOGVV("Value %d found in slot %d (goto 0x%02x)",
+        testVal, index,
+        s4FromSwitchData(&entries[index]));
+    return s4FromSwitchData(&entries[index]);
 }
 
 /*
@@ -839,13 +856,13 @@ s4 dvmInterpHandleSparseSwitch(const u2* switchData, s4 testVal)
         } else if (testVal > foundVal) {
             lo = mid + 1;
         } else {
-            LOGVV("Value %d found in entry %d (goto 0x%02x)\n",
+            LOGVV("Value %d found in entry %d (goto 0x%02x)",
                 testVal, mid, s4FromSwitchData(&entries[mid]));
             return s4FromSwitchData(&entries[mid]);
         }
     }
 
-    LOGVV("Value %d not found in switch\n", testVal);
+    LOGVV("Value %d not found in switch", testVal);
     return kInstrLen;
 }
 
@@ -898,7 +915,7 @@ static void copySwappedArrayData(void* dest, const u2* src, u4 size, u2 width)
         }
         break;
     default:
-        ALOGE("Unexpected width %d in copySwappedArrayData\n", width);
+        ALOGE("Unexpected width %d in copySwappedArrayData", width);
         dvmAbort();
         break;
     }
@@ -970,7 +987,7 @@ Method* dvmInterpFindInterfaceMethod(ClassObject* thisClass, u4 methodIdx,
     if (absMethod == NULL) {
         absMethod = dvmResolveInterfaceMethod(method->clazz, methodIdx);
         if (absMethod == NULL) {
-            ALOGV("+ unknown method\n");
+            ALOGV("+ unknown method");
             return NULL;
         }
     }
@@ -1019,7 +1036,7 @@ Method* dvmInterpFindInterfaceMethod(ClassObject* thisClass, u4 methodIdx,
         methodToCall->nativeFunc != NULL);
 #endif
 
-    LOGVV("+++ interface=%s.%s concrete=%s.%s\n",
+    LOGVV("+++ interface=%s.%s concrete=%s.%s",
         absMethod->clazz->descriptor, absMethod->name,
         methodToCall->clazz->descriptor, methodToCall->name);
     assert(methodToCall != NULL);
@@ -1040,7 +1057,6 @@ static char* classNameFromIndex(const Method* method, int ref,
 {
     static const int kBufLen = 256;
     const DvmDex* pDvmDex = method->clazz->pDvmDex;
-
     if (refType == VERIFY_ERROR_REF_FIELD) {
         /* get class ID from field ID */
         const DexFieldId* pFieldId = dexGetFieldId(pDvmDex->pDexFile, ref);
@@ -1075,19 +1091,16 @@ static char* fieldNameFromIndex(const Method* method, int ref,
     VerifyErrorRefType refType, int flags)
 {
     static const int kBufLen = 256;
-    const DvmDex* pDvmDex = method->clazz->pDvmDex;
-    const DexFieldId* pFieldId;
-    const char* className;
-    const char* fieldName;
 
     if (refType != VERIFY_ERROR_REF_FIELD) {
-        ALOGW("Expected ref type %d, got %d\n", VERIFY_ERROR_REF_FIELD, refType);
+        ALOGW("Expected ref type %d, got %d", VERIFY_ERROR_REF_FIELD, refType);
         return NULL;    /* no message */
     }
 
-    pFieldId = dexGetFieldId(pDvmDex->pDexFile, ref);
-    className = dexStringByTypeIdx(pDvmDex->pDexFile, pFieldId->classIdx);
-    fieldName = dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx);
+    const DvmDex* pDvmDex = method->clazz->pDvmDex;
+    const DexFieldId* pFieldId = dexGetFieldId(pDvmDex->pDexFile, ref);
+    const char* className = dexStringByTypeIdx(pDvmDex->pDexFile, pFieldId->classIdx);
+    const char* fieldName = dexStringById(pDvmDex->pDexFile, pFieldId->nameIdx);
 
     char* dotName = dvmDescriptorToDot(className);
     char* result = (char*) malloc(kBufLen);
@@ -1108,19 +1121,16 @@ static char* methodNameFromIndex(const Method* method, int ref,
     VerifyErrorRefType refType, int flags)
 {
     static const int kBufLen = 384;
-    const DvmDex* pDvmDex = method->clazz->pDvmDex;
-    const DexMethodId* pMethodId;
-    const char* className;
-    const char* methodName;
 
     if (refType != VERIFY_ERROR_REF_METHOD) {
-        ALOGW("Expected ref type %d, got %d\n", VERIFY_ERROR_REF_METHOD,refType);
+        ALOGW("Expected ref type %d, got %d", VERIFY_ERROR_REF_METHOD,refType);
         return NULL;    /* no message */
     }
 
-    pMethodId = dexGetMethodId(pDvmDex->pDexFile, ref);
-    className = dexStringByTypeIdx(pDvmDex->pDexFile, pMethodId->classIdx);
-    methodName = dexStringById(pDvmDex->pDexFile, pMethodId->nameIdx);
+    const DvmDex* pDvmDex = method->clazz->pDvmDex;
+    const DexMethodId* pMethodId = dexGetMethodId(pDvmDex->pDexFile, ref);
+    const char* className = dexStringByTypeIdx(pDvmDex->pDexFile, pMethodId->classIdx);
+    const char* methodName = dexStringById(pDvmDex->pDexFile, pMethodId->nameIdx);
 
     char* dotName = dvmDescriptorToDot(className);
     char* result = (char*) malloc(kBufLen);
@@ -1152,9 +1162,10 @@ static char* methodNameFromIndex(const Method* method, int ref,
  */
 void dvmThrowVerificationError(const Method* method, int kind, int ref)
 {
-    const int typeMask = 0xff << kVerifyErrorRefTypeShift;
-    VerifyError errorKind = kind & ~typeMask;
-    VerifyErrorRefType refType = kind >> kVerifyErrorRefTypeShift;
+    int errorPart = kind & ~(0xff << kVerifyErrorRefTypeShift);
+    int errorRefPart = kind >> kVerifyErrorRefTypeShift;
+    VerifyError errorKind = static_cast<VerifyError>(errorPart);
+    VerifyErrorRefType refType = static_cast<VerifyErrorRefType>(errorRefPart);
     const char* exceptionName = "Ljava/lang/VerifyError;";
     char* msg = NULL;
 
@@ -1227,20 +1238,6 @@ void dvmInterpret(Thread* self, const Method* method, JValue* pResult)
     InterpState interpState;
     bool change;
 #if defined(WITH_JIT)
-    /* Target-specific save/restore */
-    extern void dvmJitCalleeSave(double *saveArea);
-    extern void dvmJitCalleeRestore(double *saveArea);
-    /* Interpreter entry points from compiled code */
-    extern void dvmJitToInterpNormal();
-    extern void dvmJitToInterpNoChain();
-    extern void dvmJitToInterpPunt();
-    extern void dvmJitToInterpSingleStep();
-    extern void dvmJitToInterpTraceSelectNoChain();
-    extern void dvmJitToInterpTraceSelect();
-    extern void dvmJitToPatchPredictedChain();
-#if defined(WITH_SELF_VERIFICATION)
-    extern void dvmJitToInterpBackwardBranch();
-#endif
 
     /*
      * Reserve a static entity here to quickly setup runtime contents as
@@ -1316,7 +1313,7 @@ void dvmInterpret(Thread* self, const Method* method, JValue* pResult)
     if (method->clazz->status < CLASS_INITIALIZING ||
         method->clazz->status == CLASS_ERROR)
     {
-        ALOGE("ERROR: tried to execute code in unprepared class '%s' (%d)\n",
+        ALOGE("ERROR: tried to execute code in unprepared class '%s' (%d)",
             method->clazz->descriptor, method->clazz->status);
         dvmDumpThread(self, false);
         dvmAbort();

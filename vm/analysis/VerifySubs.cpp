@@ -331,7 +331,6 @@ bool dvmCheckBranchTarget(const Method* meth, InsnFlags* insnFlags,
     return true;
 }
 
-
 /*
  * Output a code verifier warning message.  For the pre-verifier it's not
  * a big deal if something fails (and it may even be expected), but if
@@ -353,7 +352,7 @@ void dvmLogVerifyFailure(const Method* meth, const char* format, ...)
     LOG_PRI_VA(logLevel, LOG_TAG, format, ap);
     if (meth != NULL) {
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        LOG_PRI(logLevel, LOG_TAG, "VFY:  rejected %s.%s %s\n",
+        LOG_PRI(logLevel, LOG_TAG, "VFY:  rejected %s.%s %s",
             meth->clazz->descriptor, meth->name, desc);
         free(desc);
     }
