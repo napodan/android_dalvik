@@ -130,14 +130,14 @@ LOCAL_SRC_FILES := \
 	analysis/RegisterMap.cpp \
 	analysis/VerifySubs.cpp \
 	interp/Interp.cpp.arm \
-	interp/Stack.c \
-	jdwp/ExpandBuf.c \
-	jdwp/JdwpAdb.c \
-	jdwp/JdwpConstants.c \
-	jdwp/JdwpEvent.c \
-	jdwp/JdwpHandler.c \
-	jdwp/JdwpMain.c \
-	jdwp/JdwpSocket.c \
+	interp/Stack.cpp \
+	jdwp/ExpandBuf.cpp \
+	jdwp/JdwpAdb.cpp \
+	jdwp/JdwpConstants.cpp \
+	jdwp/JdwpEvent.cpp \
+	jdwp/JdwpHandler.cpp \
+	jdwp/JdwpMain.cpp \
+	jdwp/JdwpSocket.cpp \
 	mterp/Mterp.c.arm \
 	mterp/out/InterpC-portstd.c.arm \
 	mterp/out/InterpC-portdbg.c.arm \

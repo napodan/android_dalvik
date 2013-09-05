@@ -16,13 +16,16 @@
 /*
  * These come out of the JDWP documentation.
  */
-#ifndef _DALVIK_JDWP_JDWPCONSTANTS
-#define _DALVIK_JDWP_JDWPCONSTANTS
+#ifndef DALVIK_JDWP_JDWPCONSTANTS_H_
+#define DALVIK_JDWP_JDWPCONSTANTS_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Error constants.
  */
-enum JdwpError {
+typedef enum JdwpError {
     ERR_NONE                                        = 0,
     ERR_INVALID_THREAD                              = 10,
     ERR_INVALID_THREAD_GROUP                        = 11,
@@ -79,9 +82,8 @@ enum JdwpError {
     ERR_TRANSPORT_INIT                              = 510,
     ERR_NATIVE_METHOD                               = 511,
     ERR_INVALID_COUNT                               = 512,
-};
-typedef enum JdwpError JdwpError;
-const char* dvmJdwpErrorStr(enum JdwpError error);
+}JdwpError;
+const char* dvmJdwpErrorStr(JdwpError error);
 
 
 /*
@@ -97,7 +99,7 @@ enum JdwpClassStatus {
 /*
  * EventKind constants.
  */
-enum JdwpEventKind {
+typedef enum JdwpEventKind {
     EK_SINGLE_STEP          = 1,
     EK_BREAKPOINT           = 2,
     EK_FRAME_POP            = 3,
@@ -118,13 +120,13 @@ enum JdwpEventKind {
     EK_VM_DISCONNECTED      = 100,  /* "Never sent across JDWP */
     EK_VM_START             = EK_VM_INIT,
     EK_THREAD_DEATH         = EK_THREAD_END,
-};
-const char* dvmJdwpEventKindStr(enum JdwpEventKind kind);
+}JdwpEventKind;
+const char* dvmJdwpEventKindStr(JdwpEventKind kind);
 
 /*
  * Values for "modKind" in EventRequest.Set.
  */
-enum JdwpModKind {
+typedef enum JdwpModKind {
     MK_COUNT                = 1,
     MK_CONDITIONAL          = 2,
     MK_THREAD_ONLY          = 3,
@@ -136,7 +138,8 @@ enum JdwpModKind {
     MK_FIELD_ONLY           = 9,
     MK_STEP                 = 10,
     MK_INSTANCE_ONLY        = 11,
-};
+}JdwpModKind;
+const char* dvmJdwpModKindStr(JdwpModKind kind);
 
 /*
  * InvokeOptions constants (bit flags).
@@ -149,51 +152,52 @@ enum JdwpInvokeOptions {
 /*
  * StepDepth constants.
  */
-enum JdwpStepDepth {
+typedef enum JdwpStepDepth {
     SD_INTO                 = 0,    /* step into method calls */
     SD_OVER                 = 1,    /* step over method calls */
     SD_OUT                  = 2,    /* step out of current method */
-};
-const char* dvmJdwpStepDepthStr(enum JdwpStepDepth depth);
+}JdwpStepDepth;
+const char* dvmJdwpStepDepthStr(JdwpStepDepth depth);
 
 /*
  * StepSize constants.
  */
-enum JdwpStepSize {
+typedef enum JdwpStepSize {
     SS_MIN                  = 0,    /* step by minimum (e.g. 1 bytecode inst) */
     SS_LINE                 = 1,    /* if possible, step to next line */
-};
-const char* dvmJdwpStepSizeStr(enum JdwpStepSize size);
+}JdwpStepSize;
+const char* dvmJdwpStepSizeStr(JdwpStepSize size);
 
 /*
  * SuspendPolicy constants.
  */
-enum JdwpSuspendPolicy {
+typedef enum JdwpSuspendPolicy {
     SP_NONE                 = 0,    /* suspend no threads */
     SP_EVENT_THREAD         = 1,    /* suspend event thread */
     SP_ALL                  = 2,    /* suspend all threads */
-};
-const char* dvmJdwpSuspendPolicyStr(enum JdwpSuspendPolicy policy);
+}JdwpSuspendPolicy;
+const char* dvmJdwpSuspendPolicyStr(JdwpSuspendPolicy policy);
 
 /*
  * SuspendStatus constants.
  */
-enum JdwpSuspendStatus {
-    SUSPEND_STATUS_SUSPENDED = 1,
-};
-const char* dvmJdwpSuspendStatusStr(enum JdwpSuspendStatus status);
+typedef enum JdwpSuspendStatus {
+    SUSPEND_STATUS_NOT_SUSPENDED = 0,
+    SUSPEND_STATUS_SUSPENDED     = 1,
+}JdwpSuspendStatus;
+const char* dvmJdwpSuspendStatusStr(JdwpSuspendStatus status);
 
 /*
  * ThreadStatus constants.
  */
-enum JdwpThreadStatus {
+typedef enum JdwpThreadStatus {
     TS_ZOMBIE               = 0,
     TS_RUNNING              = 1,        // RUNNING
     TS_SLEEPING             = 2,        // (in Thread.sleep())
     TS_MONITOR              = 3,        // WAITING (monitor wait)
     TS_WAIT                 = 4,        // (in Object.wait())
-};
-const char* dvmJdwpThreadStatusStr(enum JdwpThreadStatus status);
+}JdwpThreadStatus;
+const char* dvmJdwpThreadStatusStr(JdwpThreadStatus status);
 
 /*
  * TypeTag constants.
@@ -226,4 +230,8 @@ enum JdwpType {
     JT_CLASS_OBJECT          = 'c',
 };
 
-#endif /*_DALVIK_JDWP_JDWPCONSTANTS*/
+#ifdef __cplusplus
+};
+#endif
+
+#endif  // DALVIK_JDWP_JDWPCONSTANTS_H_

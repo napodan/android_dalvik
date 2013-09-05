@@ -18,6 +18,10 @@
  */
 #ifndef _DALVIK_JDWP_JDWPHANDLER
 #define _DALVIK_JDWP_JDWPHANDLER
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "Common.h"
 #include "ExpandBuf.h"
@@ -43,5 +47,9 @@ void dvmJdwpProcessRequest(JdwpState* state, const JdwpReqHeader* pHeader,
 
 /* helper function */
 void dvmJdwpAddLocation(ExpandBuf* pReply, const JdwpLocation* pLoc);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_JDWP_JDWPHANDLER*/

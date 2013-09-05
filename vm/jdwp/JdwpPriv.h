@@ -18,6 +18,9 @@
  */
 #ifndef _DALVIK_JDWP_JDWPPRIV
 #define _DALVIK_JDWP_JDWPPRIV
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define LOG_TAG "jdwp"
 
@@ -175,5 +178,9 @@ INLINE bool dvmJdwpSendBufferedRequest(JdwpState* state,
 {
     return (*state->transport->sendBufferedRequest)(state, iov, iovcnt);
 }
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_JDWP_JDWPPRIV*/
