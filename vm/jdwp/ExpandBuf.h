@@ -18,6 +18,10 @@
  */
 #ifndef _DALVIK_JDWP_EXPANDBUF
 #define _DALVIK_JDWP_EXPANDBUF
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "Common.h"     // need u1/u2/u4/u8 types
 
@@ -53,5 +57,9 @@ void expandBufAdd2BE(ExpandBuf* pBuf, u2 val);
 void expandBufAdd4BE(ExpandBuf* pBuf, u4 val);
 void expandBufAdd8BE(ExpandBuf* pBuf, u8 val);
 void expandBufAddUtf8String(ExpandBuf* pBuf, const u1* str);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_JDWP_EXPANDBUF*/

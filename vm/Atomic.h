@@ -19,6 +19,9 @@
  */
 #ifndef _DALVIK_ATOMIC
 #define _DALVIK_ATOMIC
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <cutils/atomic.h>          /* use common Android atomic ops */
 #include <cutils/atomic-inline.h>   /* and some uncommon ones */
@@ -51,5 +54,9 @@ int64_t dvmQuasiAtomicRead64(volatile const int64_t* addr);
  */
 int dvmQuasiAtomicCas64(int64_t oldvalue, int64_t newvalue,
         volatile int64_t* addr);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_ATOMIC*/

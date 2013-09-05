@@ -23,7 +23,7 @@
 /*
  * Return a string for the error code.
  */
-const char* dvmJdwpErrorStr(enum JdwpError error)
+const char* dvmJdwpErrorStr(JdwpError error)
 {
     switch (error) {
     case ERR_NONE:
@@ -146,7 +146,7 @@ const char* dvmJdwpErrorStr(enum JdwpError error)
 /*
  * Return a string for the EventKind.
  */
-const char* dvmJdwpEventKindStr(enum JdwpEventKind kind)
+const char* dvmJdwpEventKindStr(JdwpEventKind kind)
 {
     switch (kind) {
     case EK_SINGLE_STEP:        return "SINGLE_STEP";
@@ -174,9 +174,30 @@ const char* dvmJdwpEventKindStr(enum JdwpEventKind kind)
 }
 
 /*
+ * Return a string for the ModKind.
+ */
+const char* dvmJdwpModKindStr(JdwpModKind kind)
+{
+    switch (kind) {
+    case MK_COUNT:              return "COUNT";
+    case MK_CONDITIONAL:        return "CONDITIONAL";
+    case MK_THREAD_ONLY:        return "THREAD_ONLY";
+    case MK_CLASS_ONLY:         return "CLASS_ONLY";
+    case MK_CLASS_MATCH:        return "CLASS_MATCH";
+    case MK_CLASS_EXCLUDE:      return "CLASS_EXCLUDE";
+    case MK_LOCATION_ONLY:      return "LOCATION_ONLY";
+    case MK_EXCEPTION_ONLY:     return "EXCEPTION_ONLY";
+    case MK_FIELD_ONLY:         return "FIELD_ONLY";
+    case MK_STEP:               return "STEP";
+    case MK_INSTANCE_ONLY:      return "INSTANCE_ONLY";
+    default:                    return "?UNKNOWN?";
+    }
+}
+
+/*
  * Return a string for the StepDepth.
  */
-const char* dvmJdwpStepDepthStr(enum JdwpStepDepth depth)
+const char* dvmJdwpStepDepthStr(JdwpStepDepth depth)
 {
     switch (depth) {
     case SD_INTO:               return "INTO";
@@ -189,7 +210,7 @@ const char* dvmJdwpStepDepthStr(enum JdwpStepDepth depth)
 /*
  * Return a string for the StepSize.
  */
-const char* dvmJdwpStepSizeStr(enum JdwpStepSize size)
+const char* dvmJdwpStepSizeStr(JdwpStepSize size)
 {
     switch (size) {
     case SS_MIN:                return "MIN";
@@ -201,7 +222,7 @@ const char* dvmJdwpStepSizeStr(enum JdwpStepSize size)
 /*
  * Return a string for the SuspendPolicy.
  */
-const char* dvmJdwpSuspendPolicyStr(enum JdwpSuspendPolicy policy)
+const char* dvmJdwpSuspendPolicyStr(JdwpSuspendPolicy policy)
 {
     switch (policy) {
     case SP_NONE:               return "NONE";
@@ -214,19 +235,19 @@ const char* dvmJdwpSuspendPolicyStr(enum JdwpSuspendPolicy policy)
 /*
  * Return a string for the SuspendStatus.
  */
-const char* dvmJdwpSuspendStatusStr(enum JdwpSuspendStatus status)
+const char* dvmJdwpSuspendStatusStr(JdwpSuspendStatus status)
 {
     switch (status) {
-    case 0:                         return "Not SUSPENDED";
-    case SUSPEND_STATUS_SUSPENDED:  return "SUSPENDED";
-    default:                        return "?UNKNOWN?";
+    case SUSPEND_STATUS_NOT_SUSPENDED: return "Not SUSPENDED";
+    case SUSPEND_STATUS_SUSPENDED:     return "SUSPENDED";
+    default:                           return "?UNKNOWN?";
     }
 }
 
 /*
  * Return a string for the ThreadStatus.
  */
-const char* dvmJdwpThreadStatusStr(enum JdwpThreadStatus status)
+const char* dvmJdwpThreadStatusStr(JdwpThreadStatus status)
 {
     switch (status) {
     case TS_ZOMBIE:             return "ZOMBIE";

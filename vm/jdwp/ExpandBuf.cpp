@@ -38,7 +38,7 @@ struct ExpandBuf {
 /*
  * Allocate a JdwpBuf and some initial storage.
  */
-ExpandBuf* expandBufAlloc(void)
+ExpandBuf* expandBufAlloc()
 {
     ExpandBuf* newBuf;
 
@@ -93,9 +93,9 @@ static void ensureSpace(ExpandBuf* pBuf, int newCount)
     while (pBuf->curLen + newCount > pBuf->maxLen)
         pBuf->maxLen *= 2;
 
-    newPtr = realloc(pBuf->storage, pBuf->maxLen);
+    newPtr = (u1*) realloc(pBuf->storage, pBuf->maxLen);
     if (newPtr == NULL) {
-        ALOGE("realloc(%d) failed\n", pBuf->maxLen);
+        ALOGE("realloc(%d) failed", pBuf->maxLen);
         abort();
     }
 
