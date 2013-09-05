@@ -128,8 +128,8 @@ LOCAL_SRC_FILES := \
 	analysis/DexVerify.cpp \
 	analysis/Optimize.cpp \
 	analysis/RegisterMap.cpp \
-	analysis/VerifySubs.c \
-	interp/Interp.c.arm \
+	analysis/VerifySubs.cpp \
+	interp/Interp.cpp.arm \
 	interp/Stack.c \
 	jdwp/ExpandBuf.c \
 	jdwp/JdwpAdb.c \

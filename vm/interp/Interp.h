@@ -22,6 +22,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/*
+ * Extract the Dalvik opcode
+ */
+#define GET_OPCODE(_inst) (_inst & 0xff)
 
 /*
  * Interpreter entry point.  Call here after setting up the interpreted
