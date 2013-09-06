@@ -19,8 +19,8 @@
  */
 #include "Dalvik.h"
 #include "native/InternalNativePriv.h"
-#include <unistd.h>
 #include <limits.h>
+#include <unistd.h>
 
 /*
  * public void gc()
@@ -36,7 +36,7 @@ static void Dalvik_java_lang_Runtime_gc(const u4* args, JValue* pResult)
 }
 
 /*
- * private static void nativeExit(int code, boolean isExit)
+ * private static void nativeExit(int code)
  *
  * Runtime.exit() calls this after doing shutdown processing.  Runtime.halt()
  * uses this as well.
@@ -51,17 +51,17 @@ static void Dalvik_java_lang_Runtime_nativeExit(const u4* args,
         dvmChangeStatus(NULL, THREAD_NATIVE);
         (*gDvm.exitHook)(status);     // not expected to return
         dvmChangeStatus(NULL, THREAD_RUNNING);
-        ALOGW("JNI exit hook returned\n");
+        ALOGW("JNI exit hook returned");
     }
-    ALOGD("Calling exit(%d)\n", status);
 #if defined(WITH_JIT) && defined(WITH_JIT_TUNING)
     dvmCompilerDumpStats();
 #endif
+    ALOGD("Calling exit(%d)", status);
     exit(status);
 }
 
 /*
- * static String nativeLoad(String filename, ClassLoader loader)
+ * static String nativeLoad(String filename, ClassLoader loader, String ldLibraryPath)
  *
  * Load the specified full path as a dynamic library filled with
  * JNI-compatible methods. Returns null on success, or a failure
@@ -72,15 +72,13 @@ static void Dalvik_java_lang_Runtime_nativeLoad(const u4* args,
 {
     StringObject* fileNameObj = (StringObject*) args[0];
     Object* classLoader = (Object*) args[1];
-    char* fileName = NULL;
-    StringObject* result = NULL;
-    char* reason = NULL;
-    bool success;
 
     assert(fileNameObj != NULL);
-    fileName = dvmCreateCstrFromString(fileNameObj);
+    char* fileName = dvmCreateCstrFromString(fileNameObj);
 
-    success = dvmLoadNativeCode(fileName, classLoader, &reason);
+    StringObject* result = NULL;
+    char* reason = NULL;
+    bool success = dvmLoadNativeCode(fileName, classLoader, &reason);
     if (!success) {
         const char* msg = (reason != NULL) ? reason : "unknown failure";
         result = dvmCreateStringFromCstr(msg);

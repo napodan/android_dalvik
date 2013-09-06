@@ -69,10 +69,10 @@ static void Dalvik_java_lang_Class_desiredAssertionStatus(const u4* args,
             if (pCtrl->pkgOrClassLen > pkgLen ||
                 memcmp(pCtrl->pkgOrClass, className, pCtrl->pkgOrClassLen) != 0)
             {
-                ALOGV("ASRT: pkg no match: '%s'(%d) vs '%s'\n",
+                ALOGV("ASRT: pkg no match: '%s'(%d) vs '%s'",
                     className, pkgLen, pCtrl->pkgOrClass);
             } else {
-                ALOGV("ASRT: pkg match: '%s'(%d) vs '%s' --> %d\n",
+                ALOGV("ASRT: pkg match: '%s'(%d) vs '%s' --> %d",
                     className, pkgLen, pCtrl->pkgOrClass, pCtrl->enable);
                 enable = pCtrl->enable;
             }
@@ -84,22 +84,22 @@ static void Dalvik_java_lang_Class_desiredAssertionStatus(const u4* args,
             if (pCtrl->pkgOrClass == NULL) {
                 /* -esa/-dsa; see if class is a "system" class */
                 if (strncmp(className, "java/", 5) != 0) {
-                    ALOGV("ASRT: sys no match: '%s'\n", className);
+                    ALOGV("ASRT: sys no match: '%s'", className);
                 } else {
-                    ALOGV("ASRT: sys match: '%s' --> %d\n",
+                    ALOGV("ASRT: sys match: '%s' --> %d",
                         className, pCtrl->enable);
                     enable = pCtrl->enable;
                 }
             } else if (*pCtrl->pkgOrClass == '\0') {
-                ALOGV("ASRT: class all: '%s' --> %d\n",
+                ALOGV("ASRT: class all: '%s' --> %d",
                     className, pCtrl->enable);
                 enable = pCtrl->enable;
             } else {
                 if (strcmp(pCtrl->pkgOrClass, className) != 0) {
-                    ALOGV("ASRT: cls no match: '%s' vs '%s'\n",
+                    ALOGV("ASRT: cls no match: '%s' vs '%s'",
                         className, pCtrl->pkgOrClass);
                 } else {
-                    ALOGV("ASRT: cls match: '%s' vs '%s' --> %d\n",
+                    ALOGV("ASRT: cls match: '%s' vs '%s' --> %d",
                         className, pCtrl->pkgOrClass, pCtrl->enable);
                     enable = pCtrl->enable;
                 }
@@ -192,7 +192,7 @@ static void Dalvik_java_lang_Class_getDeclaredClasses(const u4* args,
         }
     } else if (publicOnly) {
         u4 count, newIdx, publicCount = 0;
-        ClassObject** pSource = (ClassObject**) classes->contents;
+        ClassObject** pSource = (ClassObject**)(void*)classes->contents;
         u4 length = classes->length;
 
         /* count up public classes */
@@ -242,7 +242,6 @@ static void Dalvik_java_lang_Class_getDeclaredConstructors(const u4* args,
 
 /*
  * static Field[] getDeclaredFields(Class klass, boolean publicOnly)
- *     throws SecurityException
  */
 static void Dalvik_java_lang_Class_getDeclaredFields(const u4* args,
     JValue* pResult)
@@ -322,7 +321,11 @@ static void Dalvik_java_lang_Class_getModifiers(const u4* args, JValue* pResult)
 /*
  * private native String getNameNative()
  *
- * Return the class' name.
+ * Return the class' name. The exact format is bizarre, but it's the specified
+ * behavior: keywords for primitive types, regular "[I" form for primitive
+ * arrays (so "int" but "[I"), and arrays of reference types written
+ * between "L" and ";" but with dots rather than slashes (so "java.lang.String"
+ * but "[Ljava.lang.String;"). Madness.
  */
 static void Dalvik_java_lang_Class_getNameNative(const u4* args, JValue* pResult)
 {
@@ -347,7 +350,7 @@ static void Dalvik_java_lang_Class_getNameNative(const u4* args, JValue* pResult
             case 'D': name = "double";  break;
             case 'V': name = "void";    break;
             default: {
-                ALOGE("Unknown primitive type '%c'\n", descriptor[0]);
+                ALOGE("Unknown primitive type '%c'", descriptor[0]);
                 assert(false);
                 RETURN_PTR(NULL);
             }
@@ -370,37 +373,6 @@ static void Dalvik_java_lang_Class_getNameNative(const u4* args, JValue* pResult
     }
 
     dvmReleaseTrackedAlloc((Object*) nameObj, NULL);
-
-#if 0
-    /* doesn't work -- need "java.lang.String" not "java/lang/String" */
-    {
-        /*
-         * Find the string in the DEX file and use the copy in the intern
-         * table if it already exists (else put one there).  Only works
-         * for strings in the DEX file, e.g. not arrays.
-         *
-         * We have to do the class lookup by name in the DEX file because
-         * we don't have a DexClassDef pointer in the ClassObject, and it's
-         * not worth adding one there just for this.  Should be cheaper
-         * to do this than the string-creation above.
-         */
-        const DexFile* pDexFile = clazz->pDexFile;
-        const DexClassDef* pClassDef;
-        const DexClassId* pClassId;
-
-        pDexFile = clazz->pDexFile;
-        pClassDef = dvmDexFindClass(pDexFile, clazz->descriptor);
-        pClassId = dvmDexGetClassId(pDexFile, pClassDef->classIdx);
-        nameObj = dvmDexGetResolvedString(pDexFile, pClassId->nameIdx);
-        if (nameObj == NULL) {
-            nameObj = dvmResolveString(clazz, pClassId->nameIdx);
-            if (nameObj == NULL)
-                ALOGW("WARNING: couldn't find string %u for '%s'\n",
-                    pClassId->nameIdx, clazz->name);
-        }
-    }
-#endif
-
     RETURN_PTR(nameObj);
 }
 
@@ -496,7 +468,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     if (dvmIsPrimitiveClass(clazz) || dvmIsInterfaceClass(clazz)
         || dvmIsArrayClass(clazz) || dvmIsAbstractClass(clazz))
     {
-        ALOGD("newInstance failed: p%d i%d [%d a%d\n",
+        ALOGD("newInstance failed: p%d i%d [%d a%d",
             dvmIsPrimitiveClass(clazz), dvmIsInterfaceClass(clazz),
             dvmIsArrayClass(clazz), dvmIsAbstractClass(clazz));
         dvmThrowExceptionWithClassMessage("Ljava/lang/InstantiationException;",
@@ -507,7 +479,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     /* initialize the class if it hasn't been already */
     if (!dvmIsClassInitialized(clazz)) {
         if (!dvmInitClass(clazz)) {
-            ALOGW("Class init failed in newInstance call (%s)\n",
+            ALOGW("Class init failed in newInstance call (%s)",
                 clazz->descriptor);
             assert(dvmCheckException(self));
             RETURN_VOID();
@@ -518,7 +490,7 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     init = dvmFindDirectMethodByDescriptor(clazz, "<init>", "()V");
     if (init == NULL) {
         /* common cause: secret "this" arg on non-static inner class ctor */
-        ALOGD("newInstance failed: no <init>()\n");
+        ALOGD("newInstance failed: no <init>()");
         dvmThrowExceptionWithClassMessage("Ljava/lang/InstantiationException;",
             clazz->descriptor);
         RETURN_VOID();
@@ -537,14 +509,14 @@ static void Dalvik_java_lang_Class_newInstance(const u4* args, JValue* pResult)
     ClassObject* callerClass = dvmGetCaller2Class(self->curFrame);
 
     if (!dvmCheckClassAccess(callerClass, clazz)) {
-        ALOGD("newInstance failed: %s not accessible to %s\n",
+        ALOGD("newInstance failed: %s not accessible to %s",
             clazz->descriptor, callerClass->descriptor);
         dvmThrowException("Ljava/lang/IllegalAccessException;",
             "access to class not allowed");
         RETURN_VOID();
     }
     if (!dvmCheckMethodAccess(callerClass, init)) {
-        ALOGD("newInstance failed: %s.<init>() not accessible to %s\n",
+        ALOGD("newInstance failed: %s.<init>() not accessible to %s",
             clazz->descriptor, callerClass->descriptor);
         dvmThrowException("Ljava/lang/IllegalAccessException;",
             "access to constructor not allowed");
@@ -652,8 +624,7 @@ static void Dalvik_java_lang_Class_getEnclosingMethod(const u4* args,
 static void Dalvik_java_lang_Class_getGenericInterfaces(const u4* args,
     JValue* pResult)
 {
-    dvmThrowException("Ljava/lang/UnsupportedOperationException;",
-        "native method not implemented");
+    dvmThrowUnsupportedOperationException("native method not implemented");
 
     RETURN_PTR(NULL);
 }
@@ -661,8 +632,7 @@ static void Dalvik_java_lang_Class_getGenericInterfaces(const u4* args,
 static void Dalvik_java_lang_Class_getGenericSuperclass(const u4* args,
     JValue* pResult)
 {
-    dvmThrowException("Ljava/lang/UnsupportedOperationException;",
-        "native method not implemented");
+    dvmThrowUnsupportedOperationException("native method not implemented");
 
     RETURN_PTR(NULL);
 }
@@ -670,8 +640,7 @@ static void Dalvik_java_lang_Class_getGenericSuperclass(const u4* args,
 static void Dalvik_java_lang_Class_getTypeParameters(const u4* args,
     JValue* pResult)
 {
-    dvmThrowException("Ljava/lang/UnsupportedOperationException;",
-        "native method not implemented");
+    dvmThrowUnsupportedOperationException("native method not implemented");
 
     RETURN_PTR(NULL);
 }

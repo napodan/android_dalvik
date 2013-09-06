@@ -147,21 +147,21 @@ LOCAL_SRC_FILES := \
 	native/dalvik_system_VMRuntime.cpp \
 	native/dalvik_system_VMStack.cpp \
 	native/dalvik_system_Zygote.cpp \
-	native/java_lang_Class.c \
-	native/java_lang_Object.c \
-	native/java_lang_Runtime.c \
-	native/java_lang_String.c \
-	native/java_lang_System.c \
+	native/java_lang_Class.cpp \
+	native/java_lang_Object.cpp \
+	native/java_lang_Runtime.cpp \
+	native/java_lang_String.cpp \
+	native/java_lang_System.cpp \
 	native/java_lang_SystemProperties.c \
-	native/java_lang_Throwable.c \
-	native/java_lang_VMClassLoader.c \
-	native/java_lang_VMThread.c \
-	native/java_lang_reflect_AccessibleObject.c \
-	native/java_lang_reflect_Array.c \
-	native/java_lang_reflect_Constructor.c \
-	native/java_lang_reflect_Field.c \
-	native/java_lang_reflect_Method.c \
-	native/java_lang_reflect_Proxy.c \
+	native/java_lang_Throwable.cpp \
+	native/java_lang_VMClassLoader.cpp \
+	native/java_lang_VMThread.cpp \
+	native/java_lang_reflect_AccessibleObject.cpp \
+	native/java_lang_reflect_Array.cpp \
+	native/java_lang_reflect_Constructor.cpp \
+	native/java_lang_reflect_Field.cpp \
+	native/java_lang_reflect_Method.cpp \
+	native/java_lang_reflect_Proxy.cpp \
 	native/java_security_AccessController.c \
 	native/java_util_concurrent_atomic_AtomicLong.c \
 	native/org_apache_harmony_dalvik_NativeTestTarget.c \

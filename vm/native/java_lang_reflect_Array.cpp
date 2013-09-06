@@ -32,7 +32,6 @@ static void Dalvik_java_lang_reflect_Array_createObjectArray(const u4* args,
 {
     ClassObject* elementClass = (ClassObject*) args[0];
     int length = args[1];
-    ArrayObject* newArray;
 
     assert(elementClass != NULL);       // tested by caller
     if (length < 0) {
@@ -40,7 +39,8 @@ static void Dalvik_java_lang_reflect_Array_createObjectArray(const u4* args,
         RETURN_VOID();
     }
 
-    newArray = dvmAllocObjectArray(elementClass, length, ALLOC_DEFAULT);
+    ArrayObject* newArray =
+        dvmAllocObjectArray(elementClass, length, ALLOC_DEFAULT);
     if (newArray == NULL) {
         assert(dvmCheckException(dvmThreadSelf()));
         RETURN_VOID();
@@ -73,7 +73,7 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
     int numDim, i;
     int* dimensions;
 
-    ALOGV("createMultiArray: '%s' [%d]\n",
+    ALOGV("createMultiArray: '%s' [%d]",
         elementClass->descriptor, dimArray->length);
 
     assert(elementClass != NULL);       // verified by caller
@@ -88,13 +88,13 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
     numDim = dimArray->length;
     assert(numDim > 0 && numDim <= 255);
 
-    dimensions = (int*) dimArray->contents;
+    dimensions = (int*)(void*)dimArray->contents;
     for (i = 0; i < numDim; i++) {
         if (dimensions[i] < 0) {
             dvmThrowException("Ljava/lang/NegativeArraySizeException;", NULL);
             RETURN_VOID();
         }
-        LOGVV("DIM %d: %d\n", i, dimensions[i]);
+        LOGVV("DIM %d: %d", i, dimensions[i]);
     }
 
     /*
@@ -104,7 +104,7 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
         (char*) malloc(strlen(elementClass->descriptor) + numDim + 1);
     memset(acDescriptor, '[', numDim);
 
-    LOGVV("#### element name = '%s'\n", elementClass->descriptor);
+    LOGVV("#### element name = '%s'", elementClass->descriptor);
     if (dvmIsPrimitiveClass(elementClass)) {
         assert(elementClass->primitiveType >= 0);
         acDescriptor[numDim] = kPrimLetter[elementClass->primitiveType];
@@ -112,14 +112,14 @@ static void Dalvik_java_lang_reflect_Array_createMultiArray(const u4* args,
     } else {
         strcpy(acDescriptor+numDim, elementClass->descriptor);
     }
-    LOGVV("#### array name = '%s'\n", acDescriptor);
+    LOGVV("#### array name = '%s'", acDescriptor);
 
     /*
      * Find/generate the array class.
      */
     arrayClass = dvmFindArrayClass(acDescriptor, elementClass->classLoader);
     if (arrayClass == NULL) {
-        ALOGW("Unable to find or generate array class '%s'\n", acDescriptor);
+        ALOGW("Unable to find or generate array class '%s'", acDescriptor);
         assert(dvmCheckException(dvmThreadSelf()));
         free(acDescriptor);
         RETURN_VOID();
