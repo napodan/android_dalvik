@@ -1,5 +1,5 @@
 /*
- * This file was generated automatically by gen-mterp.py for 'portstd'.
+ * This file was generated automatically by gen-mterp.py for 'portdbg'.
  *
  * --> DO NOT EDIT <--
  */
@@ -120,7 +120,7 @@
         {                                                                   \
             char* desc;                                                     \
             desc = dexProtoCopyMethodDescriptor(&curMethod->prototype);     \
-            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s\n",               \
+            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s",                 \
                 myoff, (int) (pc - curMethod->insns),                       \
                 curMethod->clazz->descriptor, curMethod->name, desc);       \
             free(desc);                                                     \
@@ -145,7 +145,7 @@
 # define ILOG(_level, ...) do {                                             \
         char debugStrBuf[128];                                              \
         snprintf(debugStrBuf, sizeof(debugStrBuf), __VA_ARGS__);            \
-        if (curMethod != NULL)                                                 \
+        if (curMethod != NULL)                                              \
             LOG(_level, LOG_TAG"i", "%-2d|%04x%s\n",                        \
                 self->threadId, (int)(pc - curMethod->insns), debugStrBuf); \
         else                                                                \
@@ -257,7 +257,7 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
         getLongFromArray(fp, (_idx)) : (assert(!"bad reg"),1969) )
 # define SET_REGISTER_WIDE(_idx, _val) \
     ( (_idx) < curMethod->registersSize-1 ? \
-        putLongToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969) )
+        (void)putLongToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969) )
 # define GET_REGISTER_FLOAT(_idx) \
     ( (_idx) < curMethod->registersSize ? \
         (*((float*) &fp[(_idx)])) : (assert(!"bad reg"),1969.0f) )
@@ -269,7 +269,7 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
         getDoubleFromArray(fp, (_idx)) : (assert(!"bad reg"),1969.0) )
 # define SET_REGISTER_DOUBLE(_idx, _val) \
     ( (_idx) < curMethod->registersSize-1 ? \
-        putDoubleToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969.0) )
+        (void)putDoubleToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969.0) )
 #else
 # define GET_REGISTER(_idx)                 (fp[(_idx)])
 # define SET_REGISTER(_idx, _val)           (fp[(_idx)] = (_val))
@@ -365,14 +365,14 @@ static inline bool checkForNull(Object* obj)
     }
 #ifdef WITH_EXTRA_OBJECT_VALIDATION
     if (!dvmIsValidObject(obj)) {
-        ALOGE("Invalid object %p\n", obj);
+        ALOGE("Invalid object %p", obj);
         dvmAbort();
     }
 #endif
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)", obj->clazz, obj);
         dvmAbort();
     }
 #endif
@@ -404,22 +404,31 @@ static inline bool checkForNullExportPC(Object* obj, u4* fp, const u2* pc)
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)", obj->clazz, obj);
         dvmAbort();
     }
 #endif
     return true;
 }
 
-/* File: portable/portstd.c */
-#define INTERP_FUNC_NAME dvmInterpretStd
-#define INTERP_TYPE INTERP_STD
+/* File: portable/portdbg.c */
+#define INTERP_FUNC_NAME dvmInterpretDbg
+#define INTERP_TYPE INTERP_DBG
 
-#define CHECK_DEBUG_AND_PROF() ((void)0)
+#define CHECK_DEBUG_AND_PROF() \
+    checkDebugAndProf(pc, fp, self, curMethod, &debugIsMethodEntry)
 
+#if defined(WITH_JIT)
+#define CHECK_JIT_BOOL() (dvmCheckJit(pc, self, interpState, callsiteClass,\
+                          methodToCall))
+#define CHECK_JIT_VOID() (dvmCheckJit(pc, self, interpState, callsiteClass,\
+                          methodToCall))
+#define ABORT_JIT_TSELECT() (dvmJitAbortTraceSelect(interpState))
+#else
 #define CHECK_JIT_BOOL() (false)
 #define CHECK_JIT_VOID()
-#define ABORT_JIT_TSELECT() ((void)0)
+#define ABORT_JIT_TSELECT(x) ((void)0)
+#endif
 
 /* File: portable/stubdefs.c */
 /*
@@ -519,7 +528,7 @@ static inline bool checkForNullExportPC(Object* obj, u4* fp, const u2* pc)
         }                                                                   \
     }
 
-/* File: c/opcommon.c */
+/* File: c/opcommon.cpp */
 /* forward declarations of goto targets */
 GOTO_TARGET_DECL(filledNewArray, bool methodCallRange);
 GOTO_TARGET_DECL(invokeVirtual, bool methodCallRange);
@@ -611,7 +620,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             result = 1;                                                     \
         else                                                                \
             result = (_nanVal);                                             \
-        ILOGV("+ result=%d\n", result);                                     \
+        ILOGV("+ result=%d", result);                                       \
         SET_REGISTER(vdst, result);                                         \
     }                                                                       \
     FINISH(2);
@@ -987,8 +996,8 @@ GOTO_TARGET_DECL(exceptionThrown);
             GOTO_exceptionThrown();                                         \
         }                                                                   \
         SET_REGISTER##_regsize(vdst,                                        \
-            ((_type*) arrayObj->contents)[GET_REGISTER(vsrc2)]);            \
-        ILOGV("+ AGET[%d]=0x%x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));  \
+            ((_type*)(void*)arrayObj->contents)[GET_REGISTER(vsrc2)]);      \
+        ILOGV("+ AGET[%d]=%#x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));   \
     }                                                                       \
     FINISH(2);
 
@@ -1012,7 +1021,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             GOTO_exceptionThrown();                                         \
         }                                                                   \
         ILOGV("+ APUT[%d]=0x%08x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));\
-        ((_type*) arrayObj->contents)[GET_REGISTER(vsrc2)] =                \
+        ((_type*)(void*)arrayObj->contents)[GET_REGISTER(vsrc2)] =          \
             GET_REGISTER##_regsize(vdst);                                   \
     }                                                                       \
     FINISH(2);
@@ -1176,6 +1185,247 @@ GOTO_TARGET_DECL(exceptionThrown);
         UPDATE_FIELD_PUT(&sfield->field);                                   \
     }                                                                       \
     FINISH(2);
+
+/* File: portable/debug.c */
+/* code in here is only included in portable-debug interpreter */
+
+/*
+ * Update the debugger on interesting events, such as hitting a breakpoint
+ * or a single-step point.  This is called from the top of the interpreter
+ * loop, before the current instruction is processed.
+ *
+ * Set "methodEntry" if we've just entered the method.  This detects
+ * method exit by checking to see if the next instruction is "return".
+ *
+ * This can't catch native method entry/exit, so we have to handle that
+ * at the point of invocation.  We also need to catch it in dvmCallMethod
+ * if we want to capture native->native calls made through JNI.
+ *
+ * Notes to self:
+ * - Don't want to switch to VMWAIT while posting events to the debugger.
+ *   Let the debugger code decide if we need to change state.
+ * - We may want to check for debugger-induced thread suspensions on
+ *   every instruction.  That would make a "suspend all" more responsive
+ *   and reduce the chances of multiple simultaneous events occurring.
+ *   However, it could change the behavior some.
+ *
+ * TODO: method entry/exit events are probably less common than location
+ * breakpoints.  We may be able to speed things up a bit if we don't query
+ * the event list unless we know there's at least one lurking within.
+ */
+static void updateDebugger(const Method* method, const u2* pc, const u4* fp,
+    bool methodEntry, Thread* self)
+{
+    int eventFlags = 0;
+
+    /*
+     * Update xtra.currentPc on every instruction.  We need to do this if
+     * there's a chance that we could get suspended.  This can happen if
+     * eventFlags != 0 here, or somebody manually requests a suspend
+     * (which gets handled at PERIOD_CHECKS time).  One place where this
+     * needs to be correct is in dvmAddSingleStep().
+     */
+    EXPORT_PC();
+
+    if (methodEntry)
+        eventFlags |= DBG_METHOD_ENTRY;
+
+    /*
+     * See if we have a breakpoint here.
+     *
+     * Depending on the "mods" associated with event(s) on this address,
+     * we may or may not actually send a message to the debugger.
+     */
+    if (INST_INST(*pc) == OP_BREAKPOINT) {
+        ALOGV("+++ breakpoint hit at %p\n", pc);
+        eventFlags |= DBG_BREAKPOINT;
+    }
+
+    /*
+     * If the debugger is single-stepping one of our threads, check to
+     * see if we're that thread and we've reached a step point.
+     */
+    const StepControl* pCtrl = &gDvm.stepControl;
+    if (pCtrl->active && pCtrl->thread == self) {
+        int frameDepth;
+        bool doStop = false;
+        const char* msg = NULL;
+
+        assert(!dvmIsNativeMethod(method));
+
+        if (pCtrl->depth == SD_INTO) {
+            /*
+             * Step into method calls.  We break when the line number
+             * or method pointer changes.  If we're in SS_MIN mode, we
+             * always stop.
+             */
+            if (pCtrl->method != method) {
+                doStop = true;
+                msg = "new method";
+            } else if (pCtrl->size == SS_MIN) {
+                doStop = true;
+                msg = "new instruction";
+            } else if (!dvmAddressSetGet(
+                    pCtrl->pAddressSet, pc - method->insns)) {
+                doStop = true;
+                msg = "new line";
+            }
+        } else if (pCtrl->depth == SD_OVER) {
+            /*
+             * Step over method calls.  We break when the line number is
+             * different and the frame depth is <= the original frame
+             * depth.  (We can't just compare on the method, because we
+             * might get unrolled past it by an exception, and it's tricky
+             * to identify recursion.)
+             */
+            frameDepth = dvmComputeVagueFrameDepth(self, fp);
+            if (frameDepth < pCtrl->frameDepth) {
+                /* popped up one or more frames, always trigger */
+                doStop = true;
+                msg = "method pop";
+            } else if (frameDepth == pCtrl->frameDepth) {
+                /* same depth, see if we moved */
+                if (pCtrl->size == SS_MIN) {
+                    doStop = true;
+                    msg = "new instruction";
+                } else if (!dvmAddressSetGet(pCtrl->pAddressSet,
+                            pc - method->insns)) {
+                    doStop = true;
+                    msg = "new line";
+                }
+            }
+        } else {
+            assert(pCtrl->depth == SD_OUT);
+            /*
+             * Return from the current method.  We break when the frame
+             * depth pops up.
+             *
+             * This differs from the "method exit" break in that it stops
+             * with the PC at the next instruction in the returned-to
+             * function, rather than the end of the returning function.
+             */
+            frameDepth = dvmComputeVagueFrameDepth(self, fp);
+            if (frameDepth < pCtrl->frameDepth) {
+                doStop = true;
+                msg = "method pop";
+            }
+        }
+
+        if (doStop) {
+            ALOGV("#####S %s\n", msg);
+            eventFlags |= DBG_SINGLE_STEP;
+        }
+    }
+
+    /*
+     * Check to see if this is a "return" instruction.  JDWP says we should
+     * send the event *after* the code has been executed, but it also says
+     * the location we provide is the last instruction.  Since the "return"
+     * instruction has no interesting side effects, we should be safe.
+     * (We can't just move this down to the returnFromMethod label because
+     * we potentially need to combine it with other events.)
+     *
+     * We're also not supposed to generate a method exit event if the method
+     * terminates "with a thrown exception".
+     */
+    u2 inst = INST_INST(FETCH(0));
+    if (inst == OP_RETURN_VOID || inst == OP_RETURN || inst == OP_RETURN_WIDE ||
+        inst == OP_RETURN_OBJECT)
+    {
+        eventFlags |= DBG_METHOD_EXIT;
+    }
+
+    /*
+     * If there's something interesting going on, see if it matches one
+     * of the debugger filters.
+     */
+    if (eventFlags != 0) {
+        Object* thisPtr = dvmGetThisPtr(method, fp);
+        if (thisPtr != NULL && !dvmIsValidObject(thisPtr)) {
+            /*
+             * TODO: remove this check if we're confident that the "this"
+             * pointer is where it should be -- slows us down, especially
+             * during single-step.
+             */
+            char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
+            ALOGE("HEY: invalid 'this' ptr %p (%s.%s %s)\n", thisPtr,
+                method->clazz->descriptor, method->name, desc);
+            free(desc);
+            dvmAbort();
+        }
+        dvmDbgPostLocationEvent(method, pc - method->insns, thisPtr,
+            eventFlags);
+    }
+}
+
+/*
+ * Perform some operations at the "top" of the interpreter loop.
+ * This stuff is required to support debugging and profiling.
+ *
+ * Using" __attribute__((noinline))" seems to do more harm than good.  This
+ * is best when inlined due to the large number of parameters, most of
+ * which are local vars in the main interp loop.
+ */
+static void checkDebugAndProf(const u2* pc, const u4* fp, Thread* self,
+    const Method* method, bool* pIsMethodEntry)
+{
+    /* check to see if we've run off end of method */
+    assert(pc >= method->insns && pc <
+            method->insns + dvmGetMethodInsnsSize(method));
+
+#if 0
+    /*
+     * When we hit a specific method, enable verbose instruction logging.
+     * Sometimes it's helpful to use the debugger attach as a trigger too.
+     */
+    if (*pIsMethodEntry) {
+        static const char* cd = "Landroid/test/Arithmetic;";
+        static const char* mn = "shiftTest2";
+        static const char* sg = "()V";
+
+        if (/*gDvm.debuggerActive &&*/
+            strcmp(method->clazz->descriptor, cd) == 0 &&
+            strcmp(method->name, mn) == 0 &&
+            strcmp(method->shorty, sg) == 0)
+        {
+            ALOGW("Reached %s.%s, enabling verbose mode\n",
+                method->clazz->descriptor, method->name);
+            android_setMinPriority(LOG_TAG"i", ANDROID_LOG_VERBOSE);
+            dumpRegs(method, fp, true);
+        }
+
+        if (!gDvm.debuggerActive)
+            *pIsMethodEntry = false;
+    }
+#endif
+
+    /*
+     * If the debugger is attached, check for events.  If the profiler is
+     * enabled, update that too.
+     *
+     * This code is executed for every instruction we interpret, so for
+     * performance we use a couple of #ifdef blocks instead of runtime tests.
+     */
+    bool isEntry = *pIsMethodEntry;
+    if (isEntry) {
+        *pIsMethodEntry = false;
+        TRACE_METHOD_ENTER(self, method);
+    }
+    if (gDvm.debuggerActive) {
+        updateDebugger(method, pc, fp, isEntry, self);
+    }
+    if (gDvm.instructionCountEnableCount != 0) {
+        /*
+         * Count up the #of executed instructions.  This isn't synchronized
+         * for thread-safety; if we need that we should make this
+         * thread-local and merge counts into the global area when threads
+         * exit (perhaps suspending all other threads GC-style and pulling
+         * the data out of them).
+         */
+        int inst = *pc & 0xff;
+        gDvm.executedInstrCounts[inst]++;
+    }
+}
 
 /* File: portable/entry.c */
 /*
@@ -3236,7 +3486,7 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
         /*
          * Fill in the elements.  It's legal for vsrc1 to be zero.
          */
-        contents = (u4*) newArray->contents;
+        contents = (u4*)(void*)newArray->contents;
         if (methodCallRange) {
             for (i = 0; i < vsrc1; i++)
                 contents[i] = GET_REGISTER(vdst+i);
@@ -3255,7 +3505,7 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
             dvmWriteBarrierArray(newArray, 0, newArray->length);
         }
 
-        retval.l = newArray;
+        retval.l = (Object*)newArray;
     }
     FINISH(3);
 GOTO_TARGET_END
@@ -3299,7 +3549,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
         if (baseMethod == NULL) {
             baseMethod = dvmResolveMethod(curMethod->clazz, ref,METHOD_VIRTUAL);
             if (baseMethod == NULL) {
-                ILOGV("+ unknown method or access denied\n");
+                ILOGV("+ unknown method or access denied");
                 GOTO_exceptionThrown();
             }
         }
@@ -3335,7 +3585,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
             methodToCall->nativeFunc != NULL);
 #endif
 
-        LOGVV("+++ base=%s.%s virtual[%d]=%s.%s\n",
+        LOGVV("+++ base=%s.%s virtual[%d]=%s.%s",
             baseMethod->clazz->descriptor, baseMethod->name,
             (u4) baseMethod->methodIndex,
             methodToCall->clazz->descriptor, methodToCall->name);
@@ -3343,7 +3593,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
 
 #if 0
         if (vsrc1 != methodToCall->insSize) {
-            ALOGW("WRONG METHOD: base=%s.%s virtual[%d]=%s.%s\n",
+            ALOGW("WRONG METHOD: base=%s.%s virtual[%d]=%s.%s",
                 baseMethod->clazz->descriptor, baseMethod->name,
                 (u4) baseMethod->methodIndex,
                 methodToCall->clazz->descriptor, methodToCall->name);
@@ -3377,6 +3627,7 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
                 vsrc1 >> 4, ref, vdst, vsrc1 & 0x0f);
             thisReg = vdst & 0x0f;
         }
+
         /* impossible in well-formed code, but we must check nevertheless */
         if (!checkForNull((Object*) GET_REGISTER(thisReg)))
             GOTO_exceptionThrown();
@@ -3392,7 +3643,7 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
         if (baseMethod == NULL) {
             baseMethod = dvmResolveMethod(curMethod->clazz, ref,METHOD_VIRTUAL);
             if (baseMethod == NULL) {
-                ILOGV("+ unknown method or access denied\n");
+                ILOGV("+ unknown method or access denied");
                 GOTO_exceptionThrown();
             }
         }
@@ -3426,7 +3677,7 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
         assert(!dvmIsAbstractMethod(methodToCall) ||
             methodToCall->nativeFunc != NULL);
 #endif
-        LOGVV("+++ base=%s.%s super-virtual=%s.%s\n",
+        LOGVV("+++ base=%s.%s super-virtual=%s.%s",
             baseMethod->clazz->descriptor, baseMethod->name,
             methodToCall->clazz->descriptor, methodToCall->name);
         assert(methodToCall != NULL);
@@ -3708,11 +3959,11 @@ GOTO_TARGET(returnFromMethod)
 #endif
 
         /* back up to previous frame and see if we hit a break */
-        fp = saveArea->prevFrame;
+        fp = (u4*)saveArea->prevFrame;
         assert(fp != NULL);
         if (dvmIsBreakFrame(fp)) {
             /* bail without popping the method frame from stack */
-            LOGVV("+++ returned into break frame\n");
+            LOGVV("+++ returned into break frame");
 #if defined(WITH_JIT)
             /* Let the Jit know the return is terminating normally */
             CHECK_JIT_VOID();
@@ -3820,7 +4071,7 @@ GOTO_TARGET(exceptionThrown)
          * the "catch" blocks.
          */
         catchRelPc = dvmFindCatchBlock(self, pc - curMethod->insns,
-                    exception, false, (void*)&fp);
+                    exception, false, (void**)(void*)&fp);
 
         /*
          * Restore the stack bounds after an overflow.  This isn't going to
@@ -3849,7 +4100,7 @@ GOTO_TARGET(exceptionThrown)
         if (catchRelPc < 0) {
             /* falling through to JNI code or off the bottom of the stack */
 #if DVM_SHOW_EXCEPTION >= 2
-            ALOGD("Exception %s from %s:%d not caught locally\n",
+            ALOGD("Exception %s from %s:%d not caught locally",
                 exception->clazz->descriptor, dvmGetMethodSourceFile(curMethod),
                 dvmLineNumFromPC(curMethod, pc - curMethod->insns));
 #endif
@@ -3861,7 +4112,7 @@ GOTO_TARGET(exceptionThrown)
 #if DVM_SHOW_EXCEPTION >= 3
         {
             const Method* catchMethod = SAVEAREA_FROM_FP(fp)->method;
-            ALOGD("Exception %s thrown from %s:%d to %s:%d\n",
+            ALOGD("Exception %s thrown from %s:%d to %s:%d",
                 exception->clazz->descriptor, dvmGetMethodSourceFile(curMethod),
                 dvmLineNumFromPC(curMethod, pc - curMethod->insns),
                 dvmGetMethodSourceFile(catchMethod),
@@ -4010,7 +4261,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
             bottom = (u1*) newSaveArea - methodToCall->outsSize * sizeof(u4);
             if (bottom < self->interpStackEnd) {
                 /* stack overflow */
-                ALOGV("Stack overflow on method call (start=%p end=%p newBot=%p(%d) size=%d '%s')\n",
+                ALOGV("Stack overflow on method call (start=%p end=%p newBot=%p(%d) size=%d '%s')",
                     self->interpStackStart, self->interpStackEnd, bottom,
                     (u1*) fp - bottom, self->interpStackSize,
                     methodToCall->name);
@@ -4018,7 +4269,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
                 assert(dvmCheckException(self));
                 GOTO_exceptionThrown();
             }
-            //ALOGD("+++ fp=%p newFp=%p newSave=%p bottom=%p\n",
+            //ALOGD("+++ fp=%p newFp=%p newSave=%p bottom=%p",
             //    fp, newFp, newSaveArea, bottom);
         }
 
@@ -4053,7 +4304,8 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
             curMethod = methodToCall;
             methodClassDex = curMethod->clazz->pDvmDex;
             pc = methodToCall->insns;
-            fp = self->curFrame = newFp;
+            fp = newFp;
+            self->curFrame = fp;
 #ifdef EASY_GDB
             debugSaveArea = SAVEAREA_FROM_FP(newFp);
 #endif

@@ -17,6 +17,7 @@
 /*
  * Mterp entry point and support functions.
  */
+#include "Dalvik.h"
 #include "mterp/Mterp.h"
 
 #include <stddef.h>
@@ -25,7 +26,7 @@
 /*
  * Verify some constants used by the mterp interpreter.
  */
-bool dvmCheckAsmConstants(void)
+bool dvmCheckAsmConstants()
 {
     bool failed = false;
 
@@ -38,13 +39,15 @@ bool dvmCheckAsmConstants(void)
 #include "mterp/common/asm-constants.h"
 
     if (failed) {
-        ALOGE("Please correct the values in mterp/common/asm-constants.h\n");
+        ALOGE("Please correct the values in mterp/common/asm-constants.h");
         dvmAbort();
     }
 
     /*
-     * If an instruction overflows the 64-byte handler size limit, it will
-     * push everything up and alter the total size.  Check it here.
+     * If we're using computed goto instruction transitions, make sure
+     * none of the handlers overflows the 64-byte limit.  This won't tell
+     * which one did, but if any one is too big the total size will
+     * overflow.
      */
 #if defined(__mips__)
     const int width = 128;
@@ -54,8 +57,8 @@ bool dvmCheckAsmConstants(void)
     int interpSize = (uintptr_t) dvmAsmInstructionEnd -
                      (uintptr_t) dvmAsmInstructionStart;
     if (interpSize != 0 && interpSize != kNumPackedOpcodes*width) {
-        ALOGE("ERROR: unexpected asm interp size %d\n", interpSize);
-        ALOGE("(did an instruction handler exceed %d bytes?)\n", width);
+        ALOGE("ERROR: unexpected asm interp size %d", interpSize);
+        ALOGE("(did an instruction handler exceed %d bytes?)", width);
         dvmAbort();
     }
 
@@ -66,10 +69,7 @@ bool dvmCheckAsmConstants(void)
 
 
 /*
- * "Standard" mterp entry point.  This sets up a "glue" structure and then
- * calls into the assembly interpreter implementation.
- *
- * (There is presently no "debug" entry point.)
+ * "Mterp entry point.
  */
 bool dvmMterpStd(Thread* self, InterpState* glue)
 {
@@ -95,8 +95,9 @@ bool dvmMterpStd(Thread* self, InterpState* glue)
     glue->pActiveProfilers = &gDvm.activeProfilers;
 
     IF_LOGVV() {
-        char* desc = dexProtoCopyMethodDescriptor(&glue->method->prototype);
-        LOGVV("mterp threadid=%d entry %d: %s.%s %s\n",
+        char* desc = dexProtoCopyMethodDescriptor(
+                         &glue->method->prototype);
+        LOGVV("mterp threadid=%d entry %d: %s.%s %s",
             dvmThreadSelf()->threadId,
             glue->entryPoint,
             glue->method->clazz->descriptor,
@@ -104,8 +105,9 @@ bool dvmMterpStd(Thread* self, InterpState* glue)
             desc);
         free(desc);
     }
-    //ALOGI("glue is %p, pc=%p, fp=%p\n", glue, glue->pc, glue->fp);
-    //ALOGI("first instruction is 0x%04x\n", glue->pc[0]);
+    //ALOGI("self is %p, pc=%p, fp=%p", self, self->interpSave.pc,
+    //      self->interpSave.curFrame);
+    //ALOGI("first instruction is 0x%04x", self->interpSave.pc[0]);
 
     changeInterp = dvmMterpStdRun(glue);
 
@@ -118,7 +120,7 @@ bool dvmMterpStd(Thread* self, InterpState* glue)
     if (!changeInterp) {
         /* this is a "normal" exit; we're not coming back */
 #ifdef LOG_INSTR
-        ALOGD("|-- Leaving interpreter loop");
+    ALOGD("|-- Leaving interpreter loop");
 #endif
         return false;
     } else {
