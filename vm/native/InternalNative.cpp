@@ -66,7 +66,7 @@ static DalvikNativeClass gDvmNativeMethodSet[] = {
 /*
  * Set up hash values on the class names.
  */
-bool dvmInternalNativeStartup(void)
+bool dvmInternalNativeStartup()
 {
     DalvikNativeClass* classPtr = gDvmNativeMethodSet;
 
@@ -86,7 +86,7 @@ bool dvmInternalNativeStartup(void)
 /*
  * Clean up.
  */
-void dvmInternalNativeShutdown(void)
+void dvmInternalNativeShutdown()
 {
     dvmHashTableFree(gDvm.userDexFiles);
 }
@@ -117,7 +117,7 @@ DalvikNativeFunc dvmLookupInternalNativeMethod(const Method* method)
                     pMeth->signature, method) == 0)
                 {
                     /* match */
-                    //ALOGV("+++  match on %s.%s %s at %p\n",
+                    //ALOGV("+++  match on %s.%s %s at %p",
                     //    className, methodName, methodSignature, pMeth->fnPtr);
                     return pMeth->fnPtr;
                 }
@@ -140,7 +140,7 @@ DalvikNativeFunc dvmLookupInternalNativeMethod(const Method* method)
  */
 void dvmAbstractMethodStub(const u4* args, JValue* pResult)
 {
-    ALOGD("--- called into dvmAbstractMethodStub\n");
+    ALOGD("--- called into dvmAbstractMethodStub");
     dvmThrowException("Ljava/lang/AbstractMethodError;",
         "abstract method not implemented");
 }
@@ -151,8 +151,7 @@ void dvmAbstractMethodStub(const u4* args, JValue* pResult)
  *
  * Returns "false" and throws an exception if not.
  */
-bool dvmVerifyObjectInClass(Object* obj, ClassObject* clazz)
-{
+bool dvmVerifyObjectInClass(Object* obj, ClassObject* clazz) {
     if (obj == NULL) {
         dvmThrowException("Ljava/lang/NullPointerException;", NULL);
         return false;
@@ -222,7 +221,7 @@ ClassObject* dvmFindClassByName(StringObject* nameObj, Object* loader,
      * auto-generating bogus array classes.
      */
     if (!validateClassName(name)) {
-        ALOGW("dvmFindClassByName rejecting '%s'\n", name);
+        ALOGW("dvmFindClassByName rejecting '%s'", name);
         dvmThrowException("Ljava/lang/ClassNotFoundException;", name);
         goto bail;
     }
@@ -238,7 +237,7 @@ ClassObject* dvmFindClassByName(StringObject* nameObj, Object* loader,
         clazz = dvmFindClassNoInit(descriptor, loader);
 
     if (clazz == NULL) {
-        LOGVV("FAIL: load %s (%d)\n", descriptor, doInit);
+        LOGVV("FAIL: load %s (%d)", descriptor, doInit);
         Thread* self = dvmThreadSelf();
         Object* oldExcep = dvmGetException(self);
         dvmAddTrackedAlloc(oldExcep, self);     /* don't let this be GCed */
@@ -247,7 +246,7 @@ ClassObject* dvmFindClassByName(StringObject* nameObj, Object* loader,
             name, oldExcep);
         dvmReleaseTrackedAlloc(oldExcep, self);
     } else {
-        LOGVV("GOOD: load %s (%d) --> %p ldr=%p\n",
+        LOGVV("GOOD: load %s (%d) --> %p ldr=%p",
             descriptor, doInit, clazz, clazz->classLoader);
     }
 

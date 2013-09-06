@@ -24,13 +24,13 @@
 /*
  * Internal struct for managing DexFile.
  */
-typedef struct DexOrJar {
+struct DexOrJar {
     char*       fileName;
     bool        isDex;
     bool        okayToFree;
     RawDexFile* pRawDexFile;
     JarFile*    pJarFile;
-} DexOrJar;
+};
 
 /*
  * (This is a dvmHashTableFree callback.)
@@ -39,7 +39,7 @@ void dvmFreeDexOrJar(void* vptr)
 {
     DexOrJar* pDexOrJar = (DexOrJar*) vptr;
 
-    ALOGV("Freeing DexOrJar '%s'\n", pDexOrJar->fileName);
+    ALOGV("Freeing DexOrJar '%s'", pDexOrJar->fileName);
 
     if (pDexOrJar->isDex)
         dvmRawDexFileFree(pDexOrJar->pRawDexFile);
@@ -70,7 +70,7 @@ static bool validateCookie(int cookie)
 {
     DexOrJar* pDexOrJar = (DexOrJar*) cookie;
 
-    LOGVV("+++ dex verifying cookie %p\n", pDexOrJar);
+    LOGVV("+++ dex verifying cookie %p", pDexOrJar);
 
     if (pDexOrJar == NULL)
         return false;
@@ -162,19 +162,19 @@ static void Dalvik_dalvik_system_DexFile_openDexFile(const u4* args,
      * with a "classes.dex" inside.
      */
     if (dvmRawDexFileOpen(sourceName, outputName, &pRawDexFile, false) == 0) {
-        ALOGV("Opening DEX file '%s' (DEX)\n", sourceName);
+        ALOGV("Opening DEX file '%s' (DEX)", sourceName);
 
         pDexOrJar = (DexOrJar*) malloc(sizeof(DexOrJar));
         pDexOrJar->isDex = true;
         pDexOrJar->pRawDexFile = pRawDexFile;
     } else if (dvmJarFileOpen(sourceName, outputName, &pJarFile, false) == 0) {
-        ALOGV("Opening DEX file '%s' (Jar)\n", sourceName);
+        ALOGV("Opening DEX file '%s' (Jar)", sourceName);
 
         pDexOrJar = (DexOrJar*) malloc(sizeof(DexOrJar));
         pDexOrJar->isDex = false;
         pDexOrJar->pJarFile = pJarFile;
     } else {
-        ALOGV("Unable to open DEX file '%s'\n", sourceName);
+        ALOGV("Unable to open DEX file '%s'", sourceName);
         dvmThrowException("Ljava/io/IOException;", "unable to open DEX file");
     }
 
@@ -213,11 +213,10 @@ static void Dalvik_dalvik_system_DexFile_closeDexFile(const u4* args,
 
     if (pDexOrJar == NULL)
         RETURN_VOID();
-
-    ALOGV("Closing DEX file %p (%s)\n", pDexOrJar, pDexOrJar->fileName);
-
     if (!validateCookie(cookie))
         RETURN_VOID();
+
+    ALOGV("Closing DEX file %p (%s)", pDexOrJar, pDexOrJar->fileName);
 
     /*
      * We can't just free arbitrary DEX files because they have bits and
@@ -231,14 +230,14 @@ static void Dalvik_dalvik_system_DexFile_closeDexFile(const u4* args,
         u4 hash = dvmComputeUtf8Hash(pDexOrJar->fileName);
         dvmHashTableLock(gDvm.userDexFiles);
         if (!dvmHashTableRemove(gDvm.userDexFiles, hash, pDexOrJar)) {
-            ALOGW("WARNING: could not remove '%s' from DEX hash table\n",
+            ALOGW("WARNING: could not remove '%s' from DEX hash table",
                 pDexOrJar->fileName);
         }
         dvmHashTableUnlock(gDvm.userDexFiles);
-        ALOGV("+++ freeing DexFile '%s' resources\n", pDexOrJar->fileName);
+        ALOGV("+++ freeing DexFile '%s' resources", pDexOrJar->fileName);
         dvmFreeDexOrJar(pDexOrJar);
     } else {
-        ALOGV("+++ NOT freeing DexFile '%s' resources\n", pDexOrJar->fileName);
+        ALOGV("+++ NOT freeing DexFile '%s' resources", pDexOrJar->fileName);
     }
 
     RETURN_VOID();
@@ -273,7 +272,8 @@ static void Dalvik_dalvik_system_DexFile_defineClass(const u4* args,
 
     name = dvmCreateCstrFromString(nameObj);
     descriptor = dvmDotToDescriptor(name);
-    ALOGV("--- Explicit class load '%s' 0x%08x\n", descriptor, cookie);
+    ALOGV("--- Explicit class load '%s' 0x%08x",
+        descriptor, cookie);
     free(name);
 
     if (!validateCookie(cookie))
@@ -332,27 +332,25 @@ static void Dalvik_dalvik_system_DexFile_getClassNameList(const u4* args,
 {
     int cookie = args[0];
     DexOrJar* pDexOrJar = (DexOrJar*) cookie;
-    DvmDex* pDvmDex;
-    DexFile* pDexFile;
-    ArrayObject* stringArray;
     Thread* self = dvmThreadSelf();
 
     if (!validateCookie(cookie))
         RETURN_VOID();
 
+    DvmDex* pDvmDex;
     if (pDexOrJar->isDex)
         pDvmDex = dvmGetRawDexFileDex(pDexOrJar->pRawDexFile);
     else
         pDvmDex = dvmGetJarFileDex(pDexOrJar->pJarFile);
     assert(pDvmDex != NULL);
-    pDexFile = pDvmDex->pDexFile;
+    DexFile* pDexFile = pDvmDex->pDexFile;
 
     int count = pDexFile->pHeader->classDefsSize;
-    stringArray = dvmAllocObjectArray(gDvm.classJavaLangString, count,
-                    ALLOC_DEFAULT);
+    ArrayObject* stringArray =
+        dvmAllocObjectArray(gDvm.classJavaLangString, count, ALLOC_DEFAULT);
     if (stringArray == NULL) {
         /* probably OOM */
-        ALOGD("Failed allocating array of %d strings\n", count);
+        ALOGD("Failed allocating array of %d strings", count);
         assert(dvmCheckException(self));
         RETURN_VOID();
     }
@@ -375,7 +373,7 @@ static void Dalvik_dalvik_system_DexFile_getClassNameList(const u4* args,
 }
 
 /*
- * public static boolean isDexOptNeeded(String apkName)
+ * public static boolean isDexOptNeeded(String fileName)
  *         throws FileNotFoundException, IOException
  *
  * Returns true if the VM believes that the apk/jar file is out of date
@@ -410,7 +408,7 @@ static void Dalvik_dalvik_system_DexFile_isDexOptNeeded(const u4* args,
         RETURN_VOID();
     }
     status = dvmDexCacheStatus(name);
-    ALOGV("dvmDexCacheStatus(%s) returned %d\n", name, status);
+    ALOGV("dvmDexCacheStatus(%s) returned %d", name, status);
 
     result = true;
     switch (status) {

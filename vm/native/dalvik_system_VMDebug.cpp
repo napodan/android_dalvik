@@ -58,7 +58,7 @@ static int getFileDescriptor(Object* obj)
  *
  * Returns NULL on failure, with an exception raised.
  */
-static ArrayObject* convertStringArray(char** strings, size_t count)
+static ArrayObject* convertStringArray(const char** strings, size_t count)
 {
     Thread* self = dvmThreadSelf();
 
@@ -111,11 +111,9 @@ static ArrayObject* convertStringArray(char** strings, size_t count)
  * of interest to DDMS).  Some features may be controlled by compile-time
  * or command-line flags.
  */
-static void Dalvik_dalvik_system_VMDebug_getVmFeatureList(const u4* args,
-    JValue* pResult)
-{
+static void Dalvik_dalvik_system_VMDebug_getVmFeatureList(const u4* args, JValue* pResult) {
     static const int MAX_FEATURE_COUNT = 10;
-    char* features[MAX_FEATURE_COUNT];
+    const char* features[MAX_FEATURE_COUNT];
     int idx = 0;
 
     /* VM responds to DDMS method profiling requests */
@@ -133,7 +131,6 @@ static void Dalvik_dalvik_system_VMDebug_getVmFeatureList(const u4* args,
     ArrayObject* arrayObj = convertStringArray(features, idx);
     RETURN_PTR(arrayObj);       /* will be null on OOM */
 }
-
 
 /* These must match the values in dalvik.system.VMDebug.
  */
@@ -562,12 +559,23 @@ static void Dalvik_dalvik_system_VMDebug_getInstructionCount(const u4* args,
     JValue* pResult)
 {
     ArrayObject* countArray = (ArrayObject*) args[0];
-    int* storage;
 
-    storage = (int*) countArray->contents;
-    sched_yield();
-    memcpy(storage, gDvm.executedInstrCounts,
-        kNumPackedOpcodes * sizeof(int));
+    if (countArray != NULL) {
+        int* storage = (int*)(void*)countArray->contents;
+        u4 length = countArray->length;
+
+        /*
+         * Ensure that we copy at most kNumPackedOpcodes
+         * elements, but no more than the length of the given array.
+         */
+        if (length > kNumPackedOpcodes) {
+            length = kNumPackedOpcodes;
+        }
+
+        sched_yield();
+        memcpy(storage, gDvm.executedInstrCounts, length * sizeof(int));
+    }
+
     RETURN_VOID();
 }
 
@@ -673,8 +681,9 @@ static void Dalvik_dalvik_system_VMDebug_dumpHprofData(const u4* args,
     int fd = -1;
     if (fileDescriptor != NULL) {
         fd = getFileDescriptor(fileDescriptor);
-        if (fd < 0)
+        if (fd < 0) {
             RETURN_VOID();
+        }
     }
 
     result = hprofDumpHeap(fileName, fd, false);
@@ -683,7 +692,7 @@ static void Dalvik_dalvik_system_VMDebug_dumpHprofData(const u4* args,
     if (result != 0) {
         /* ideally we'd throw something more specific based on actual failure */
         dvmThrowException("Ljava/lang/RuntimeException;",
-            "Failure during heap dump -- check log output for details");
+            "Failure during heap dump; check log output for details");
         RETURN_VOID();
     }
 #else
@@ -709,7 +718,7 @@ static void Dalvik_dalvik_system_VMDebug_dumpHprofDataDdms(const u4* args,
     if (result != 0) {
         /* ideally we'd throw something more specific based on actual failure */
         dvmThrowException("Ljava/lang/RuntimeException;",
-            "Failure during heap dump -- check log output for details");
+            "Failure during heap dump; check log output for details");
         RETURN_VOID();
     }
 #else
@@ -771,14 +780,14 @@ static void Dalvik_dalvik_system_VMDebug_cacheRegisterMap(const u4* args,
     }
     *methodDescr++ = '\0';
 
-    //ALOGD("GOT: %s %s %s\n", classAndMethodDesc, methodName, methodDescr);
+    //ALOGD("GOT: %s %s %s", classAndMethodDesc, methodName, methodDescr);
 
     /*
      * Find the class, but only if it's already loaded.
      */
     clazz = dvmLookupClass(classAndMethodDesc, NULL, false);
     if (clazz == NULL) {
-        ALOGD("Class %s not found in bootstrap loader\n", classAndMethodDesc);
+        ALOGD("Class %s not found in bootstrap loader", classAndMethodDesc);
         goto bail;
     }
 
@@ -814,15 +823,15 @@ static void Dalvik_dalvik_system_VMDebug_cacheRegisterMap(const u4* args,
         const RegisterMap* pMap;
         pMap = dvmGetExpandedRegisterMap(method);
         if (pMap == NULL) {
-            ALOGV("No map for %s.%s %s\n",
+            ALOGV("No map for %s.%s %s",
                 classAndMethodDesc, methodName, methodDescr);
         } else {
-            ALOGV("Found map %s.%s %s\n",
+            ALOGV("Found map %s.%s %s",
                 classAndMethodDesc, methodName, methodDescr);
             result = true;
         }
     } else {
-        ALOGV("Unable to find %s.%s %s\n",
+        ALOGV("Unable to find %s.%s %s",
             classAndMethodDesc, methodName, methodDescr);
     }
 
@@ -840,11 +849,11 @@ static void Dalvik_dalvik_system_VMDebug_dumpReferenceTables(const u4* args,
     UNUSED_PARAMETER(args);
     UNUSED_PARAMETER(pResult);
 
-    ALOGI("--- reference table dump ---\n");
+    ALOGI("--- reference table dump ---");
     dvmDumpJniReferenceTables();
     // could dump thread's internalLocalRefTable, probably not useful
     // ditto for thread's jniMonitorRefTable
-    ALOGI("---\n");
+    ALOGI("---");
     RETURN_VOID();
 }
 
@@ -863,7 +872,7 @@ static void Dalvik_dalvik_system_VMDebug_crash(const u4* args,
     UNUSED_PARAMETER(args);
     UNUSED_PARAMETER(pResult);
 
-    ALOGW("Crashing VM on request\n");
+    ALOGW("Crashing VM on request");
     dvmDumpThread(dvmThreadSelf(), false);
     dvmAbort();
 }
