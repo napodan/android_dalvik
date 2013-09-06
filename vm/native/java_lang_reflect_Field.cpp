@@ -22,8 +22,7 @@
 
 
 /*
- * Get the address of a field from an object.  This can be used with "get"
- * or "set".
+ * Validate access to a field.  Returns a pointer to the Field struct.
  *
  * "declaringClass" is the class in which the field was declared.  For an
  * instance field, "obj" is the object that holds the field data; for a
@@ -35,12 +34,12 @@
  * On failure, throws an exception and returns NULL.
  *
  * The documentation lists exceptional conditions and the exceptions that
- * should be thrown, but doesn't say which exception previals when two or
+ * should be thrown, but doesn't say which exception prevails when two or
  * more exceptional conditions exist at the same time.  For example,
  * attempting to set a protected field from an unrelated class causes an
  * IllegalAccessException, while passing in a data type that doesn't match
  * the field causes an IllegalArgumentException.  If code does both at the
- * same time, we have to choose one or othe other.
+ * same time, we have to choose one or the other.
  *
  * The expected order is:
  *  (1) Check for illegal access. Throw IllegalAccessException.
@@ -142,10 +141,10 @@ static JValue* getFieldDataAddr(Object* obj, ClassObject* declaringClass,
 /*
  * public int getFieldModifiers(Class declaringClass, int slot)
  */
-static void Dalvik_java_lang_reflect_Field_getFieldModifiers(
-    const u4* args, JValue* pResult)
+static void Dalvik_java_lang_reflect_Field_getFieldModifiers(const u4* args,
+    JValue* pResult)
 {
-    // ignore thisPtr in args[0]
+    /* ignore thisPtr in args[0] */
     ClassObject* declaringClass = (ClassObject*) args[1];
     int slot = args[2];
     Field* field;
@@ -163,7 +162,7 @@ static void Dalvik_java_lang_reflect_Field_getFieldModifiers(
 static void Dalvik_java_lang_reflect_Field_getField(const u4* args,
     JValue* pResult)
 {
-    // ignore thisPtr in args[0]
+    /* ignore thisPtr in args[0] */
     Object* obj = (Object*) args[1];
     ClassObject* declaringClass = (ClassObject*) args[2];
     ClassObject* fieldType = (ClassObject*) args[3];
@@ -204,7 +203,7 @@ static void Dalvik_java_lang_reflect_Field_getField(const u4* args,
 static void Dalvik_java_lang_reflect_Field_setField(const u4* args,
     JValue* pResult)
 {
-    // ignore thisPtr in args[0]
+    /* ignore thisPtr in args[0] */
     Object* obj = (Object*) args[1];
     ClassObject* declaringClass = (ClassObject*) args[2];
     ClassObject* fieldType = (ClassObject*) args[3];
@@ -236,11 +235,11 @@ static void Dalvik_java_lang_reflect_Field_setField(const u4* args,
             StaticField *sfield;
             sfield = (StaticField *)dvmSlotToField(declaringClass, slot);
             assert(fieldPtr == &sfield->value);
-            dvmSetStaticFieldObject(sfield, value.l);
+            dvmSetStaticFieldObject(sfield, (Object*)value.l);
         } else {
             int offset = declaringClass->ifields[slot].byteOffset;
             assert(fieldPtr == (JValue *)BYTE_OFFSET(obj, offset));
-            dvmSetFieldObject(obj, offset, value.l);
+            dvmSetFieldObject(obj, offset, (Object*)value.l);
         }
     } else {
         fieldPtr->i = value.i;
@@ -398,7 +397,7 @@ static void Dalvik_java_lang_reflect_Field_getDeclaredAnnotations(
 static void Dalvik_java_lang_reflect_Field_getSignatureAnnotation(const u4* args,
     JValue* pResult)
 {
-    // ignore thisPtr in args[0]
+    /* ignore thisPtr in args[0] */
     ClassObject* declaringClass = (ClassObject*) args[1];
     int slot = args[2];
     Field* field;

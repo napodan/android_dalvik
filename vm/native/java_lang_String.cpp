@@ -21,22 +21,14 @@
 #include "native/InternalNativePriv.h"
 
 
-/*
- * public String intern()
- *
- * Intern a string in the VM string table.
- */
-static void Dalvik_java_lang_String_intern(const u4* args, JValue* pResult)
+static void String_intern(const u4* args, JValue* pResult)
 {
     StringObject* str = (StringObject*) args[0];
-    StringObject* interned;
-
-    interned = dvmLookupInternedString(str);
+    StringObject* interned = dvmLookupInternedString(str);
     RETURN_PTR(interned);
 }
 
 const DalvikNativeMethod dvm_java_lang_String[] = {
-    { "intern",             "()Ljava/lang/String;",
-        Dalvik_java_lang_String_intern },
+    { "intern",      "()Ljava/lang/String;",  String_intern },
     { NULL, NULL, NULL },
 };

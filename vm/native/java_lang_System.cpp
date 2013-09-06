@@ -14,14 +14,33 @@
  * limitations under the License.
  */
 
-/*
- * java.lang.Class
- */
 #include "Dalvik.h"
 #include "native/InternalNativePriv.h"
 
 /*
- * Call the appropriate copy function given the circumstances.
+ * The VM makes guarantees about the atomicity of accesses to primitive
+ * variables.  These guarantees also apply to elements of arrays.
+ * In particular, 8-bit, 16-bit, and 32-bit accesses must be atomic and
+ * must not cause "word tearing".  Accesses to 64-bit array elements must
+ * either be atomic or treated as two 32-bit operations.  References are
+ * always read and written atomically, regardless of the number of bits
+ * used to represent them.
+ *
+ * We can't rely on standard libc functions like memcpy() and memmove()
+ * in our implementation of System.arraycopy(), because they may copy
+ * byte-by-byte (either for the full run or for "unaligned" parts at the
+ * start or end).  We need to use functions that guarantee 16-bit or 32-bit
+ * atomicity as appropriate.
+ *
+ * System.arraycopy() is heavily used, so having an efficient implementation
+ * is important.  The bionic libc provides a platform-optimized memory move
+ * function that should be used when possible.  If it's not available,
+ * the trivial "reference implementation" versions below can be used until
+ * a proper version can be written.
+ *
+ * For these functions, The caller must guarantee that dest/src are aligned
+ * appropriately for the element type, and that n is a multiple of the
+ * element size.
  */
 static void copy(void *dest, const void *src, size_t n, bool sameArray,
         size_t elemSize)
@@ -57,22 +76,12 @@ static void copy(void *dest, const void *src, size_t n, bool sameArray,
  */
 static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
 {
-    ArrayObject* srcArray;
-    ArrayObject* dstArray;
-    ClassObject* srcClass;
-    ClassObject* dstClass;
-    int srcPos, dstPos, length;
-    char srcType, dstType;
-    bool srcPrim, dstPrim;
-    bool sameArray;
-
-    srcArray = (ArrayObject*) args[0];
-    srcPos = args[1];
-    dstArray = (ArrayObject*) args[2];
-    dstPos = args[3];
-    length = args[4];
-
-    sameArray = (srcArray == dstArray);
+    ArrayObject* srcArray = (ArrayObject*) args[0];
+    int srcPos = args[1];
+    ArrayObject* dstArray = (ArrayObject*) args[2];
+    int dstPos = args[3];
+    int length = args[4];
+    bool sameArray = (srcArray == dstArray);
 
     /* check for null or bad pointer */
     if (!dvmValidateObject((Object*)srcArray) ||
@@ -90,7 +99,7 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
         RETURN_VOID();
     }
 
-    // avoid int overflow
+    /* avoid int overflow */
     if (srcPos < 0 || dstPos < 0 || length < 0 ||
         srcPos > (int) srcArray->length - length ||
         dstPos > (int) dstArray->length - length)
@@ -101,17 +110,17 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
         RETURN_VOID();
     }
 
-    srcClass = srcArray->obj.clazz;
-    dstClass = dstArray->obj.clazz;
-    srcType = srcClass->descriptor[1];
-    dstType = dstClass->descriptor[1];
+    ClassObject* srcClass = srcArray->obj.clazz;
+    ClassObject* dstClass = dstArray->obj.clazz;
+    char srcType = srcClass->descriptor[1];
+    char dstType = dstClass->descriptor[1];
 
     /*
      * If one of the arrays holds a primitive type, the other array must
      * hold the same type.
      */
-    srcPrim = (srcType != '[' && srcType != 'L');
-    dstPrim = (dstType != '[' && dstType != 'L');
+    bool srcPrim = (srcType != '[' && srcType != 'L');
+    bool dstPrim = (dstType != '[' && dstType != 'L');
     if (srcPrim || dstPrim) {
         int width;
 
@@ -146,7 +155,7 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
             break;
         }
 
-        if (false) LOGVV("arraycopy prim dst=%p %d src=%p %d len=%d\n",
+        if (false) ALOGD("arraycopy prim dst=%p %d src=%p %d len=%d",
                 dstArray->contents, dstPos * width,
                 srcArray->contents, srcPos * width,
                 length * width);
@@ -160,7 +169,7 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
          * of elements in "dst" (e.g. copy String to String or String to
          * Object).
          */
-        int width = sizeof(Object*);
+        const int width = sizeof(Object*);
 
         if (srcClass->arrayDim == dstClass->arrayDim &&
             dvmInstanceof(srcClass, dstClass))
@@ -168,7 +177,7 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
             /*
              * "dst" can hold "src"; copy the whole thing.
              */
-            if (false) LOGVV("arraycopy ref dst=%p %d src=%p %d len=%d\n",
+            if (false) ALOGD("arraycopy ref dst=%p %d src=%p %d len=%d",
                 dstArray->contents, dstPos * width,
                 srcArray->contents, srcPos * width,
                 length * width);
@@ -179,24 +188,24 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
             dvmWriteBarrierArray(dstArray, dstPos, dstPos+length);
         } else {
             /*
-             * The arrays are not fundamentally compatible.  However, we may
-             * still be able to do this if the destination object is compatible
-             * (e.g. copy Object to String, but the Object being copied is
-             * actually a String).  We need to copy elements one by one until
-             * something goes wrong.
+             * The arrays are not fundamentally compatible.  However, we
+             * may still be able to do this if the destination object is
+             * compatible (e.g. copy Object[] to String[], but the Object
+             * being copied is actually a String).  We need to copy elements
+             * one by one until something goes wrong.
              *
-             * Because of overlapping moves, what we really want to do is
-             * compare the types and count up how many we can move, then call
-             * memmove() to shift the actual data.  If we just start from the
-             * front we could do a smear rather than a move.
+             * Because of overlapping moves, what we really want to do
+             * is compare the types and count up how many we can move,
+             * then call move32() to shift the actual data.  If we just
+             * start from the front we could do a smear rather than a move.
              */
             Object** srcObj;
             Object** dstObj;
             int copyCount;
             ClassObject*   clazz = NULL;
 
-            srcObj = ((Object**) srcArray->contents) + srcPos;
-            dstObj = ((Object**) dstArray->contents) + dstPos;
+            srcObj = ((Object**)(void*)srcArray->contents) + srcPos;
+            dstObj = ((Object**)(void*)dstArray->contents) + dstPos;
 
             if (length > 0 && srcObj[0] != NULL)
             {
@@ -216,13 +225,13 @@ static void Dalvik_java_lang_System_arraycopy(const u4* args, JValue* pResult)
                 }
             }
 
-            if (false) LOGVV("arraycopy iref dst=%p %d src=%p %d count=%d of %d\n",
+            if (false) ALOGD("arraycopy iref dst=%p %d src=%p %d count=%d of %d",
                 dstArray->contents, dstPos * width,
                 srcArray->contents, srcPos * width,
                 copyCount, length);
             copy((u1*)dstArray->contents + dstPos * width,
-                    (const u1*)srcArray->contents + srcPos * width,
-                    copyCount * width,
+                (const u1*)srcArray->contents + srcPos * width,
+                copyCount * width,
                     sameArray, width);
             dvmWriteBarrierArray(dstArray, 0, copyCount);
             if (copyCount != length) {
@@ -286,9 +295,6 @@ static void Dalvik_java_lang_System_identityHashCode(const u4* args,
     RETURN_INT(dvmIdentityHashCode(thisPtr));
 }
 
-/*
- * public static String mapLibraryName(String libname)
- */
 static void Dalvik_java_lang_System_mapLibraryName(const u4* args,
     JValue* pResult)
 {
@@ -319,11 +325,11 @@ const DalvikNativeMethod dvm_java_lang_System[] = {
         Dalvik_java_lang_System_arraycopy },
     { "currentTimeMillis",  "()J",
         Dalvik_java_lang_System_currentTimeMillis },
-    { "nanoTime",  "()J",
-        Dalvik_java_lang_System_nanoTime },
     { "identityHashCode",  "(Ljava/lang/Object;)I",
         Dalvik_java_lang_System_identityHashCode },
     { "mapLibraryName",     "(Ljava/lang/String;)Ljava/lang/String;",
         Dalvik_java_lang_System_mapLibraryName },
+    { "nanoTime",  "()J",
+        Dalvik_java_lang_System_nanoTime },
     { NULL, NULL, NULL },
 };

@@ -40,7 +40,7 @@ static void Dalvik_java_lang_VMClassLoader_defineClass(const u4* args,
     char* name = NULL;
 
     name = dvmCreateCstrFromString(nameObj);
-    ALOGE("ERROR: defineClass(%p, %s, %p, %d, %d, %p)\n",
+    ALOGE("ERROR: defineClass(%p, %s, %p, %d, %d, %p)",
         loader, name, data, offset, len, pd);
     dvmThrowException("Ljava/lang/UnsupportedOperationException;",
         "can't load this type of class file");
@@ -66,7 +66,7 @@ static void Dalvik_java_lang_VMClassLoader_defineClass2(const u4* args,
     int len = args[3];
     Object* pd = (Object*) args[4];
 
-    ALOGE("ERROR: defineClass(%p, %p, %d, %d, %p)\n",
+    ALOGE("ERROR: defineClass(%p, %p, %d, %d, %p)",
         loader, data, offset, len, pd);
     dvmThrowException("Ljava/lang/UnsupportedOperationException;",
         "can't load this type of class file");
@@ -103,7 +103,7 @@ static void Dalvik_java_lang_VMClassLoader_findLoadedClass(const u4* args,
         goto bail;
 
     clazz = dvmLookupClass(descriptor, loader, false);
-    LOGVV("look: %s ldr=%p --> %p\n", descriptor, loader, clazz);
+    LOGVV("look: %s ldr=%p --> %p", descriptor, loader, clazz);
 
 bail:
     free(name);
@@ -156,7 +156,7 @@ static void Dalvik_java_lang_VMClassLoader_getPrimitiveClass(const u4* args,
 {
     int primType = args[0];
 
-    pResult->l = dvmFindPrimitiveClass(primType);
+    pResult->l = (Object*)dvmFindPrimitiveClass(primType);
 }
 
 /*
