@@ -20,7 +20,6 @@
 #include "Dalvik.h"
 #include "native/InternalNativePriv.h"
 
-
 /*
  * public static ClassLoader getCallingClassLoader()
  *
@@ -91,7 +90,8 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
     /*
      * Get an array with the stack trace in it.
      */
-    if (!dvmCreateStackTraceArray(dvmThreadSelf()->curFrame, &methods,
+    void *fp = dvmThreadSelf()->curFrame;
+    if (!dvmCreateStackTraceArray(fp, &methods,
             &methodCount))
     {
         ALOGE("Failed to create stack trace array\n");
@@ -99,12 +99,6 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
         RETURN_VOID();
     }
 
-    //int i;
-    //ALOGI("dvmCreateStackTraceArray results:\n");
-    //for (i = 0; i < methodCount; i++) {
-    //    ALOGI(" %2d: %s.%s\n",
-    //        i, methods[i]->clazz->descriptor, methods[i]->name);
-    //}
 
     /*
      * Run through the array and count up how many elements there are.
@@ -133,18 +127,20 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
      * Create an array object to hold the classes.
      * TODO: can use gDvm.classJavaLangClassArray here?
      */
-    ClassObject* classArrayClass = NULL;
-    ArrayObject* classes = NULL;
-    classArrayClass = dvmFindArrayClass("[Ljava/lang/Class;", NULL);
+    ClassObject* classArrayClass = dvmFindArrayClass("[Ljava/lang/Class;",
+                                                     NULL);
     if (classArrayClass == NULL) {
-        ALOGW("Unable to find java.lang.Class array class\n");
-        goto bail;
+        ALOGW("Unable to find java.lang.Class array class");
+    free(methods);
+        return;
     }
-    classes = dvmAllocArray(classArrayClass, size, kObjectArrayRefWidth,
-                ALLOC_DEFAULT);
+    ArrayObject* classes = dvmAllocArray(classArrayClass,
+                                                size, kObjectArrayRefWidth,
+                                                ALLOC_DEFAULT);
     if (classes == NULL) {
-        ALOGW("Unable to allocate class array (%d elems)\n", size);
-        goto bail;
+        ALOGW("Unable to allocate class array (%d elems)", size);
+    free(methods);
+        return;
     }
 
     /*
@@ -161,22 +157,19 @@ static void Dalvik_dalvik_system_VMStack_getClasses(const u4* args,
     }
     assert(objCount == classes->length);
 
-bail:
     free(methods);
-    dvmReleaseTrackedAlloc((Object*) classes, NULL);
+    dvmReleaseTrackedAlloc((Object*)classes, NULL);
     RETURN_PTR(classes);
 }
 
 /*
- * public static StackTraceElement[] getThreadStackTrace(Thread t)
- *
- * Retrieve the stack trace of the specified thread and return it as an
- * array of StackTraceElement.  Returns NULL on failure.
+ * Return a trace buffer for the specified thread or NULL if the
+ * thread is not still alive. *depth is set to the length of a
+ * non-NULL trace buffer. Caller is responsible for freeing the trace
+ * buffer.
  */
-static void Dalvik_dalvik_system_VMStack_getThreadStackTrace(const u4* args,
-    JValue* pResult)
+static int* getTraceBuf(Object* targetThreadObj, int* pStackDepth)
 {
-    Object* targetThreadObj = (Object*) args[0];
     Thread* self = dvmThreadSelf();
     Thread* thread;
     int* traceBuf;
@@ -193,10 +186,10 @@ static void Dalvik_dalvik_system_VMStack_getThreadStackTrace(const u4* args,
             break;
     }
     if (thread == NULL) {
-        ALOGI("VMStack.getThreadStackTrace: threadObj %p not active\n",
+        ALOGI("VMStack.getTraceBuf: threadObj %p not active",
             targetThreadObj);
         dvmUnlockThreadList();
-        RETURN_PTR(NULL);
+        return NULL;
     }
 
     /*
@@ -204,13 +197,31 @@ static void Dalvik_dalvik_system_VMStack_getThreadStackTrace(const u4* args,
      * and release the thread list lock.  If we're being asked to examine
      * our own stack trace, skip the suspend/resume.
      */
-    int stackDepth = -1;
     if (thread != self)
         dvmSuspendThread(thread);
-    traceBuf = dvmFillInStackTraceRaw(thread, &stackDepth);
+    traceBuf = dvmFillInStackTraceRaw(thread, pStackDepth);
     if (thread != self)
         dvmResumeThread(thread);
     dvmUnlockThreadList();
+
+    return traceBuf;
+}
+
+/*
+ * public static StackTraceElement[] getThreadStackTrace(Thread t)
+ *
+ * Retrieve the stack trace of the specified thread and return it as an
+ * array of StackTraceElement.  Returns NULL on failure.
+ */
+static void Dalvik_dalvik_system_VMStack_getThreadStackTrace(const u4* args,
+    JValue* pResult)
+{
+    Object* targetThreadObj = (Object*) args[0];
+    int stackDepth;
+    int* traceBuf = getTraceBuf(targetThreadObj, &stackDepth);
+
+    if (traceBuf == NULL)
+        RETURN_PTR(NULL);
 
     /*
      * Convert the raw buffer into an array of StackTraceElement.

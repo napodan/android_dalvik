@@ -141,12 +141,12 @@ LOCAL_SRC_FILES := \
 	mterp/Mterp.cpp.arm \
 	mterp/out/InterpC-portstd.cpp.arm \
 	mterp/out/InterpC-portdbg.cpp.arm \
-	native/InternalNative.c \
-	native/dalvik_system_DexFile.c \
-	native/dalvik_system_VMDebug.c \
-	native/dalvik_system_VMRuntime.c \
-	native/dalvik_system_VMStack.c \
-	native/dalvik_system_Zygote.c \
+	native/InternalNative.cpp \
+	native/dalvik_system_DexFile.cpp \
+	native/dalvik_system_VMDebug.cpp \
+	native/dalvik_system_VMRuntime.cpp \
+	native/dalvik_system_VMStack.cpp \
+	native/dalvik_system_Zygote.cpp \
 	native/java_lang_Class.c \
 	native/java_lang_Object.c \
 	native/java_lang_Runtime.c \

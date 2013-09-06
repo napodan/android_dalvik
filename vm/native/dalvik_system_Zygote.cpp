@@ -52,38 +52,38 @@ static void sigchldHandler(int s)
 
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
         /* Log process-death status that we care about.  In general it is not
-           safe to call LOG(...) from a signal handler because of possible
+           safe to call ALOG(...) from a signal handler because of possible
            reentrancy.  However, we know a priori that the current implementation
-           of LOG() is safe to call from a SIGCHLD handler in the zygote process.
-           If the LOG() implementation changes its locking strategy or its use
+           of ALOG() is safe to call from a SIGCHLD handler in the zygote process.
+           If the ALOG() implementation changes its locking strategy or its use
            of syscalls within the lazy-init critical section, its use here may
            become unsafe. */
         if (WIFEXITED(status)) {
             if (WEXITSTATUS(status)) {
-                ALOG(LOG_DEBUG, ZYGOTE_LOG_TAG, "Process %d exited cleanly (%d)\n",
+                ALOG(LOG_DEBUG, ZYGOTE_LOG_TAG, "Process %d exited cleanly (%d)",
                     (int) pid, WEXITSTATUS(status));
             } else {
                 IF_ALOGV(/*should use ZYGOTE_LOG_TAG*/) {
                     ALOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
-                        "Process %d exited cleanly (%d)\n",
+                        "Process %d exited cleanly (%d)",
                         (int) pid, WEXITSTATUS(status));
                 }
             }
         } else if (WIFSIGNALED(status)) {
             if (WTERMSIG(status) != SIGKILL) {
                 ALOG(LOG_DEBUG, ZYGOTE_LOG_TAG,
-                    "Process %d terminated by signal (%d)\n",
+                    "Process %d terminated by signal (%d)",
                     (int) pid, WTERMSIG(status));
             } else {
                 IF_ALOGV(/*should use ZYGOTE_LOG_TAG*/) {
                     ALOG(LOG_VERBOSE, ZYGOTE_LOG_TAG,
-                        "Process %d terminated by signal (%d)\n",
+                        "Process %d terminated by signal (%d)",
                         (int) pid, WTERMSIG(status));
                 }
             }
 #ifdef WCOREDUMP
             if (WCOREDUMP(status)) {
-                ALOG(LOG_INFO, ZYGOTE_LOG_TAG, "Process %d dumped core\n",
+                ALOG(LOG_INFO, ZYGOTE_LOG_TAG, "Process %d dumped core",
                     (int) pid);
             }
 #endif /* ifdef WCOREDUMP */
@@ -96,7 +96,7 @@ static void sigchldHandler(int s)
          */
         if (pid == gDvm.systemServerPid) {
             ALOG(LOG_INFO, ZYGOTE_LOG_TAG,
-                "Exit zygote because system server (%d) has terminated\n",
+                "Exit zygote because system server (%d) has terminated",
                 (int) pid);
             kill(getpid(), SIGKILL);
         }
@@ -104,7 +104,7 @@ static void sigchldHandler(int s)
 
     if (pid < 0) {
         ALOG(LOG_WARN, ZYGOTE_LOG_TAG,
-            "Zygote SIGCHLD error in waitpid: %s\n",strerror(errno));
+            "Zygote SIGCHLD error in waitpid: %s",strerror(errno));
     }
 }
 
@@ -168,8 +168,8 @@ static int setgroupsIntarray(ArrayObject* gidArray)
     }
 
     /* just in case gid_t and u4 are different... */
-    gids = alloca(sizeof(gid_t) * gidArray->length);
-    contents = (s4 *)gidArray->contents;
+    gids = (gid_t *)alloca(sizeof(gid_t) * gidArray->length);
+    contents = (s4 *)(void *)gidArray->contents;
 
     for (i = 0 ; i < gidArray->length ; i++) {
         gids[i] = (gid_t) contents[i];
@@ -197,11 +197,11 @@ static int setrlimitsFromArray(ArrayObject* rlimits)
 
     memset (&rlim, 0, sizeof(rlim));
 
-    ArrayObject** tuples = (ArrayObject **)(rlimits->contents);
+    ArrayObject** tuples = (ArrayObject **)(void *)rlimits->contents;
 
     for (i = 0; i < rlimits->length; i++) {
         ArrayObject * rlimit_tuple = tuples[i];
-        s4* contents = (s4 *)rlimit_tuple->contents;
+        s4* contents = (s4 *)(void *)rlimit_tuple->contents;
         int err;
 
         if (rlimit_tuple->length != 3) {
@@ -235,7 +235,7 @@ static void Dalvik_dalvik_system_Zygote_fork(const u4* args, JValue* pResult)
     }
 
     if (!dvmGcPreZygoteFork()) {
-        ALOGE("pre-fork heap failed\n");
+        ALOGE("pre-fork heap failed");
         dvmAbort();
     }
 
@@ -263,9 +263,7 @@ static void Dalvik_dalvik_system_Zygote_fork(const u4* args, JValue* pResult)
  *   easy to handle, because the JDWP thread isn't started until we call
  *   dvmInitAfterZygote().
  * checkjni
- *   If set, make sure "check JNI" is eabled.  This is a little weird,
- *   because we already have the JNIEnv for the main thread set up.  However,
- *   since we only have one thread at this point, it's easy to patch up.
+ *   If set, make sure "check JNI" is enabled.
  * assert
  *   If set, make sure assertions are enabled.  This gets fairly weird,
  *   because it affects the result of a method called by class initializers,
@@ -278,7 +276,7 @@ static void Dalvik_dalvik_system_Zygote_fork(const u4* args, JValue* pResult)
  */
 static void enableDebugFeatures(u4 debugFlags)
 {
-    ALOGV("debugFlags is 0x%02x\n", debugFlags);
+    ALOGV("debugFlags is 0x%02x", debugFlags);
 
     gDvm.jdwpAllowed = ((debugFlags & DEBUG_ENABLE_DEBUGGER) != 0);
 
@@ -344,7 +342,7 @@ static int setCapabilities(int64_t permitted, int64_t effective)
     capdata.effective = effective;
     capdata.permitted = permitted;
 
-    ALOGV("CAPSET perm=%llx eff=%llx\n", permitted, effective);
+    ALOGV("CAPSET perm=%llx eff=%llx", permitted, effective);
     if (capset(&capheader, &capdata) != 0)
         return errno;
 #endif /*HAVE_ANDROID_OS*/
@@ -388,7 +386,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
     }
 
     if (!dvmGcPreZygoteFork()) {
-        ALOGE("pre-fork heap failed\n");
+        ALOGE("pre-fork heap failed");
         dvmAbort();
     }
 
@@ -425,7 +423,6 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
         }
 
         err = setrlimitsFromArray(rlimits);
-
         if (err < 0) {
             ALOGE("cannot setrlimit(): %s", strerror(errno));
             dvmAbort();
@@ -445,7 +442,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
 
         err = setCapabilities(permittedCapabilities, effectiveCapabilities);
         if (err != 0) {
-            ALOGE("cannot set capabilities (%llx,%llx): %s\n",
+            ALOGE("cannot set capabilities (%llx,%llx): %s",
                 permittedCapabilities, effectiveCapabilities, strerror(err));
             dvmAbort();
         }
@@ -462,7 +459,7 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
         unsetSignalHandler();
         gDvm.zygote = false;
         if (!dvmInitAfterZygote()) {
-            ALOGE("error in post-zygote initialization\n");
+            ALOGE("error in post-zygote initialization");
             dvmAbort();
         }
     } else if (pid > 0) {
@@ -472,8 +469,10 @@ static pid_t forkAndSpecializeCommon(const u4* args, bool isSystemServer)
     return pid;
 }
 
-/* native public static int forkAndSpecialize(int uid, int gid,
- *     int[] gids, int debugFlags);
+/*
+ * native public static int nativeForkAndSpecialize(int uid, int gid,
+ *     int[] gids, int debugFlags, int[][] rlimits, int mountExternal,
+ *     String seInfo, String niceName);
  */
 static void Dalvik_dalvik_system_Zygote_forkAndSpecialize(const u4* args,
     JValue* pResult)
@@ -485,9 +484,10 @@ static void Dalvik_dalvik_system_Zygote_forkAndSpecialize(const u4* args,
     RETURN_INT(pid);
 }
 
-/* native public static int forkSystemServer(int uid, int gid,
- *     int[] gids, int debugFlags, long permittedCapabilities,
- *     long effectiveCapabilities);
+/*
+ * native public static int nativeForkSystemServer(int uid, int gid,
+ *     int[] gids, int debugFlags, int[][] rlimits,
+ *     long permittedCapabilities, long effectiveCapabilities);
  */
 static void Dalvik_dalvik_system_Zygote_forkSystemServer(
         const u4* args, JValue* pResult)
@@ -514,11 +514,11 @@ static void Dalvik_dalvik_system_Zygote_forkSystemServer(
 }
 
 const DalvikNativeMethod dvm_dalvik_system_Zygote[] = {
-    { "fork",            "()I",
-        Dalvik_dalvik_system_Zygote_fork },
-    { "forkAndSpecialize",            "(II[II[[I)I",
-        Dalvik_dalvik_system_Zygote_forkAndSpecialize },
-    { "forkSystemServer",            "(II[II[[IJJ)I",
-        Dalvik_dalvik_system_Zygote_forkSystemServer },
+    { "fork", "()I",
+      Dalvik_dalvik_system_Zygote_fork },
+    { "forkAndSpecialize", "(II[II[[I)I",
+      Dalvik_dalvik_system_Zygote_forkAndSpecialize },
+    { "forkSystemServer", "(II[II[[IJJ)I",
+      Dalvik_dalvik_system_Zygote_forkSystemServer },
     { NULL, NULL, NULL },
 };
