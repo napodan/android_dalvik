@@ -138,9 +138,9 @@ LOCAL_SRC_FILES := \
 	jdwp/JdwpHandler.cpp \
 	jdwp/JdwpMain.cpp \
 	jdwp/JdwpSocket.cpp \
-	mterp/Mterp.c.arm \
-	mterp/out/InterpC-portstd.c.arm \
-	mterp/out/InterpC-portdbg.c.arm \
+	mterp/Mterp.cpp.arm \
+	mterp/out/InterpC-portstd.cpp.arm \
+	mterp/out/InterpC-portdbg.cpp.arm \
 	native/InternalNative.c \
 	native/dalvik_system_DexFile.c \
 	native/dalvik_system_VMDebug.c \
