@@ -41,8 +41,6 @@ static const char gPrimLetter[] = PRIM_TYPE_TO_LETTER;
 ArrayObject* dvmAllocArray(ClassObject* arrayClass, size_t length,
     size_t elemWidth, int allocFlags)
 {
-    ArrayObject* newArray;
-    size_t size;
 
     assert(arrayClass->descriptor[0] == '[');
 
@@ -53,24 +51,15 @@ ArrayObject* dvmAllocArray(ClassObject* arrayClass, size_t length,
         return NULL;
     }
 
-    size = offsetof(ArrayObject, contents);
-    size += length * elemWidth;
+    size_t totalSize = offsetof(ArrayObject, contents);
+    totalSize += length * elemWidth;
 
-    /* Note that we assume that the Array class does not
-     * override finalize().
-     */
-    newArray = dvmMalloc(size, allocFlags);
+    ArrayObject* newArray = (ArrayObject*)dvmMalloc(totalSize, allocFlags);
     if (newArray != NULL) {
         DVM_OBJECT_INIT(&newArray->obj, arrayClass);
         newArray->length = length;
-        LOGVV("AllocArray: %s [%d] (%d)\n",
-            arrayClass->descriptor, (int) length, (int) size);
-#if WITH_HPROF && WITH_HPROF_STACK
-        hprofFillInStackTrace(&newArray->obj);
-#endif
-        dvmTrackAllocation(arrayClass, size);
+        dvmTrackAllocation(arrayClass, totalSize);
     }
-    /* the caller must call dvmReleaseTrackedAlloc */
     return newArray;
 }
 
@@ -228,17 +217,17 @@ ArrayObject* dvmAllocMultiArray(ClassObject* arrayClass, int curDim,
     ArrayObject* newArray;
     const char* elemName = arrayClass->descriptor + 1; // Advance past one '['.
 
-    LOGVV("dvmAllocMultiArray: class='%s' curDim=%d *dimensions=%d\n",
+    LOGVV("dvmAllocMultiArray: class='%s' curDim=%d *dimensions=%d",
         arrayClass->descriptor, curDim, *dimensions);
 
     if (curDim == 0) {
         if (*elemName == 'L' || *elemName == '[') {
-            LOGVV("  end: array class (obj) is '%s'\n",
+            LOGVV("  end: array class (obj) is '%s'",
                 arrayClass->descriptor);
             newArray = dvmAllocArray(arrayClass, *dimensions,
                         kObjectArrayRefWidth, ALLOC_DEFAULT);
         } else {
-            LOGVV("  end: array class (prim) is '%s'\n",
+            LOGVV("  end: array class (prim) is '%s'",
                 arrayClass->descriptor);
             newArray = dvmAllocPrimitiveArray(
                     gPrimLetter[arrayClass->elementClass->primitiveType],
@@ -299,11 +288,11 @@ ClassObject* dvmFindArrayClass(const char* descriptor, Object* loader)
     ClassObject* clazz;
 
     assert(descriptor[0] == '[');
-    //ALOGV("dvmFindArrayClass: '%s' %p\n", descriptor, loader);
+    //ALOGV("dvmFindArrayClass: '%s' %p", descriptor, loader);
 
     clazz = dvmLookupClass(descriptor, loader, false);
     if (clazz == NULL) {
-        ALOGV("Array class '%s' %p not found; creating\n", descriptor, loader);
+        ALOGV("Array class '%s' %p not found; creating", descriptor, loader);
         clazz = createArrayClass(descriptor, loader);
         if (clazz != NULL)
             dvmAddInitiatingLoader(clazz, loader);
@@ -359,7 +348,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
         if (descriptor[1] == 'L') {
             /* array of objects; strip off "[" and look up descriptor. */
             const char* subDescriptor = &descriptor[1];
-            LOGVV("searching for element class '%s'\n", subDescriptor);
+            LOGVV("searching for element class '%s'", subDescriptor);
             elementClass = dvmFindClassNoInit(subDescriptor, loader);
             extraFlags |= CLASS_ISOBJECTARRAY;
         } else {
@@ -395,11 +384,11 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
      * other threads.)
      */
     if (loader != elementClass->classLoader) {
-        LOGVV("--- checking for '%s' in %p vs. elem %p\n",
+        LOGVV("--- checking for '%s' in %p vs. elem %p",
             descriptor, loader, elementClass->classLoader);
         newClass = dvmLookupClass(descriptor, elementClass->classLoader, false);
         if (newClass != NULL) {
-            ALOGV("--- we already have %s in %p, don't need in %p\n",
+            ALOGV("--- we already have %s in %p, don't need in %p",
                 descriptor, elementClass->classLoader, loader);
             return newClass;
         }
@@ -470,7 +459,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
         dvmFindSystemClassNoInit("Ljava/io/Serializable;");
     dvmLinearReadOnly(newClass->classLoader, newClass->interfaces);
     if (newClass->interfaces[0] == NULL || newClass->interfaces[1] == NULL) {
-        ALOGE("Unable to create array class '%s': missing interfaces\n",
+        ALOGE("Unable to create array class '%s': missing interfaces",
             descriptor);
         dvmFreeClassInnards(newClass);
         dvmThrowException("Ljava/lang/InternalError;", "missing array ifaces");
@@ -513,9 +502,9 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
          * Another thread must have loaded the class after we
          * started but before we finished.  Discard what we've
          * done and leave some hints for the GC.
+         *
+         * (Yes, this happens.)
          */
-        ALOGI("WOW: somebody generated %s simultaneously\n",
-            newClass->descriptor);
 
         /* Clean up the class before letting the
          * GC get its hands on it.
@@ -534,7 +523,7 @@ static ClassObject* createArrayClass(const char* descriptor, Object* loader)
     }
     dvmReleaseTrackedAlloc((Object*) newClass, NULL);
 
-    ALOGV("Created array class '%s' %p (access=0x%04x.%04x)\n",
+    ALOGV("Created array class '%s' %p (access=0x%04x.%04x)",
         descriptor, newClass->classLoader,
         newClass->accessFlags >> 16,
         newClass->accessFlags & JAVA_FLAGS_MASK);
@@ -598,7 +587,7 @@ ClassObject* dvmFindPrimitiveClass(char type)
         dvmReleaseTrackedAlloc((Object*) primClass, NULL);
 
         if (android_atomic_release_cas(0, (int) primClass,
-                (int*) &gDvm.primitiveClass[idx]) != 0)
+                (int*) (void*) &gDvm.primitiveClass[idx]) != 0)
         {
             /*
              * Looks like somebody beat us to it.  Free up the one we
@@ -639,7 +628,7 @@ static ClassObject* createPrimitiveClass(int idx)
     DVM_OBJECT_INIT(&newClass->obj, gDvm.classJavaLangClass);
     dvmSetClassSerialNumber(newClass);
     newClass->accessFlags = ACC_PUBLIC | ACC_FINAL | ACC_ABSTRACT;
-    newClass->primitiveType = idx;
+    newClass->primitiveType = (PrimitiveType)idx;
     newClass->descriptorAlloc = NULL;
     newClass->descriptor = kClassDescriptors[idx];
     //newClass->super = gDvm.classJavaLangObject;
@@ -662,7 +651,7 @@ static ClassObject* createPrimitiveClass(int idx)
 bool dvmCopyObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
     ClassObject* dstElemClass)
 {
-    Object** src = (Object**)srcArray->contents;
+    Object** src = (Object**)(void*)srcArray->contents;
     u4 length, count;
 
     assert(srcArray->length == dstArray->length);
@@ -673,7 +662,7 @@ bool dvmCopyObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
     length = dstArray->length;
     for (count = 0; count < length; count++) {
         if (!dvmInstanceof(src[count]->clazz, dstElemClass)) {
-            ALOGW("dvmCopyObjectArray: can't store %s in %s\n",
+            ALOGW("dvmCopyObjectArray: can't store %s in %s",
                 src[count]->clazz->descriptor, dstElemClass->descriptor);
             return false;
         }
@@ -691,7 +680,7 @@ bool dvmCopyObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
 bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
     ClassObject* dstElemClass)
 {
-    Object** src = (Object**)srcArray->contents;
+    Object** src = (Object**)(void*)srcArray->contents;
     void* dst = (void*)dstArray->contents;
     u4 count = dstArray->length;
     PrimitiveType typeIndex = dstElemClass->primitiveType;
@@ -709,7 +698,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
          * necessary for correctness.
          */
         if (!dvmUnwrapPrimitive(*src, dstElemClass, &result)) {
-            ALOGW("dvmCopyObjectArray: can't store %s in %s\n",
+            ALOGW("dvmCopyObjectArray: can't store %s in %s",
                 (*src)->clazz->descriptor, dstElemClass->descriptor);
             return false;
         }
@@ -719,7 +708,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
         case PRIM_BOOLEAN:
         case PRIM_BYTE:
             {
-                u1* tmp = dst;
+                u1* tmp = (u1*)dst;
                 *tmp++ = result.b;
                 dst = tmp;
             }
@@ -727,7 +716,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
         case PRIM_CHAR:
         case PRIM_SHORT:
             {
-                u2* tmp = dst;
+                u2* tmp = (u2*)dst;
                 *tmp++ = result.s;
                 dst = tmp;
             }
@@ -735,7 +724,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
         case PRIM_FLOAT:
         case PRIM_INT:
             {
-                u4* tmp = dst;
+                u4* tmp = (u4*)dst;
                 *tmp++ = result.i;
                 dst = tmp;
             }
@@ -743,7 +732,7 @@ bool dvmUnboxObjectArray(ArrayObject* dstArray, const ArrayObject* srcArray,
         case PRIM_DOUBLE:
         case PRIM_LONG:
             {
-                u8* tmp = dst;
+                u8* tmp = (u8*)dst;
                 *tmp++ = result.j;
                 dst = tmp;
             }
@@ -792,10 +781,8 @@ size_t dvmArrayClassElementWidth(const ClassObject* arrayClass)
 
 size_t dvmArrayObjectSize(const ArrayObject *array)
 {
-    size_t size;
-
     assert(array != NULL);
-    size = offsetof(ArrayObject, contents);
+    size_t size = offsetof(ArrayObject, contents);
     size += array->length * dvmArrayClassElementWidth(array->obj.clazz);
     return size;
 }

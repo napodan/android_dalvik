@@ -75,7 +75,7 @@ ClassObject* dvmResolveClass(const ClassObject* referrer, u4 classIdx,
     if (resClass != NULL)
         return resClass;
 
-    LOGVV("--- resolving class %u (referrer=%s cl=%p)\n",
+    LOGVV("--- resolving class %u (referrer=%s cl=%p)",
         classIdx, referrer->descriptor, referrer->classLoader);
 
     /*
@@ -126,12 +126,12 @@ ClassObject* dvmResolveClass(const ClassObject* referrer, u4 classIdx,
                 resClassCheck->classLoader != NULL)
             {
                 ALOGW("Class resolved by unexpected DEX:"
-                     " %s(%p):%p ref [%s] %s(%p):%p\n",
+                     " %s(%p):%p ref [%s] %s(%p):%p",
                     referrer->descriptor, referrer->classLoader,
                     referrer->pDvmDex,
                     resClass->descriptor, resClassCheck->descriptor,
                     resClassCheck->classLoader, resClassCheck->pDvmDex);
-                ALOGW("(%s had used a different %s during pre-verification)\n",
+                ALOGW("(%s had used a different %s during pre-verification)",
                     referrer->descriptor, resClass->descriptor);
                 dvmThrowException("Ljava/lang/IllegalAccessError;",
                     "Class ref in pre-verified class resolved to unexpected "
@@ -140,7 +140,7 @@ ClassObject* dvmResolveClass(const ClassObject* referrer, u4 classIdx,
             }
         }
 
-        LOGVV("##### +ResolveClass(%s): referrer=%s dex=%p ldr=%p ref=%d\n",
+        LOGVV("##### +ResolveClass(%s): referrer=%s dex=%p ldr=%p ref=%d",
             resClass->descriptor, referrer->descriptor, referrer->pDvmDex,
             referrer->classLoader, classIdx);
 
@@ -154,7 +154,7 @@ ClassObject* dvmResolveClass(const ClassObject* referrer, u4 classIdx,
         dvmDexSetResolvedClass(pDvmDex, classIdx, resClass);
     } else {
         /* not found, exception should be raised */
-        LOGVV("Class not found: %s\n",
+        LOGVV("Class not found: %s",
             dexStringByTypeIdx(pDvmDex->pDexFile, classIdx));
         assert(dvmCheckException(dvmThreadSelf()));
     }
@@ -183,7 +183,7 @@ Method* dvmResolveMethod(const ClassObject* referrer, u4 methodIdx,
 
     assert(methodType != METHOD_INTERFACE);
 
-    LOGVV("--- resolving method %u (referrer=%s)\n", methodIdx,
+    LOGVV("--- resolving method %u (referrer=%s)", methodIdx,
         referrer->descriptor);
     pMethodId = dexGetMethodId(pDvmDex->pDexFile, methodIdx);
 
@@ -224,7 +224,7 @@ Method* dvmResolveMethod(const ClassObject* referrer, u4 methodIdx,
         return NULL;
     }
 
-    LOGVV("--- found method %d (%s.%s)\n",
+    LOGVV("--- found method %d (%s.%s)",
         methodIdx, resClass->descriptor, resMethod->name);
 
     /* see if this is a pure-abstract method */
@@ -265,7 +265,7 @@ Method* dvmResolveMethod(const ClassObject* referrer, u4 methodIdx,
      */
     if (methodType == METHOD_STATIC && !dvmIsClassInitialized(resMethod->clazz))
     {
-        LOGVV("--- not caching resolved method %s.%s (class init=%d/%d)\n",
+        LOGVV("--- not caching resolved method %s.%s (class init=%d/%d)",
             resMethod->clazz->descriptor, resMethod->name,
             dvmIsClassInitializing(resMethod->clazz),
             dvmIsClassInitialized(resMethod->clazz));
@@ -287,9 +287,8 @@ Method* dvmResolveInterfaceMethod(const ClassObject* referrer, u4 methodIdx)
     ClassObject* resClass;
     const DexMethodId* pMethodId;
     Method* resMethod;
-    int i;
 
-    LOGVV("--- resolving interface method %d (referrer=%s)\n",
+    LOGVV("--- resolving interface method %d (referrer=%s)",
         methodIdx, referrer->descriptor);
     pMethodId = dexGetMethodId(pDvmDex->pDexFile, methodIdx);
 
@@ -336,12 +335,11 @@ Method* dvmResolveInterfaceMethod(const ClassObject* referrer, u4 methodIdx)
     DexProto proto;
     dexProtoSetFromMethodId(&proto, pDvmDex->pDexFile, pMethodId);
 
-    LOGVV("+++ looking for '%s' '%s' in resClass='%s'\n",
-        methodName, methodSig, resClass->descriptor);
+    LOGVV("+++ looking for '%s' '%s' in resClass='%s'\n", methodName, methodSig, resClass->descriptor);
     resMethod = dvmFindVirtualMethod(resClass, methodName, &proto);
     if (resMethod == NULL) {
         LOGVV("+++ did not resolve immediately\n");
-        for (i = 0; i < resClass->iftableCount; i++) {
+        for (int i = 0; i < resClass->iftableCount; i++) {
             resMethod = dvmFindVirtualMethod(resClass->iftable[i].clazz,
                             methodName, &proto);
             if (resMethod != NULL)
@@ -357,7 +355,7 @@ Method* dvmResolveInterfaceMethod(const ClassObject* referrer, u4 methodIdx)
             resMethod->clazz->descriptor, (u4) resMethod->methodIndex);
     }
 
-    LOGVV("--- found interface method %d (%s.%s)\n",
+    LOGVV("--- found interface method %d (%s.%s)",
         methodIdx, resClass->descriptor, resMethod->name);
 
     /* we're expecting this to be abstract */
@@ -402,7 +400,7 @@ InstField* dvmResolveInstField(const ClassObject* referrer, u4 ifieldIdx)
     const DexFieldId* pFieldId;
     InstField* resField;
 
-    LOGVV("--- resolving field %u (referrer=%s cl=%p)\n",
+    LOGVV("--- resolving field %u (referrer=%s cl=%p)",
         ifieldIdx, referrer->descriptor, referrer->classLoader);
 
     pFieldId = dexGetFieldId(pDvmDex->pDexFile, ifieldIdx);
@@ -444,7 +442,7 @@ InstField* dvmResolveInstField(const ClassObject* referrer, u4 ifieldIdx)
      * So it's always okay to update the table.
      */
     dvmDexSetResolvedField(pDvmDex, ifieldIdx, (Field*)resField);
-    LOGVV("    field %u is %s.%s\n",
+    LOGVV("    field %u is %s.%s",
         ifieldIdx, resField->field.clazz->descriptor, resField->field.name);
 
     return resField;
@@ -506,7 +504,7 @@ StaticField* dvmResolveStaticField(const ClassObject* referrer, u4 sfieldIdx)
     if (dvmIsClassInitialized(resField->field.clazz)) {
         dvmDexSetResolvedField(pDvmDex, sfieldIdx, (Field*) resField);
     } else {
-        LOGVV("--- not caching resolved field %s.%s (class init=%d/%d)\n",
+        LOGVV("--- not caching resolved field %s.%s (class init=%d/%d)",
             resField->field.clazz->descriptor, resField->field.name,
             dvmIsClassInitializing(resField->field.clazz),
             dvmIsClassInitialized(resField->field.clazz));
@@ -531,7 +529,7 @@ StringObject* dvmResolveString(const ClassObject* referrer, u4 stringIdx)
     const char* utf8;
     u4 utf16Size;
 
-    LOGVV("+++ resolving string, referrer is %s\n", referrer->descriptor);
+    LOGVV("+++ resolving string, referrer is %s", referrer->descriptor);
 
     /*
      * Create a UTF-16 version so we can trivially compare it to what's

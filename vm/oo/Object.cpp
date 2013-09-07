@@ -369,7 +369,7 @@ static Method* findMethodInListByDescriptor(const ClassObject* clazz,
     size_t argCount = countArgsAndFindReturnType(descriptor, &returnType);
 
     if (returnType == NULL) {
-        ALOGW("Bogus method descriptor: %s\n", descriptor);
+        ALOGW("Bogus method descriptor: %s", descriptor);
         return NULL;
     }
 
@@ -517,7 +517,7 @@ Method* dvmFindVirtualMethod(const ClassObject* clazz, const char* methodName,
 
 /*
  * Find a "virtual" method in a class.  If we don't find it, try the
- * superclass.
+ * superclass.  Does not examine interfaces.
  *
  * Returns NULL if the method can't be found.  (Does not throw an exception.)
  */
@@ -530,7 +530,7 @@ Method* dvmFindVirtualMethodHierByDescriptor(const ClassObject* clazz,
 
 /*
  * Find a "virtual" method in a class.  If we don't find it, try the
- * superclass.
+ * superclass.  Does not examine interfaces.
  *
  * Returns NULL if the method can't be found.  (Does not throw an exception.)
  */
@@ -629,8 +629,10 @@ const Method* dvmGetVirtualizedMethod(const ClassObject* clazz,
 
     assert(!dvmIsStaticMethod(meth));
 
-    if (dvmIsPrivateMethod(meth))   // no vtable entry for these
+    if (dvmIsPrivateMethod(meth)) {
+        /* no vtable entry for these */
         return meth;
+    }
 
     /*
      * If the method was declared in an interface, we need to scan through
