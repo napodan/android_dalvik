@@ -31,7 +31,7 @@ static void Dalvik_org_apache_harmony_dalvik_ddmc_DdmVmInternal_threadNotify(
 {
     bool enable = (args[0] != 0);
 
-    //ALOGI("ddmThreadNotification: %d\n", enable);
+    //ALOGI("ddmThreadNotification: %d", enable);
     dvmDdmSetThreadNotification(enable);
     RETURN_VOID();
 }
