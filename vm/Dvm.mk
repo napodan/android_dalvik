@@ -163,11 +163,11 @@ LOCAL_SRC_FILES := \
 	native/java_lang_reflect_Method.cpp \
 	native/java_lang_reflect_Proxy.cpp \
 	native/java_security_AccessController.c \
-	native/java_util_concurrent_atomic_AtomicLong.c \
-	native/org_apache_harmony_dalvik_NativeTestTarget.c \
-	native/org_apache_harmony_dalvik_ddmc_DdmServer.c \
-	native/org_apache_harmony_dalvik_ddmc_DdmVmInternal.c \
-	native/sun_misc_Unsafe.c \
+	native/java_util_concurrent_atomic_AtomicLong.cpp \
+	native/org_apache_harmony_dalvik_NativeTestTarget.cpp \
+	native/org_apache_harmony_dalvik_ddmc_DdmServer.cpp \
+	native/org_apache_harmony_dalvik_ddmc_DdmVmInternal.cpp \
+	native/sun_misc_Unsafe.cpp \
 	oo/AccessCheck.c \
 	oo/Array.c \
 	oo/Class.c \
