@@ -23,12 +23,12 @@
 
 #ifndef NDEBUG
 
-#define DBUG_MSG    ALOGV
+#define DBUG_MSG    ALOGI
 
 /*
  * Basic add/get/delete tests in an unsegmented table.
  */
-static bool basicTest(void)
+static bool basicTest()
 {
     static const int kTableMax = 20;
     IndirectRefTable irt;
@@ -50,7 +50,7 @@ static bool basicTest(void)
 
     iref0 = (IndirectRef) 0x11110;
     if (dvmRemoveFromIndirectRefTable(&irt, cookie, iref0)) {
-        ALOGE("unexpectedly successful removal\n");
+        ALOGE("unexpectedly successful removal");
         goto bail;
     }
 
@@ -62,7 +62,7 @@ static bool basicTest(void)
     iref1 = dvmAddToIndirectRefTable(&irt, cookie, obj1);
     iref2 = dvmAddToIndirectRefTable(&irt, cookie, obj2);
     if (iref0 == NULL || iref1 == NULL || iref2 == NULL) {
-        ALOGE("trivial add1 failed\n");
+        ALOGE("trivial add1 failed");
         goto bail;
     }
 
@@ -84,19 +84,19 @@ static bool basicTest(void)
         !dvmRemoveFromIndirectRefTable(&irt, cookie, iref1) ||
         !dvmRemoveFromIndirectRefTable(&irt, cookie, iref2))
     {
-        ALOGE("fifo deletion failed\n");
+        ALOGE("fifo deletion failed");
         goto bail;
     }
 
     /* table should be empty now */
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("fifo del not empty\n");
+        ALOGE("fifo del not empty");
         goto bail;
     }
 
     /* get invalid entry (off the end of the list) */
     if (dvmGetFromIndirectRefTable(&irt, iref0) != NULL) {
-        ALOGE("stale entry get succeeded unexpectedly\n");
+        ALOGE("stale entry get succeeded unexpectedly");
         goto bail;
     }
 
@@ -108,7 +108,7 @@ static bool basicTest(void)
     iref1 = dvmAddToIndirectRefTable(&irt, cookie, obj1);
     iref2 = dvmAddToIndirectRefTable(&irt, cookie, obj2);
     if (iref0 == NULL || iref1 == NULL || iref2 == NULL) {
-        ALOGE("trivial add2 failed\n");
+        ALOGE("trivial add2 failed");
         goto bail;
     }
 
@@ -116,13 +116,13 @@ static bool basicTest(void)
         !dvmRemoveFromIndirectRefTable(&irt, cookie, iref1) ||
         !dvmRemoveFromIndirectRefTable(&irt, cookie, iref0))
     {
-        ALOGE("lifo deletion failed\n");
+        ALOGE("lifo deletion failed");
         goto bail;
     }
 
     /* table should be empty now */
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("lifo del not empty\n");
+        ALOGE("lifo del not empty");
         goto bail;
     }
 
@@ -135,39 +135,37 @@ static bool basicTest(void)
     iref1 = dvmAddToIndirectRefTable(&irt, cookie, obj1);
     iref2 = dvmAddToIndirectRefTable(&irt, cookie, obj2);
     if (iref0 == NULL || iref1 == NULL || iref2 == NULL) {
-        ALOGE("trivial add3 failed\n");
+        ALOGE("trivial add3 failed");
         goto bail;
     }
 
     if (dvmIndirectRefTableEntries(&irt) != 3) {
-        ALOGE("expected 3 entries, found %d\n",
+        ALOGE("expected 3 entries, found %d",
             dvmIndirectRefTableEntries(&irt));
         goto bail;
     }
 
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref1) ||
-        dvmRemoveFromIndirectRefTable(&irt, cookie, iref1))
-    {
-        ALOGE("unorder deletion1 failed\n");
+        dvmRemoveFromIndirectRefTable(&irt, cookie, iref1)) {
+        ALOGE("unorder deletion1 failed");
         goto bail;
     }
 
     /* get invalid entry (from hole) */
     if (dvmGetFromIndirectRefTable(&irt, iref1) != NULL) {
-        ALOGE("hole get succeeded unexpectedly\n");
+        ALOGE("hole get succeeded unexpectedly");
         goto bail;
     }
 
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref2) ||
-        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref0))
-    {
-        ALOGE("unorder deletion2 failed\n");
+        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref0)) {
+        ALOGE("unorder deletion2 failed");
         goto bail;
     }
 
     /* table should be empty now */
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("unorder del not empty\n");
+        ALOGE("unorder del not empty");
         goto bail;
     }
 
@@ -182,36 +180,34 @@ static bool basicTest(void)
     iref2 = dvmAddToIndirectRefTable(&irt, cookie, obj2);
     iref3 = dvmAddToIndirectRefTable(&irt, cookie, obj3);
     if (iref0 == NULL || iref1 == NULL || iref2 == NULL || iref3 == NULL) {
-        ALOGE("trivial add4 failed\n");
+        ALOGE("trivial add4 failed");
         goto bail;
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref1)) {
-        ALOGE("remove 1 of 4 failed\n");
+        ALOGE("remove 1 of 4 failed");
         goto bail;
     }
     iref1 = dvmAddToIndirectRefTable(&irt, cookie, obj1);
     if (dvmIndirectRefTableEntries(&irt) != 4) {
-        ALOGE("hole not filled\n");
+        ALOGE("hole not filled");
         goto bail;
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref1) ||
-        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref3))
-    {
-        ALOGE("remove 1/3 failed\n");
+        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref3)) {
+        ALOGE("remove 1/3 failed");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != 3) {
-        ALOGE("should be 3 after two deletions\n");
+        ALOGE("should be 3 after two deletions");
         goto bail;
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref2) ||
-        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref0))
-    {
-        ALOGE("remove 2/0 failed\n");
+        !dvmRemoveFromIndirectRefTable(&irt, cookie, iref0)) {
+        ALOGE("remove 2/0 failed");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("not empty after split remove\n");
+        ALOGE("not empty after split remove");
         goto bail;
     }
 
@@ -225,15 +221,15 @@ static bool basicTest(void)
     dvmRemoveFromIndirectRefTable(&irt, cookie, iref0);
     iref1 = dvmAddToIndirectRefTable(&irt, cookie, obj1);
     if (dvmRemoveFromIndirectRefTable(&irt, cookie, iref0)) {
-        ALOGE("mismatched del succeeded (%p vs %p)\n", iref0, iref1);
+        ALOGE("mismatched del succeeded (%p vs %p)", iref0, iref1);
         goto bail;
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref1)) {
-        ALOGE("switched del failed\n");
+        ALOGE("switched del failed");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("switching del not empty\n");
+        ALOGE("switching del not empty");
         goto bail;
     }
 
@@ -247,16 +243,16 @@ static bool basicTest(void)
     if (iref0 != iref1) {
         /* try 0, should not work */
         if (dvmRemoveFromIndirectRefTable(&irt, cookie, iref0)) {
-            ALOGE("temporal del succeeded (%p vs %p)\n", iref0, iref1);
+            ALOGE("temporal del succeeded (%p vs %p)", iref0, iref1);
             goto bail;
         }
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, iref1)) {
-        ALOGE("temporal cleanup failed\n");
+        ALOGE("temporal cleanup failed");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("temporal del not empty\n");
+        ALOGE("temporal del not empty");
         goto bail;
     }
 
@@ -268,40 +264,40 @@ static bool basicTest(void)
     for (i = 0; i < kTableMax; i++) {
         manyRefs[i] = dvmAddToIndirectRefTable(&irt, cookie, obj0);
         if (manyRefs[i] == NULL) {
-            ALOGE("Failed adding %d of %d\n", i, kTableMax);
+            ALOGE("Failed adding %d of %d", i, kTableMax);
             goto bail;
         }
     }
     if (dvmAddToIndirectRefTable(&irt, cookie, obj0) != NULL) {
-        ALOGE("Table overflow succeeded\n");
+        ALOGE("Table overflow succeeded");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != (size_t)kTableMax) {
-        ALOGE("Expected %d entries, found %d\n",
-            kTableMax, dvmIndirectRefTableEntries(&irt));
+        ALOGE("Expected %d entries, found %d", kTableMax, dvmIndirectRefTableEntries(&irt));
         goto bail;
     }
     for (i = 0; i < kTableMax-1; i++) {
         if (!dvmRemoveFromIndirectRefTable(&irt, cookie, manyRefs[i])) {
-            ALOGE("multi-remove failed at %d\n", i);
+            ALOGE("multi-remove failed at %d", i);
             goto bail;
         }
     }
     /* because of removal order, should have 20 entries, 19 of them holes */
     if (dvmIndirectRefTableEntries(&irt) != (size_t)kTableMax) {
-        ALOGE("Expected %d entries (with holes), found %d\n",
-            kTableMax, dvmIndirectRefTableEntries(&irt));
+        ALOGE("Expected %d entries (with holes), found %d",
+                kTableMax, dvmIndirectRefTableEntries(&irt));
         goto bail;
     }
     if (!dvmRemoveFromIndirectRefTable(&irt, cookie, manyRefs[kTableMax-1])) {
-        ALOGE("multi-remove final failed\n");
+        ALOGE("multi-remove final failed");
         goto bail;
     }
     if (dvmIndirectRefTableEntries(&irt) != 0) {
-        ALOGE("multi-del not empty\n");
+        ALOGE("multi-del not empty");
         goto bail;
     }
 
+    /* Done */
     DBUG_MSG("+++ basic test complete\n");
     result = true;
 
@@ -467,18 +463,18 @@ bail:
     return result;
 }
 
-
 /*
  * Some quick tests.
  */
-bool dvmTestIndirectRefTable(void)
+bool dvmTestIndirectRefTable()
 {
     if (!basicTest()) {
-        ALOGE("IRT basic test failed\n");
+        ALOGE("IRT basic test failed");
         return false;
     }
+
     if (!segmentTest()) {
-        ALOGE("IRT segment test failed\n");
+        ALOGE("IRT segment test failed");
         return false;
     }
 
