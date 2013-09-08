@@ -190,7 +190,7 @@ ifeq ($(WITH_COPYING_GC),true)
 else
   LOCAL_SRC_FILES += \
 	alloc/HeapSource.cpp \
-	alloc/MarkSweep.c.arm
+	alloc/MarkSweep.cpp.arm
 endif
 
 WITH_JIT := $(strip $(WITH_JIT))

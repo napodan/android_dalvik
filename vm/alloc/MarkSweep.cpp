@@ -47,37 +47,35 @@
 /* Do not cast the result of this to a boolean; the only set bit
  * may be > 1<<8.
  */
-static inline long isMarked(const void *obj, const GcMarkContext *ctx)
+static bool isMarked(const Object *obj, const GcMarkContext *ctx)
 {
     return dvmHeapBitmapIsObjectBitSet(ctx->bitmap, obj);
 }
 
+/*
+ * Initializes the stack top and advises the mark stack pages as needed.
+ */
 static bool createMarkStack(GcMarkStack *stack)
 {
-    const Object **limit;
-    const char *name;
-    size_t size;
-
-    /* Create a stack big enough for the worst possible case,
-     * where the heap is perfectly full of the smallest object.
-     * TODO: be better about memory usage; use a smaller stack with
-     *       overflow detection and recovery.
-     */
-    size = dvmHeapSourceGetIdealFootprint() * sizeof(Object*) /
-            (sizeof(Object) + HEAP_SOURCE_CHUNK_OVERHEAD);
-    size = ALIGN_UP_TO_PAGE_SIZE(size);
-    name = "dalvik-mark-stack";
-    limit = dvmAllocRegion(size, PROT_READ | PROT_WRITE, name);
+    size_t length = dvmHeapSourceGetIdealFootprint() * sizeof(Object*) /
+        (sizeof(Object) + HEAP_SOURCE_CHUNK_OVERHEAD);
+    length = ALIGN_UP_TO_PAGE_SIZE(length);
+    const char *name = "dalvik-mark-stack";
+    const Object ** limit = (const Object **)dvmAllocRegion(length, PROT_READ | PROT_WRITE, name);
     if (limit == NULL) {
-        LOGE_GC("Could not mmap %zd-byte ashmem region '%s'", size, name);
+        LOGE_GC("Could not mmap %zd-byte ashmem region '%s'", length, name);
         return false;
     }
     stack->limit = limit;
-    stack->base = (const Object **)((uintptr_t)limit + size);
+    stack->base = (const Object **)((uintptr_t)limit + length);
     stack->top = stack->base;
     return true;
 }
 
+/*
+ * Assigns NULL to the stack top and advises the mark stack pages as
+ * not needed.
+ */
 static void destroyMarkStack(GcMarkStack *stack)
 {
     munmap((char *)stack->limit,
@@ -98,7 +96,7 @@ bool dvmHeapBeginMarkStep(GcMode mode)
         return false;
     }
     ctx->finger = NULL;
-    ctx->immuneLimit = dvmHeapSourceGetImmuneLimit(mode);
+    ctx->immuneLimit = (char*)dvmHeapSourceGetImmuneLimit(mode);
     return true;
 }
 
@@ -113,7 +111,6 @@ static void markObjectNonNull(const Object *obj, GcMarkContext *ctx,
     assert(ctx != NULL);
     assert(obj != NULL);
     assert(dvmIsValidObject(obj));
-
     if (obj < (Object *)ctx->immuneLimit) {
         assert(isMarked(obj, ctx));
         return;
@@ -128,6 +125,7 @@ static void markObjectNonNull(const Object *obj, GcMarkContext *ctx,
         }
 
 #if WITH_HPROF
+#error
         if (gDvm.gcHeap->hprofContext != NULL) {
             hprofMarkRootObject(gDvm.gcHeap->hprofContext, obj, 0);
         }
@@ -253,22 +251,22 @@ void dvmHeapMarkRootSet()
  * Callback applied to root references.  If the root location contains
  * a white reference it is pushed on the mark stack and grayed.
  */
-static void markObjectVisitor(void *addr, void *arg)
+static void markObjectVisitor(void *addr,
+                                    void *arg)
 {
-    Object *obj;
-
     assert(addr != NULL);
     assert(arg != NULL);
-    obj = *(Object **)addr;
+    Object *obj = *(Object **)addr;
+    GcMarkContext *ctx = (GcMarkContext *)arg;
     if (obj != NULL) {
-        markObjectNonNull(obj, arg, true);
+        markObjectNonNull(obj, ctx, true);
     }
 }
 
 /*
  * Grays all references in the roots.
  */
-void dvmHeapReMarkRootSet(void)
+void dvmHeapReMarkRootSet()
 {
     GcMarkContext *ctx = &gDvm.gcHeap->markContext;
     assert(ctx->finger == (void *)ULONG_MAX);
@@ -288,12 +286,11 @@ void dvmHeapReMarkRootSet(void)
 /*
  * Scans instance fields.
  */
-static void scanInstanceFields(const Object *obj, GcMarkContext *ctx)
+static void scanFields(const Object *obj, GcMarkContext *ctx)
 {
     assert(obj != NULL);
     assert(obj->clazz != NULL);
     assert(ctx != NULL);
-
     if (obj->clazz->refOffsets != CLASS_WALK_SUPER) {
         unsigned int refOffsets = obj->clazz->refOffsets;
         while (refOffsets != 0) {
@@ -303,13 +300,14 @@ static void scanInstanceFields(const Object *obj, GcMarkContext *ctx)
                                           CLASS_OFFSET_FROM_CLZ(rshift)), ctx);
         }
     } else {
-        ClassObject *clazz;
-        int i;
-        for (clazz = obj->clazz; clazz != NULL; clazz = clazz->super) {
+        for (ClassObject *clazz = obj->clazz;
+             clazz != NULL;
+             clazz = clazz->super) {
             InstField *field = clazz->ifields;
-            for (i = 0; i < clazz->ifieldRefCount; ++i, ++field) {
-                void *addr = BYTE_OFFSET((Object *)obj, field->byteOffset);
-                markObject(((JValue *)addr)->l, ctx);
+            for (int i = 0; i < clazz->ifieldRefCount; ++i, ++field) {
+                void *addr = BYTE_OFFSET(obj, field->byteOffset);
+                Object *ref = (Object *)((JValue *)addr)->l;
+                markObject(ref, ctx);
             }
         }
     }
@@ -319,36 +317,34 @@ static void scanInstanceFields(const Object *obj, GcMarkContext *ctx)
  * Scans the header, static field references, and interface
  * pointers of a class object.
  */
-static void scanClassObject(const ClassObject *obj, GcMarkContext *ctx)
+static void scanClassObject(const Object *obj, GcMarkContext *ctx)
 {
-    int i;
-
     assert(obj != NULL);
-    assert(obj->obj.clazz == gDvm.classJavaLangClass);
+    assert(obj->clazz == gDvm.classJavaLangClass);
     assert(ctx != NULL);
-
-    markObject((Object *)obj->obj.clazz, ctx);
-    if (IS_CLASS_FLAG_SET(obj, CLASS_ISARRAY)) {
-        markObject((Object *)obj->elementClass, ctx);
+    markObject((const Object *)obj->clazz, ctx);
+    const ClassObject *asClass = (const ClassObject *)obj;
+    if (IS_CLASS_FLAG_SET(asClass, CLASS_ISARRAY)) {
+        markObject((const Object *)asClass->elementClass, ctx);
     }
     /* Do super and the interfaces contain Objects and not dex idx values? */
-    if (obj->status > CLASS_IDX) {
-        markObject((Object *)obj->super, ctx);
+    if (asClass->status > CLASS_IDX) {
+        markObject((const Object *)asClass->super, ctx);
     }
-    markObject(obj->classLoader, ctx);
+    markObject((const Object *)asClass->classLoader, ctx);
     /* Scan static field references. */
-    for (i = 0; i < obj->sfieldCount; ++i) {
-        char ch = obj->sfields[i].field.signature[0];
+    for (int i = 0; i < asClass->sfieldCount; ++i) {
+        char ch = asClass->sfields[i].field.signature[0];
         if (ch == '[' || ch == 'L') {
-            markObject(obj->sfields[i].value.l, ctx);
+            markObject((const Object *)asClass->sfields[i].value.l, ctx);
         }
     }
     /* Scan the instance fields. */
-    scanInstanceFields((const Object *)obj, ctx);
+    scanFields((const Object *)asClass, ctx);
     /* Scan interface references. */
-    if (obj->status > CLASS_IDX) {
-        for (i = 0; i < obj->interfaceCount; ++i) {
-            markObject((Object *)obj->interfaces[i], ctx);
+    if (asClass->status > CLASS_IDX) {
+        for (int i = 0; i < asClass->interfaceCount; ++i) {
+            markObject((Object *)asClass->interfaces[i], ctx);
         }
     }
 }
@@ -357,19 +353,16 @@ static void scanClassObject(const ClassObject *obj, GcMarkContext *ctx)
  * Scans the header of all array objects.  If the array object is
  * specialized to a reference type, scans the array data as well.
  */
-static void scanArrayObject(const ArrayObject *obj, GcMarkContext *ctx)
+static void scanArrayObject(const Object *obj, GcMarkContext *ctx)
 {
-    size_t i;
-
     assert(obj != NULL);
-    assert(obj->obj.clazz != NULL);
+    assert(obj->clazz != NULL);
     assert(ctx != NULL);
-    /* Scan the class object reference. */
-    markObject((Object *)obj->obj.clazz, ctx);
-    if (IS_CLASS_FLAG_SET(obj->obj.clazz, CLASS_ISOBJECTARRAY)) {
-        /* Scan the array contents. */
-        Object **contents = (Object **)obj->contents;
-        for (i = 0; i < obj->length; ++i) {
+    markObject((const Object *)obj->clazz, ctx);
+    if (IS_CLASS_FLAG_SET(obj->clazz, CLASS_ISOBJECTARRAY)) {
+        const ArrayObject *array = (const ArrayObject *)obj;
+        const Object **contents = (const Object **)(void *)array->contents;
+        for (size_t i = 0; i < array->length; ++i) {
             markObject(contents[i], ctx);
         }
     }
@@ -415,11 +408,9 @@ static bool isPhantomReference(const Object *obj)
  */
 static void enqueuePendingReference(Object *ref, Object **list)
 {
-    size_t offset;
-
     assert(ref != NULL);
     assert(list != NULL);
-    offset = gDvm.offJavaLangRefReference_pendingNext;
+    size_t offset = gDvm.offJavaLangRefReference_pendingNext;
     if (*list == NULL) {
         dvmSetFieldObject(ref, offset, ref);
         *list = ref;
@@ -436,13 +427,11 @@ static void enqueuePendingReference(Object *ref, Object **list)
  */
 static Object *dequeuePendingReference(Object **list)
 {
-    Object *ref, *head;
-    size_t offset;
-
     assert(list != NULL);
     assert(*list != NULL);
-    offset = gDvm.offJavaLangRefReference_pendingNext;
-    head = dvmGetFieldObject(*list, offset);
+    size_t offset = gDvm.offJavaLangRefReference_pendingNext;
+    Object *head = dvmGetFieldObject(*list, offset);
+    Object *ref;
     if (*list == head) {
         ref = *list;
         *list = NULL;
@@ -462,18 +451,15 @@ static Object *dequeuePendingReference(Object **list)
  */
 static void delayReferenceReferent(Object *obj, GcMarkContext *ctx)
 {
-    GcHeap *gcHeap = gDvm.gcHeap;
-    Object *pending, *referent;
-    size_t pendingNextOffset, referentOffset;
-
     assert(obj != NULL);
     assert(obj->clazz != NULL);
     assert(IS_CLASS_FLAG_SET(obj->clazz, CLASS_ISREFERENCE));
     assert(ctx != NULL);
-    pendingNextOffset = gDvm.offJavaLangRefReference_pendingNext;
-    referentOffset = gDvm.offJavaLangRefReference_referent;
-    pending = dvmGetFieldObject(obj, pendingNextOffset);
-    referent = dvmGetFieldObject(obj, referentOffset);
+    GcHeap *gcHeap = gDvm.gcHeap;
+    size_t pendingNextOffset = gDvm.offJavaLangRefReference_pendingNext;
+    size_t referentOffset = gDvm.offJavaLangRefReference_referent;
+    Object *pending = dvmGetFieldObject(obj, pendingNextOffset);
+    Object *referent = dvmGetFieldObject(obj, referentOffset);
     if (pending == NULL && referent != NULL && !isMarked(referent, ctx)) {
         Object **list = NULL;
         if (isSoftReference(obj)) {
@@ -491,16 +477,14 @@ static void delayReferenceReferent(Object *obj, GcMarkContext *ctx)
 /*
  * Scans the header and field references of a data object.
  */
-static void scanDataObject(DataObject *obj, GcMarkContext *ctx)
+static void scanDataObject(const Object *obj, GcMarkContext *ctx)
 {
     assert(obj != NULL);
-    assert(obj->obj.clazz != NULL);
+    assert(obj->clazz != NULL);
     assert(ctx != NULL);
-    /* Scan the class object. */
-    markObject((Object *)obj->obj.clazz, ctx);
-    /* Scan the instance fields. */
-    scanInstanceFields((const Object *)obj, ctx);
-    if (IS_CLASS_FLAG_SET(obj->obj.clazz, CLASS_ISREFERENCE)) {
+    markObject((const Object *)obj->clazz, ctx);
+    scanFields(obj, ctx);
+    if (IS_CLASS_FLAG_SET(obj->clazz, CLASS_ISREFERENCE)) {
         delayReferenceReferent((Object *)obj, ctx);
     }
 }
@@ -515,22 +499,26 @@ static void scanObject(const Object *obj, GcMarkContext *ctx)
     assert(ctx != NULL);
     assert(obj->clazz != NULL);
 #if WITH_HPROF
+#error
     if (gDvm.gcHeap->hprofContext != NULL) {
         hprofDumpHeapObject(gDvm.gcHeap->hprofContext, obj);
     }
 #endif
     /* Dispatch a type-specific scan routine. */
     if (obj->clazz == gDvm.classJavaLangClass) {
-        scanClassObject((ClassObject *)obj, ctx);
+        scanClassObject(obj, ctx);
     } else if (IS_CLASS_FLAG_SET(obj->clazz, CLASS_ISARRAY)) {
-        scanArrayObject((ArrayObject *)obj, ctx);
+        scanArrayObject(obj, ctx);
     } else {
-        scanDataObject((DataObject *)obj, ctx);
+        scanDataObject(obj, ctx);
     }
 }
 
-static void
-processMarkStack(GcMarkContext *ctx)
+/*
+ * Scan anything that's on the mark stack.  We can't use the bitmaps
+ * anymore, so use a finger that points past the end of them.
+ */
+static void processMarkStack(GcMarkContext *ctx)
 {
     const Object **const base = ctx->stack.base;
 
@@ -561,9 +549,10 @@ static size_t objectSize(const Object *obj)
  * Scans forward to the header of the next marked object between start
  * and limit.  Returns NULL if no marked objects are in that region.
  */
-static Object *nextGrayObject(u1 *base, u1 *limit, HeapBitmap *markBits)
+static Object *nextGrayObject(const u1 *base, const u1 *limit,
+                              const HeapBitmap *markBits)
 {
-    u1 *ptr;
+    const u1 *ptr;
 
     assert(base < limit);
     assert(limit - base <= GC_CARD_SIZE);
@@ -597,7 +586,7 @@ static void scanGrayObjects(GcMarkContext *ctx)
              * The card is dirty.  Scan all of the objects that
              * intersect with the card address.
              */
-            u1 *addr = dvmAddrFromCard(card);
+            u1 *addr = (u1*) dvmAddrFromCard(card);
             /*
              * Scan through all black objects that start on the
              * current card.
@@ -622,9 +611,9 @@ static void scanGrayObjects(GcMarkContext *ctx)
  */
 static void scanBitmapCallback(void *addr, void *finger, void *arg)
 {
-    GcMarkContext *ctx = arg;
+    GcMarkContext *ctx = (GcMarkContext *)arg;
     ctx->finger = (void *)finger;
-    scanObject(addr, ctx);
+    scanObject((Object *)addr, ctx);
 }
 
 /* Given bitmaps with the root set marked, find and mark all
@@ -650,7 +639,7 @@ void dvmHeapScanMarkedObjects(void)
     LOG_SCAN("done with marked objects\n");
 }
 
-void dvmHeapReScanMarkedObjects(void)
+void dvmHeapReScanMarkedObjects()
 {
     GcMarkContext *ctx = &gDvm.gcHeap->markContext;
 
@@ -713,7 +702,6 @@ void dvmHandleSoftRefs(Object **list)
     Object *clear;
     size_t referentOffset;
     size_t counter;
-    bool marked;
 
     ctx = &gDvm.gcHeap->markContext;
     referentOffset = gDvm.offJavaLangRefReference_referent;
@@ -726,7 +714,7 @@ void dvmHandleSoftRefs(Object **list)
             /* Referent was cleared by the user during marking. */
             continue;
         }
-        marked = isMarked(referent, ctx);
+        bool marked = isMarked(referent, ctx);
         if (!marked && ((++counter) & 1)) {
             /* Referent is white and biased toward saving, mark it. */
             markObject(referent, ctx);
@@ -752,17 +740,12 @@ void dvmHandleSoftRefs(Object **list)
  */
 void dvmClearWhiteRefs(Object **list)
 {
-    GcMarkContext *ctx;
-    Object *ref, *referent;
-    size_t referentOffset;
-    bool doSignal;
-
-    ctx = &gDvm.gcHeap->markContext;
-    referentOffset = gDvm.offJavaLangRefReference_referent;
-    doSignal = false;
+    GcMarkContext *ctx = &gDvm.gcHeap->markContext;
+    size_t referentOffset = gDvm.offJavaLangRefReference_referent;
+    bool doSignal = false;
     while (*list != NULL) {
-        ref = dequeuePendingReference(list);
-        referent = dvmGetFieldObject(ref, referentOffset);
+        Object *ref = dequeuePendingReference(list);
+        Object *referent = dvmGetFieldObject(ref, referentOffset);
         if (referent != NULL && !isMarked(referent, ctx)) {
             /* Referent is white, clear it. */
             clearReference(ref);
@@ -894,9 +877,7 @@ void dvmHeapScheduleFinalizations()
 
 void dvmHeapFinishMarkStep()
 {
-    GcMarkContext *ctx;
-
-    ctx = &gDvm.gcHeap->markContext;
+    GcMarkContext *ctx = &gDvm.gcHeap->markContext;
 
     /* The mark bits are now not needed.
      */
@@ -909,16 +890,16 @@ void dvmHeapFinishMarkStep()
     ctx->finger = NULL;
 }
 
-typedef struct {
+struct SweepContext {
     size_t numObjects;
     size_t numBytes;
     bool isConcurrent;
-} SweepContext;
+};
 
 static void sweepBitmapCallback(size_t numPtrs, void **ptrs, void *arg)
 {
-    SweepContext *ctx = arg;
-
+    assert(arg != NULL);
+    SweepContext *ctx = (SweepContext *)arg;
     if (ctx->isConcurrent) {
         dvmLockHeap();
     }
@@ -933,17 +914,16 @@ static void sweepBitmapCallback(size_t numPtrs, void **ptrs, void *arg)
  * Returns true if the given object is unmarked.  This assumes that
  * the bitmaps have not yet been swapped.
  */
-static int isUnmarkedObject(void *object)
+static int isUnmarkedObject(void *obj)
 {
-    return !isMarked((void *)((uintptr_t)object & ~(HB_OBJECT_ALIGNMENT-1)),
-            &gDvm.gcHeap->markContext);
+    return !isMarked((Object *)obj, &gDvm.gcHeap->markContext);
 }
 
 /*
  * Process all the internal system structures that behave like
  * weakly-held objects.
  */
-void dvmHeapSweepSystemWeaks(void)
+void dvmHeapSweepSystemWeaks()
 {
     dvmGcDetachDeadInternedStrings(isUnmarkedObject);
     dvmSweepMonitorList(&gDvm.monitorList, isUnmarkedObject);
@@ -956,26 +936,26 @@ void dvmHeapSweepSystemWeaks(void)
 void dvmHeapSweepUnmarkedObjects(GcMode mode, bool isConcurrent,
                                  size_t *numObjects, size_t *numBytes)
 {
-    HeapBitmap currMark[HEAP_SOURCE_MAX_HEAP_COUNT];
-    HeapBitmap currLive[HEAP_SOURCE_MAX_HEAP_COUNT];
+    HeapBitmap base[HEAP_SOURCE_MAX_HEAP_COUNT];
+    HeapBitmap max[HEAP_SOURCE_MAX_HEAP_COUNT];
     SweepContext ctx;
-    size_t numBitmaps, numSweepBitmaps;
-    size_t i;
+    size_t numHeaps, numSweepHeaps;
 
-    numBitmaps = dvmHeapSourceGetNumHeaps();
-    dvmHeapSourceGetObjectBitmaps(currLive, currMark, numBitmaps);
+    numHeaps = dvmHeapSourceGetNumHeaps();
+    dvmHeapSourceGetObjectBitmaps(max, base, numHeaps);
     if (mode == GC_PARTIAL) {
-        numSweepBitmaps = 1;
-        assert((uintptr_t)gDvm.gcHeap->markContext.immuneLimit == currLive[0].base);
+        assert((uintptr_t)gDvm.gcHeap->markContext.immuneLimit == max[0].base);
+        numSweepHeaps = 1;
     } else {
-        numSweepBitmaps = numBitmaps;
+        numSweepHeaps = numHeaps;
     }
     ctx.numObjects = ctx.numBytes = 0;
     ctx.isConcurrent = isConcurrent;
-    for (i = 0; i < numSweepBitmaps; i++) {
-        HeapBitmap* prevLive = &currMark[i];
-        HeapBitmap* prevMark = &currLive[i];
-        dvmHeapBitmapSweepWalk(prevLive, prevMark, sweepBitmapCallback, &ctx);
+    for (size_t i = 0; i < numSweepHeaps; i++) {
+        HeapBitmap* prevLive = &base[i];
+        HeapBitmap* prevMark = &max[i];
+        dvmHeapBitmapSweepWalk(prevLive, prevMark,
+                               sweepBitmapCallback, &ctx);
     }
     *numObjects = ctx.numObjects;
     *numBytes = ctx.numBytes;
