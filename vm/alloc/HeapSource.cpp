@@ -25,11 +25,10 @@
 #include "alloc/HeapSource.h"
 #include "alloc/HeapBitmap.h"
 
-// TODO: find a real header file for these.
-extern int dlmalloc_trim(size_t);
-extern void dlmalloc_walk_free_pages(void(*)(void*, void*, void*), void*);
+extern "C" int dlmalloc_trim(size_t);
+extern "C" void dlmalloc_walk_free_pages(void(*)(void*, void*, void*), void*);
 
-static void snapIdealFootprint(void);
+static void snapIdealFootprint();
 static void setIdealFootprint(size_t max);
 
 #define ALIGN_UP_TO_PAGE_SIZE(p) \
@@ -66,45 +65,9 @@ static void setIdealFootprint(size_t max);
 #define HSTRACE(...)  /**/
 #endif
 
-/*
-=======================================================
-=======================================================
-=======================================================
 
-How will this be used?
-allocating/freeing: Heap.c just wants to say "alloc(n)" and get a ptr
-    - if allocating in large doesn't work, try allocating from small
-Heap.c will use HeapSource.h; HeapSource.c will do the right thing
-    between small and large
-    - some operations should be abstracted; put in a structure
 
-How do we manage the size trade-offs?
-- keep mspace max footprint clamped to actual footprint
-- if small-alloc returns null, adjust large vs. small ratio
-    - give small all available slack and retry
-    - success or fail, snap back to actual footprint and give rest to large
-
-managed as "small actual" + "large actual" + "delta to allowed total footprint"
-- when allocating from one source or the other, give the delta to the
-    active source, but snap back afterwards
-- that may not work so great for a gc heap, because small will always consume.
-    - but we need to use the memory, and the current max is the amount we
-      need to fill before a GC.
-
-Find a way to permanently steal pages from the middle of the heap
-    - segment tricks?
-
-Allocate String and char[] in a separate heap?
-
-Maybe avoid growing small heap, even if there's slack?  Look at
-live ratio of small heap after a gc; scale it based on that.
-
-=======================================================
-=======================================================
-=======================================================
-*/
-
-typedef struct {
+struct Heap {
     /* The mspace to allocate from.
      */
     mspace msp;
@@ -137,7 +100,7 @@ typedef struct {
      * The highest address of this heap, exclusive.
      */
     char *limit;
-} Heap;
+};
 
 struct HeapSource {
     /* Target ideal heap utilization ratio; range 1..HEAP_UTILIZATION_MAX
@@ -222,8 +185,7 @@ struct HeapSource {
 /*
  * Returns true iff a soft limit is in effect for the active heap.
  */
-static inline bool
-softLimited(const HeapSource *hs)
+static bool isSoftLimited(const HeapSource *hs)
 {
     /* softLimit will be either SIZE_MAX or the limit for the
      * active mspace.  idealSize can be greater than softLimit
@@ -238,10 +200,9 @@ softLimited(const HeapSource *hs)
  * Returns approximately the maximum number of bytes allowed to be
  * allocated from the active heap before a GC is forced.
  */
-static size_t
-getAllocLimit(const HeapSource *hs)
+static size_t getAllocLimit(const HeapSource *hs)
 {
-    if (softLimited(hs)) {
+    if (isSoftLimited(hs)) {
         return hs->softLimit;
     } else {
         return mspace_max_allowed_footprint(hs2heap(hs)->msp);
@@ -252,8 +213,7 @@ getAllocLimit(const HeapSource *hs)
  * Returns the current footprint of all heaps.  If includeActive
  * is false, don't count the heap at index 0.
  */
-static inline size_t
-oldHeapOverhead(const HeapSource *hs, bool includeActive)
+static size_t oldHeapOverhead(const HeapSource *hs, bool includeActive)
 {
     size_t footprint = 0;
     size_t i;
@@ -274,15 +234,12 @@ oldHeapOverhead(const HeapSource *hs, bool includeActive)
  * Returns the heap that <ptr> could have come from, or NULL
  * if it could not have come from any heap.
  */
-static inline Heap *
-ptr2heap(const HeapSource *hs, const void *ptr)
+static Heap *ptr2heap(const HeapSource *hs, const void *ptr)
 {
     const size_t numHeaps = hs->numHeaps;
-    size_t i;
 
-//TODO: unroll this to HEAP_SOURCE_MAX_HEAP_COUNT
     if (ptr != NULL) {
-        for (i = 0; i < numHeaps; i++) {
+        for (size_t i = 0; i < numHeaps; i++) {
             const Heap *const heap = &hs->heaps[i];
 
             if ((const char *)ptr >= heap->base && (const char *)ptr < heap->limit) {
@@ -303,16 +260,14 @@ ptr2heap(const HeapSource *hs, const void *ptr)
  */
 static void countAllocation(Heap *heap, const void *ptr, bool isObj)
 {
-    HeapSource *hs;
-
     assert(heap->bytesAllocated < mspace_footprint(heap->msp));
 
     heap->bytesAllocated += mspace_usable_size(heap->msp, ptr) +
             HEAP_SOURCE_CHUNK_OVERHEAD;
     if (isObj) {
-        heap->objectsAllocated++;
-        hs = gDvm.gcHeap->heapSource;
-        dvmHeapBitmapSetObjectBit(&hs->liveBits, ptr);
+    heap->objectsAllocated++;
+    HeapSource* hs = gDvm.gcHeap->heapSource;
+    dvmHeapBitmapSetObjectBit(&hs->liveBits, ptr);
     }
 
     assert(heap->bytesAllocated < mspace_footprint(heap->msp));
@@ -320,17 +275,14 @@ static void countAllocation(Heap *heap, const void *ptr, bool isObj)
 
 static void countFree(Heap *heap, const void *ptr, size_t *numBytes)
 {
-    HeapSource *hs;
-    size_t delta;
-
-    delta = mspace_usable_size(heap->msp, ptr) + HEAP_SOURCE_CHUNK_OVERHEAD;
+    size_t delta = mspace_usable_size(heap->msp, ptr) + HEAP_SOURCE_CHUNK_OVERHEAD;
     assert(delta > 0);
     if (delta < heap->bytesAllocated) {
         heap->bytesAllocated -= delta;
     } else {
         heap->bytesAllocated = 0;
     }
-    hs = gDvm.gcHeap->heapSource;
+    HeapSource* hs = gDvm.gcHeap->heapSource;
     dvmHeapBitmapClearObjectBit(&hs->liveBits, ptr);
     if (heap->objectsAllocated > 0) {
         heap->objectsAllocated--;
@@ -340,8 +292,7 @@ static void countFree(Heap *heap, const void *ptr, size_t *numBytes)
 
 static HeapSource *gHs = NULL;
 
-static mspace
-createMspace(void *base, size_t startSize, size_t absoluteMaxSize)
+static mspace createMspace(void* base, size_t startSize, size_t absoluteMaxSize)
 {
     mspace msp;
 
@@ -373,13 +324,16 @@ createMspace(void *base, size_t startSize, size_t absoluteMaxSize)
     return msp;
 }
 
-static bool
-addNewHeap(HeapSource *hs, mspace msp, size_t mspAbsoluteMaxSize)
+/*
+ * Adds an additional heap to the heap source.  Returns false if there
+ * are too many heaps or insufficient free space to add another heap.
+ */
+static bool addNewHeap(HeapSource *hs, mspace msp, size_t mspAbsoluteMaxSize)
 {
     Heap heap;
 
     if (hs->numHeaps >= HEAP_SOURCE_MAX_HEAP_COUNT) {
-        ALOGE("Attempt to create too many heaps (%zd >= %zd)\n",
+        ALOGE("Attempt to create too many heaps (%zd >= %zd)",
                 hs->numHeaps, HEAP_SOURCE_MAX_HEAP_COUNT);
         dvmAbort();
         return false;
@@ -436,7 +390,8 @@ addNewHeap(HeapSource *hs, mspace msp, size_t mspAbsoluteMaxSize)
 
 /*
  * The garbage collection daemon.  Initiates a concurrent collection
- * when signaled.
+ * when signaled.  Also periodically trims the heaps when a few seconds
+ * have elapsed since the last concurrent GC.
  */
 static void *gcDaemonThread(void* arg)
 {
@@ -454,7 +409,7 @@ static void *gcDaemonThread(void* arg)
     return NULL;
 }
 
-static bool gcDaemonStartup(void)
+static bool gcDaemonStartup()
 {
     dvmInitMutex(&gHs->gcThreadMutex);
     pthread_cond_init(&gHs->gcThreadCond, NULL);
@@ -464,7 +419,7 @@ static bool gcDaemonStartup(void)
     return gHs->hasGcThread;
 }
 
-static void gcDaemonShutdown(void)
+static void gcDaemonShutdown()
 {
     if (gHs->hasGcThread) {
         dvmLockMutex(&gHs->gcThreadMutex);
@@ -480,8 +435,7 @@ static void gcDaemonShutdown(void)
  * dvmHeapSource*() functions.  Returns a GcHeap structure
  * allocated from the heap source.
  */
-GcHeap *
-dvmHeapSourceStartup(size_t startSize, size_t absoluteMaxSize)
+GcHeap* dvmHeapSourceStartup(size_t startSize, size_t absoluteMaxSize)
 {
     GcHeap *gcHeap;
     HeapSource *hs;
@@ -508,28 +462,25 @@ dvmHeapSourceStartup(size_t startSize, size_t absoluteMaxSize)
     }
 
     /* Create an unlocked dlmalloc mspace to use as
-     * the small object heap source.
+     * a heap source.
      */
     msp = createMspace(base, startSize, absoluteMaxSize);
     if (msp == NULL) {
         goto fail;
     }
 
-    /* Allocate a descriptor from the heap we just created.
-     */
-    gcHeap = mspace_malloc(msp, sizeof(*gcHeap));
+    gcHeap = (GcHeap *)calloc(1, sizeof(*gcHeap));
     if (gcHeap == NULL) {
-        LOGE_HEAP("Can't allocate heap descriptor\n");
+        LOGE_HEAP("Can't allocate heap descriptor");
         goto fail;
     }
-    memset(gcHeap, 0, sizeof(*gcHeap));
 
-    hs = mspace_malloc(msp, sizeof(*hs));
+    hs = (HeapSource *)calloc(1, sizeof(*hs));
     if (hs == NULL) {
-        LOGE_HEAP("Can't allocate heap source\n");
+        LOGE_HEAP("Can't allocate heap source");
+        free(gcHeap);
         goto fail;
     }
-    memset(hs, 0, sizeof(*hs));
 
     hs->targetUtilization = DEFAULT_HEAP_UTILIZATION;
     hs->minimumSize = 0;
@@ -540,18 +491,18 @@ dvmHeapSourceStartup(size_t startSize, size_t absoluteMaxSize)
     hs->numHeaps = 0;
     hs->sawZygote = gDvm.zygote;
     hs->hasGcThread = false;
-    hs->heapBase = base;
+    hs->heapBase = (char *)base;
     hs->heapLength = length;
     if (!addNewHeap(hs, msp, absoluteMaxSize)) {
         LOGE_HEAP("Can't add initial heap\n");
         goto fail;
     }
     if (!dvmHeapBitmapInit(&hs->liveBits, base, length, "dalvik-bitmap-1")) {
-        LOGE_HEAP("Can't create liveBits\n");
+        LOGE_HEAP("Can't create liveBits");
         goto fail;
     }
     if (!dvmHeapBitmapInit(&hs->markBits, base, length, "dalvik-bitmap-2")) {
-        LOGE_HEAP("Can't create markBits\n");
+        LOGE_HEAP("Can't create markBits");
         dvmHeapBitmapDelete(&hs->liveBits);
         goto fail;
     }
@@ -570,7 +521,7 @@ fail:
     return NULL;
 }
 
-bool dvmHeapSourceStartupAfterZygote(void)
+bool dvmHeapSourceStartupAfterZygote()
 {
     return gDvm.concurrentMarkSweep ? gcDaemonStartup() : true;
 }
@@ -582,8 +533,7 @@ bool dvmHeapSourceStartupAfterZygote(void)
  * probably be unnecessary if we had a compacting GC -- the source of our
  * troubles is small allocations filling in the gaps from larger ones.)
  */
-bool
-dvmHeapSourceStartupBeforeFork()
+bool dvmHeapSourceStartupBeforeFork()
 {
     HeapSource *hs = gHs; // use a local to avoid the implicit "volatile"
 
@@ -595,14 +545,14 @@ dvmHeapSourceStartupBeforeFork()
         /* Create a new heap for post-fork zygote allocations.  We only
          * try once, even if it fails.
          */
-        ALOGV("Splitting out new zygote heap\n");
+        ALOGV("Splitting out new zygote heap");
         gDvm.newZygoteHeapAllocated = true;
         return addNewHeap(hs, NULL, 0);
     }
     return true;
 }
 
-void dvmHeapSourceThreadShutdown(void)
+void dvmHeapSourceThreadShutdown()
 {
     if (gDvm.gcHeap != NULL && gDvm.concurrentMarkSweep) {
         gcDaemonShutdown();
@@ -614,14 +564,10 @@ void dvmHeapSourceThreadShutdown(void)
  * attached to it.  This call has the side effect of setting the given
  * gcHeap pointer and gHs to NULL.
  */
-void
-dvmHeapSourceShutdown(GcHeap **gcHeap)
+void dvmHeapSourceShutdown(GcHeap **gcHeap)
 {
     if (*gcHeap != NULL && (*gcHeap)->heapSource != NULL) {
-        HeapSource *hs;
-
-        hs = (*gcHeap)->heapSource;
-
+        HeapSource *hs = (*gcHeap)->heapSource;
         assert((char *)*gcHeap >= hs->heapBase);
         assert((char *)*gcHeap < hs->heapBase + hs->heapLength);
 
@@ -637,7 +583,7 @@ dvmHeapSourceShutdown(GcHeap **gcHeap)
 /*
  * Gets the begining of the allocation for the HeapSource.
  */
-void *dvmHeapSourceGetBase(void)
+void *dvmHeapSourceGetBase()
 {
     return gHs->heapBase;
 }
@@ -648,14 +594,12 @@ void *dvmHeapSourceGetBase(void)
  *
  * Caller must hold the heap lock.
  */
-size_t
-dvmHeapSourceGetValue(enum HeapSourceValueSpec spec, size_t perHeapStats[],
-                      size_t arrayLen)
+size_t dvmHeapSourceGetValue(HeapSourceValueSpec spec, size_t perHeapStats[],
+                             size_t arrayLen)
 {
     HeapSource *hs = gHs;
     size_t value = 0;
     size_t total = 0;
-    size_t i;
 
     HS_BOILERPLATE();
 
@@ -670,7 +614,7 @@ dvmHeapSourceGetValue(enum HeapSourceValueSpec spec, size_t perHeapStats[],
     }
 
     assert(arrayLen >= hs->numHeaps || perHeapStats == NULL);
-    for (i = 0; i < hs->numHeaps; i++) {
+    for (size_t i = 0; i < hs->numHeaps; i++) {
         Heap *const heap = &hs->heaps[i];
 
         switch (spec) {
@@ -744,23 +688,22 @@ void dvmHeapSourceGetObjectBitmaps(HeapBitmap liveBits[], HeapBitmap markBits[],
 /*
  * Get the bitmap representing all live objects.
  */
-HeapBitmap *dvmHeapSourceGetLiveBits(void)
+HeapBitmap *dvmHeapSourceGetLiveBits()
 {
     HS_BOILERPLATE();
 
     return &gHs->liveBits;
 }
 
-void dvmHeapSourceSwapBitmaps(void)
-{
-    HeapBitmap tmp;
 
-    tmp = gHs->liveBits;
+void dvmHeapSourceSwapBitmaps()
+{
+    HeapBitmap tmp = gHs->liveBits;
     gHs->liveBits = gHs->markBits;
     gHs->markBits = tmp;
 }
 
-void dvmHeapSourceZeroMarkBitmap(void)
+void dvmHeapSourceZeroMarkBitmap()
 {
     HS_BOILERPLATE();
 
@@ -769,9 +712,6 @@ void dvmHeapSourceZeroMarkBitmap(void)
 
 void dvmMarkImmuneObjects(const char *immuneLimit)
 {
-    char *dst, *src;
-    size_t i, index, length;
-
     /*
      * Copy the contents of the live bit vector for immune object
      * range into the mark bit vector.
@@ -785,17 +725,17 @@ void dvmMarkImmuneObjects(const char *immuneLimit)
     assert(gHs->heaps[0].base >= immuneLimit);
     assert(gHs->heaps[0].limit > immuneLimit);
 
-    for (i = 1; i < gHs->numHeaps; ++i) {
+    for (size_t i = 1; i < gHs->numHeaps; ++i) {
         if (gHs->heaps[i].base < immuneLimit) {
             assert(gHs->heaps[i].limit <= immuneLimit);
             /* Compute the number of words to copy in the bitmap. */
-            index = HB_OFFSET_TO_INDEX(
+            size_t index = HB_OFFSET_TO_INDEX(
                 (uintptr_t)gHs->heaps[i].base - gHs->liveBits.base);
             /* Compute the starting offset in the live and mark bits. */
-            src = (char *)(gHs->liveBits.bits + index);
-            dst = (char *)(gHs->markBits.bits + index);
+            char *src = (char *)(gHs->liveBits.bits + index);
+            char *dst = (char *)(gHs->markBits.bits + index);
             /* Compute the number of bytes of the live bitmap to copy. */
-            length = HB_OFFSET_TO_BYTE_INDEX(
+            size_t length = HB_OFFSET_TO_BYTE_INDEX(
                 gHs->heaps[i].limit - gHs->heaps[i].base);
             /* Do the copy. */
             memcpy(dst, src, length);
@@ -810,25 +750,22 @@ void dvmMarkImmuneObjects(const char *immuneLimit)
 /*
  * Allocates <n> bytes of zeroed data.
  */
-void *
-dvmHeapSourceAlloc(size_t n)
+void* dvmHeapSourceAlloc(size_t n)
 {
-    HeapSource *hs = gHs;
-    Heap *heap;
-    void *ptr;
-
     HS_BOILERPLATE();
-    heap = hs2heap(hs);
+
+    HeapSource *hs = gHs;
+    Heap* heap = hs2heap(hs);
     if (heap->bytesAllocated + n > hs->softLimit) {
         /*
          * This allocation would push us over the soft limit; act as
          * if the heap is full.
          */
-        LOGV_HEAP("softLimit of %zd.%03zdMB hit for %zd-byte allocation\n",
+        LOGV_HEAP("softLimit of %zd.%03zdMB hit for %zd-byte allocation",
                   FRACTIONAL_MB(hs->softLimit), n);
         return NULL;
     }
-    ptr = mspace_calloc(heap->msp, 1, n);
+    void* ptr = mspace_calloc(heap->msp, 1, n);
     if (ptr == NULL) {
         return NULL;
     }
@@ -856,16 +793,13 @@ dvmHeapSourceAlloc(size_t n)
 /* Remove any hard limits, try to allocate, and shrink back down.
  * Last resort when trying to allocate an object.
  */
-static void *
-heapAllocAndGrow(HeapSource *hs, Heap *heap, size_t n)
+static void* heapAllocAndGrow(HeapSource *hs, Heap *heap, size_t n)
 {
-    void *ptr;
-    size_t max;
-
+    void* ptr = NULL;
     /* Grow as much as possible, but don't let the real footprint
      * plus external allocations go over the absolute max.
      */
-    max = heap->absoluteMaxSize;
+    size_t max = heap->absoluteMaxSize;
     if (max > hs->externalBytesAllocated) {
         max -= hs->externalBytesAllocated;
 
@@ -888,24 +822,19 @@ heapAllocAndGrow(HeapSource *hs, Heap *heap, size_t n)
  * Allocates <n> bytes of zeroed data, growing as much as possible
  * if necessary.
  */
-void *
-dvmHeapSourceAllocAndGrow(size_t n)
+void* dvmHeapSourceAllocAndGrow(size_t n)
 {
-    HeapSource *hs = gHs;
-    Heap *heap;
-    void *ptr;
-    size_t oldIdealSize;
-
     HS_BOILERPLATE();
-    heap = hs2heap(hs);
 
-    ptr = dvmHeapSourceAlloc(n);
+    HeapSource *hs = gHs;
+    Heap* heap = hs2heap(hs);
+    void* ptr = dvmHeapSourceAlloc(n);
     if (ptr != NULL) {
         return ptr;
     }
 
-    oldIdealSize = hs->idealSize;
-    if (softLimited(hs)) {
+    size_t oldIdealSize = hs->idealSize;
+    if (isSoftLimited(hs)) {
         /* We're soft-limited.  Try removing the soft limit to
          * see if we can allocate without actually growing.
          */
@@ -947,9 +876,6 @@ dvmHeapSourceAllocAndGrow(size_t n)
  */
 size_t dvmHeapSourceFreeList(size_t numPtrs, void **ptrs)
 {
-    Heap *heap;
-    size_t numBytes;
-
     HS_BOILERPLATE();
 
     if (numPtrs == 0) {
@@ -958,10 +884,10 @@ size_t dvmHeapSourceFreeList(size_t numPtrs, void **ptrs)
 
     assert(ptrs != NULL);
     assert(*ptrs != NULL);
-    heap = ptr2heap(gHs, *ptrs);
-    numBytes = 0;
+    Heap* heap = ptr2heap(gHs, *ptrs);
+    size_t numBytes = 0;
     if (heap != NULL) {
-        mspace *msp = heap->msp;
+        mspace msp = heap->msp;
         // Calling mspace_free on shared heaps disrupts sharing too
         // much. For heap[0] -- the 'active heap' -- we call
         // mspace_free, but on the other heaps we only do some
@@ -986,8 +912,7 @@ size_t dvmHeapSourceFreeList(size_t numPtrs, void **ptrs)
             countFree(heap, ptrs[0], &numBytes);
             void *merged = ptrs[0];
 
-            size_t i;
-            for (i = 1; i < numPtrs; i++) {
+            for (size_t i = 1; i < numPtrs; i++) {
                 assert(merged != NULL);
                 assert(ptrs[i] != NULL);
                 assert((intptr_t)merged < (intptr_t)ptrs[i]);
@@ -1006,8 +931,7 @@ size_t dvmHeapSourceFreeList(size_t numPtrs, void **ptrs)
             mspace_free(msp, merged);
         } else {
             // This is not an 'active heap'. Only do the accounting.
-            size_t i;
-            for (i = 0; i < numPtrs; i++) {
+            for (size_t i = 0; i < numPtrs; i++) {
                 assert(ptrs[i] != NULL);
                 assert(ptr2heap(gHs, ptrs[i]) == heap);
                 countFree(heap, ptrs[i], &numBytes);
@@ -1020,8 +944,7 @@ size_t dvmHeapSourceFreeList(size_t numPtrs, void **ptrs)
 /*
  * Returns true iff <ptr> is in the heap source.
  */
-bool
-dvmHeapSourceContainsAddress(const void *ptr)
+bool dvmHeapSourceContainsAddress(const void *ptr)
 {
     HS_BOILERPLATE();
 
@@ -1031,8 +954,7 @@ dvmHeapSourceContainsAddress(const void *ptr)
 /*
  * Returns true iff <ptr> was allocated from the heap source.
  */
-bool
-dvmHeapSourceContains(const void *ptr)
+bool dvmHeapSourceContains(const void *ptr)
 {
     HS_BOILERPLATE();
 
@@ -1045,8 +967,7 @@ dvmHeapSourceContains(const void *ptr)
 /*
  * Returns the value of the requested flag.
  */
-bool
-dvmHeapSourceGetPtrFlag(const void *ptr, enum HeapSourcePtrFlag flag)
+bool dvmHeapSourceGetPtrFlag(const void *ptr, enum HeapSourcePtrFlag flag)
 {
     if (ptr == NULL) {
         return false;
@@ -1083,14 +1004,11 @@ dvmHeapSourceGetPtrFlag(const void *ptr, enum HeapSourcePtrFlag flag)
  * Returns the number of usable bytes in an allocated chunk; the size
  * may be larger than the size passed to dvmHeapSourceAlloc().
  */
-size_t
-dvmHeapSourceChunkSize(const void *ptr)
+size_t dvmHeapSourceChunkSize(const void *ptr)
 {
-    Heap *heap;
-
     HS_BOILERPLATE();
 
-    heap = ptr2heap(gHs, ptr);
+    Heap* heap = ptr2heap(gHs, ptr);
     if (heap != NULL) {
         return mspace_usable_size(heap->msp, ptr);
     }
@@ -1103,8 +1021,7 @@ dvmHeapSourceChunkSize(const void *ptr)
  *
  * Caller must hold the heap lock.
  */
-size_t
-dvmHeapSourceFootprint()
+size_t dvmHeapSourceFootprint()
 {
     HS_BOILERPLATE();
 
@@ -1118,15 +1035,13 @@ dvmHeapSourceFootprint()
  * is in effect, this is effectively what it's compared against
  * (though, in practice, it only looks at the current heap).
  */
-static size_t
-getSoftFootprint(bool includeActive)
+static size_t getSoftFootprint(bool includeActive)
 {
     HeapSource *hs = gHs;
-    size_t ret;
 
     HS_BOILERPLATE();
 
-    ret = oldHeapOverhead(hs, false) + hs->externalBytesAllocated;
+    size_t ret = oldHeapOverhead(hs, false) + hs->externalBytesAllocated;
     if (includeActive) {
         ret += hs->heaps[0].bytesAllocated;
     }
@@ -1138,8 +1053,7 @@ getSoftFootprint(bool includeActive)
  * Gets the maximum number of bytes that the heap source is allowed
  * to allocate from the system.
  */
-size_t
-dvmHeapSourceGetIdealFootprint()
+size_t dvmHeapSourceGetIdealFootprint()
 {
     HeapSource *hs = gHs;
 
@@ -1152,8 +1066,7 @@ dvmHeapSourceGetIdealFootprint()
  * Sets the soft limit, handling any necessary changes to the allowed
  * footprint of the active heap.
  */
-static void
-setSoftLimit(HeapSource *hs, size_t softLimit)
+static void setSoftLimit(HeapSource *hs, size_t softLimit)
 {
     /* Compare against the actual footprint, rather than the
      * max_allowed, because the heap may not have grown all the
@@ -1180,11 +1093,11 @@ setSoftLimit(HeapSource *hs, size_t softLimit)
  * to allocate from the system.  Clamps to the appropriate maximum
  * value.
  */
-static void
-setIdealFootprint(size_t max)
+static void setIdealFootprint(size_t max)
 {
     HeapSource *hs = gHs;
 #if DEBUG_HEAP_SOURCE
+#error
     HeapSource oldHs = *hs;
     mspace msp = hs->heaps[0].msp;
     size_t oldAllowedFootprint =
@@ -1203,7 +1116,7 @@ setIdealFootprint(size_t max)
     }
 
     /* Convert max into a size that applies to the active heap.
-     * Old heaps and external allocations will count against the ideal size.
+     * Old heaps will count against the ideal size.
      */
     size_t overhead = getSoftFootprint(false);
     size_t activeMax;
@@ -1229,8 +1142,7 @@ setIdealFootprint(size_t max)
 /*
  * Make the ideal footprint equal to the current footprint.
  */
-static void
-snapIdealFootprint()
+static void snapIdealFootprint()
 {
     HS_BOILERPLATE();
 
@@ -1271,7 +1183,7 @@ void dvmSetTargetHeapUtilization(float newTarget)
 
     hs->targetUtilization =
             (size_t)(newTarget * (float)HEAP_UTILIZATION_MAX);
-    ALOGV("Set heap target utilization to %zd/%d (%f)\n",
+    ALOGV("Set heap target utilization to %zd/%d (%f)",
             hs->targetUtilization, HEAP_UTILIZATION_MAX, newTarget);
 }
 
@@ -1280,8 +1192,7 @@ void dvmSetTargetHeapUtilization(float newTarget)
  * returns the current (or previous) size.  If size is negative,
  * removes the current minimum constraint (if present).
  */
-size_t
-dvmMinimumHeapSize(size_t size, bool set)
+size_t dvmMinimumHeapSize(size_t size, bool set)
 {
     HeapSource *hs = gHs;
     size_t oldMinimumSize;
@@ -1329,15 +1240,12 @@ dvmMinimumHeapSize(size_t size, bool set)
  *
  * targetUtilization is in the range 1..HEAP_UTILIZATION_MAX.
  */
-static size_t
-getUtilizationTarget(size_t liveSize, size_t targetUtilization)
+static size_t getUtilizationTarget(size_t liveSize, size_t targetUtilization)
 {
-    size_t targetSize;
-
     /* Use the current target utilization ratio to determine the
      * ideal heap size based on the size of the live set.
      */
-    targetSize = (liveSize / targetUtilization) * HEAP_UTILIZATION_MAX;
+    size_t targetSize = (liveSize / targetUtilization) * HEAP_UTILIZATION_MAX;
 
     /* Cap the amount of free space, though, so we don't end up
      * with, e.g., 8MB of free space when the live set size hits 8MB.
@@ -1357,17 +1265,13 @@ getUtilizationTarget(size_t liveSize, size_t targetUtilization)
  */
 void dvmHeapSourceGrowForUtilization()
 {
-    HeapSource *hs = gHs;
-    Heap *heap;
-    size_t targetHeapSize;
-    size_t currentHeapUsed;
     size_t oldIdealSize;
     size_t newHeapMax;
-    size_t overhead;
-    size_t freeBytes;
 
     HS_BOILERPLATE();
-    heap = hs2heap(hs);
+
+    HeapSource *hs = gHs;
+    Heap* heap = hs2heap(hs);
 
     /* Use the current target utilization ratio to determine the
      * ideal heap size based on the size of the live set.
@@ -1378,7 +1282,7 @@ void dvmHeapSourceGrowForUtilization()
      * in the working set.  Just look at the allocated size of
      * the current heap.
      */
-    currentHeapUsed = heap->bytesAllocated;
+    size_t currentHeapUsed = heap->bytesAllocated;
 #define LET_EXTERNAL_INFLUENCE_UTILIZATION 1
 #if LET_EXTERNAL_INFLUENCE_UTILIZATION
     /* This is a hack to deal with the side-effects of moving
@@ -1393,8 +1297,7 @@ void dvmHeapSourceGrowForUtilization()
      */
     currentHeapUsed += hs->externalBytesAllocated;
 #endif
-    targetHeapSize =
-            getUtilizationTarget(currentHeapUsed, hs->targetUtilization);
+    size_t targetHeapSize = getUtilizationTarget(currentHeapUsed, hs->targetUtilization);
 #if LET_EXTERNAL_INFLUENCE_UTILIZATION
     currentHeapUsed -= hs->externalBytesAllocated;
     targetHeapSize -= hs->externalBytesAllocated;
@@ -1405,11 +1308,11 @@ void dvmHeapSourceGrowForUtilization()
      * If the target heap size would exceed the max, setIdealFootprint()
      * will clamp it to a legal value.
      */
-    overhead = getSoftFootprint(false);
+    size_t overhead = getSoftFootprint(false);
     oldIdealSize = hs->idealSize;
     setIdealFootprint(targetHeapSize + overhead);
 
-    freeBytes = getAllocLimit(hs);
+    size_t freeBytes = getAllocLimit(hs);
     if (freeBytes < CONCURRENT_MIN_FREE) {
         /* Not enough free memory to allow a concurrent GC. */
         heap->concurrentStartBytes = SIZE_MAX;
@@ -1417,7 +1320,7 @@ void dvmHeapSourceGrowForUtilization()
         heap->concurrentStartBytes = freeBytes - CONCURRENT_START;
     }
     newHeapMax = mspace_max_allowed_footprint(heap->msp);
-    if (softLimited(hs)) {
+    if (isSoftLimited(hs)) {
         LOGD_HEAP("GC old usage %zd.%zd%%; now "
                 "%zd.%03zdMB used / %zd.%03zdMB soft max "
                 "(%zd.%03zdMB over, "
@@ -1446,7 +1349,6 @@ void dvmHeapSourceGrowForUtilization()
  * Return free pages to the system.
  * TODO: move this somewhere else, especially the native heap part.
  */
-
 static void releasePagesInRange(void *start, void *end, void *nbytes)
 {
     /* Linux requires that the madvise() start address is page-aligned.
@@ -1464,40 +1366,31 @@ static void releasePagesInRange(void *start, void *end, void *nbytes)
 /*
  * Return unused memory to the system if possible.
  */
-void
-dvmHeapSourceTrim(size_t bytesTrimmed[], size_t arrayLen)
+void dvmHeapSourceTrim(size_t bytesTrimmed[], size_t arrayLen)
 {
-    HeapSource *hs = gHs;
-    size_t nativeBytes, heapBytes;
-    size_t i;
-
     HS_BOILERPLATE();
 
-    assert(arrayLen >= hs->numHeaps);
-
-    heapBytes = 0;
-    for (i = 0; i < hs->numHeaps; i++) {
+    HeapSource *hs = gHs;
+    size_t heapBytes = 0;
+    for (size_t i = 0; i < hs->numHeaps; i++) {
         Heap *heap = &hs->heaps[i];
 
-        /* Return the wilderness chunk to the system.
-         */
+        /* Return the wilderness chunk to the system. */
         mspace_trim(heap->msp, 0);
 
-        /* Return any whole free pages to the system.
-         */
+        /* Return any whole free pages to the system. */
         bytesTrimmed[i] = 0;
         mspace_walk_free_pages(heap->msp, releasePagesInRange,
                                &bytesTrimmed[i]);
         heapBytes += bytesTrimmed[i];
     }
 
-    /* Same for the native heap.
-     */
+    /* Same for the native heap. */
     dlmalloc_trim(0);
-    nativeBytes = 0;
+    size_t nativeBytes = 0;
     dlmalloc_walk_free_pages(releasePagesInRange, &nativeBytes);
 
-    LOGD_HEAP("madvised %zd (GC) + %zd (native) = %zd total bytes\n",
+    LOGD_HEAP("madvised %zd (GC) + %zd (native) = %zd total bytes",
             heapBytes, nativeBytes, heapBytes + nativeBytes);
 }
 
@@ -1505,21 +1398,17 @@ dvmHeapSourceTrim(size_t bytesTrimmed[], size_t arrayLen)
  * Walks over the heap source and passes every allocated and
  * free chunk to the callback.
  */
-void
-dvmHeapSourceWalk(void(*callback)(const void *chunkptr, size_t chunklen,
-                                      const void *userptr, size_t userlen,
-                                      void *arg),
-                  void *arg)
+void dvmHeapSourceWalk(void(*callback)(const void *chunkptr, size_t chunklen,
+                                      const void *userptr, size_t userlen, void *arg),
+                       void *arg)
 {
-    HeapSource *hs = gHs;
-    size_t i;
-
     HS_BOILERPLATE();
 
     /* Walk the heaps from oldest to newest.
      */
 //TODO: do this in address order
-    for (i = hs->numHeaps; i > 0; --i) {
+    HeapSource *hs = gHs;
+    for (size_t i = hs->numHeaps; i > 0; --i) {
         mspace_walk_heap(hs->heaps[i-1].msp, callback, arg);
     }
 }
@@ -1530,8 +1419,7 @@ dvmHeapSourceWalk(void(*callback)(const void *chunkptr, size_t chunklen,
  * Caller must hold the heap lock, because gHs caches a field
  * in gDvm.gcHeap.
  */
-size_t
-dvmHeapSourceGetNumHeaps()
+size_t dvmHeapSourceGetNumHeaps()
 {
     HeapSource *hs = gHs;
 
