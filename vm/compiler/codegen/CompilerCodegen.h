@@ -16,6 +16,10 @@
 
 #ifndef _DALVIK_VM_COMPILERCODEGEN_H_
 #define _DALVIK_VM_COMPILERCODEGEN_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "compiler/CompilerIR.h"
 
@@ -63,5 +67,9 @@ int dvmCompilerTargetOptHint(int key);
 
 /* Implemented in codegen/<target>/<target_variant>/ArchVariant.c */
 void dvmCompilerGenMemBarrier(CompilationUnit *cUnit);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* _DALVIK_VM_COMPILERCODEGEN_H_ */

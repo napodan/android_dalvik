@@ -21,6 +21,8 @@
 #include "Dalvik.h"
 #include "interp/Jit.h"
 #include "CompilerInternals.h"
+extern "C" void dvmCompilerTemplateStart(void);
+extern "C" void dmvCompilerTemplateEnd(void);
 
 static inline bool workQueueLength(void)
 {
@@ -74,8 +76,8 @@ bool dvmCompilerWorkEnqueue(const u2 *pc, WorkOrderKind kind, void* info)
      */
     if (gDvmJit.compilerQueueLength == COMPILER_WORK_QUEUE_SIZE ||
         gDvmJit.codeCacheFull == true) {
-        result = false;
-        goto unlockAndExit;
+        dvmUnlockMutex(&gDvmJit.compilerLock);
+        return false;
     }
 
     for (numWork = gDvmJit.compilerQueueLength,
@@ -83,8 +85,10 @@ bool dvmCompilerWorkEnqueue(const u2 *pc, WorkOrderKind kind, void* info)
          numWork > 0;
          numWork--) {
         /* Already enqueued */
-        if (gDvmJit.compilerWorkQueue[i++].pc == pc)
-            goto unlockAndExit;
+        if (gDvmJit.compilerWorkQueue[i++].pc == pc) {
+            dvmUnlockMutex(&gDvmJit.compilerLock);
+            return true;
+        }
         /* Wrap around */
         if (i == COMPILER_WORK_QUEUE_SIZE)
             i = 0;
@@ -108,7 +112,6 @@ bool dvmCompilerWorkEnqueue(const u2 *pc, WorkOrderKind kind, void* info)
     cc = pthread_cond_signal(&gDvmJit.compilerQueueActivity);
     assert(cc == 0);
 
-unlockAndExit:
     dvmUnlockMutex(&gDvmJit.compilerLock);
     return result;
 }
@@ -134,8 +137,6 @@ void dvmCompilerDrainQueue(void)
 
 bool dvmCompilerSetupCodeCache(void)
 {
-    extern void dvmCompilerTemplateStart(void);
-    extern void dmvCompilerTemplateEnd(void);
     int fd;
 
     /* Allocate the code cache */
@@ -150,7 +151,7 @@ bool dvmCompilerSetupCodeCache(void)
                              MAP_PRIVATE , fd, 0);
     close(fd);
     if (gDvmJit.codeCache == MAP_FAILED) {
-        ALOGE("Failed to mmap the JIT code cache: %s\n", strerror(errno));
+        ALOGE("Failed to mmap the JIT code cache: %s", strerror(errno));
         return false;
     }
 
@@ -159,6 +160,7 @@ bool dvmCompilerSetupCodeCache(void)
     /* This can be found through "dalvik-jit-code-cache" in /proc/<pid>/maps */
     // ALOGD("Code cache starts at %p", gDvmJit.codeCache);
 
+#ifndef ARCH_IA32
     /* Copy the template code into the beginning of the code cache */
     int templateSize = (intptr_t) dmvCompilerTemplateEnd -
                        (intptr_t) dvmCompilerTemplateStart;
@@ -179,7 +181,7 @@ bool dvmCompilerSetupCodeCache(void)
 
     /* Only flush the part in the code cache that is being used now */
     cacheflush((intptr_t) gDvmJit.codeCache,
-               (intptr_t) gDvmJit.codeCache + templateSize, 0);
+                          (intptr_t) gDvmJit.codeCache + templateSize, 0);
 
     int result = mprotect(gDvmJit.codeCache, gDvmJit.codeCacheSize,
                           PROTECT_CODE_CACHE_ATTRS);
@@ -188,6 +190,16 @@ bool dvmCompilerSetupCodeCache(void)
         ALOGE("Failed to remove the write permission for the code cache");
         dvmAbort();
     }
+#else
+    gDvmJit.codeCacheByteUsed = 0;
+    stream = (char*)gDvmJit.codeCache + gDvmJit.codeCacheByteUsed;
+    ALOGV("codeCache = %p stream = %p before initJIT", gDvmJit.codeCache, stream);
+    streamStart = stream;
+    initJIT(NULL, NULL);
+    gDvmJit.templateSize = (stream - streamStart);
+    gDvmJit.codeCacheByteUsed = (stream - streamStart);
+    ALOGV("stream = %p after initJIT", stream);
+#endif
 
     return true;
 }
@@ -209,7 +221,7 @@ static void crawlDalvikStack(Thread *thread, bool print)
         saveArea = SAVEAREA_FROM_FP(fp);
 
         if (print) {
-            if (dvmIsBreakFrame(fp)) {
+            if (dvmIsBreakFrame((u4*)fp)) {
                 ALOGD("  #%d: break frame (%p)",
                      stackLevel, saveArea->returnAddr);
             }
@@ -240,7 +252,7 @@ static void resetCodeCache(void)
     int inJit = 0;
     int byteUsed = gDvmJit.codeCacheByteUsed;
 
-    /* If any thread is found stuck in the JIT state, don't reset the cache */
+    /* If any thread is found stuck in the JIT state, don't reset the cache  */
     for (thread = gDvm.threadList; thread != NULL; thread = thread->next) {
         /*
          * Crawl the stack to wipe out the returnAddr field so that
@@ -280,9 +292,10 @@ static void resetCodeCache(void)
      */
     memset((char *) gDvmJit.codeCache + gDvmJit.templateSize,
            0,
-           gDvmJit.codeCacheByteUsed - gDvmJit.templateSize);
+                          gDvmJit.codeCacheByteUsed - gDvmJit.templateSize);
     cacheflush((intptr_t) gDvmJit.codeCache,
-               (intptr_t) gDvmJit.codeCache + gDvmJit.codeCacheByteUsed, 0);
+                          (intptr_t) gDvmJit.codeCache +
+                          gDvmJit.codeCacheByteUsed, 0);
 
     PROTECT_CODE_CACHE(gDvmJit.codeCache, gDvmJit.codeCacheByteUsed);
 
@@ -327,7 +340,7 @@ void dvmCompilerPerformSafePointChecks(void)
     dvmCompilerPatchInlineCache();
 }
 
-bool compilerThreadStartup(void)
+static bool compilerThreadStartup(void)
 {
     JitEntry *pJitTable = NULL;
     unsigned char *pJitProfTable = NULL;
@@ -372,7 +385,7 @@ bool compilerThreadStartup(void)
     pJitTable = (JitEntry*)
                 calloc(gDvmJit.jitTableSize, sizeof(*pJitTable));
     if (!pJitTable) {
-        ALOGE("jit table allocation failed\n");
+        ALOGE("jit table allocation failed");
         dvmUnlockMutex(&gDvmJit.tableLock);
         goto fail;
     }
@@ -380,13 +393,13 @@ bool compilerThreadStartup(void)
      * NOTE: the profile table must only be allocated once, globally.
      * Profiling is turned on and off by nulling out gDvm.pJitProfTable
      * and then restoring its original value.  However, this action
-     * is not syncronized for speed so threads may continue to hold
+     * is not synchronized for speed so threads may continue to hold
      * and update the profile table after profiling has been turned
      * off by null'ng the global pointer.  Be aware.
      */
     pJitProfTable = (unsigned char *)malloc(JIT_PROF_SIZE);
     if (!pJitProfTable) {
-        ALOGE("jit prof table allocation failed\n");
+        ALOGE("jit prof table allocation failed");
         dvmUnlockMutex(&gDvmJit.tableLock);
         goto fail;
     }
@@ -591,7 +604,7 @@ static void *compilerThreadStart(void *arg)
                 CompilerWorkOrder work = workDequeue();
                 dvmUnlockMutex(&gDvmJit.compilerLock);
 #if defined(WITH_JIT_TUNING)
-                u8 startTime = dvmGetRelativeTimeUsec();
+                volatile u8 startTime = dvmGetRelativeTimeUsec();
 #endif
                 /*
                  * Check whether there is a suspend request on me.  This
@@ -655,7 +668,7 @@ static void *compilerThreadStart(void *arg)
     dvmChangeStatus(NULL, THREAD_RUNNING);
 
     if (gDvm.verboseShutdown)
-        ALOGD("Compiler thread shutting down\n");
+        ALOGD("Compiler thread shutting down");
     return NULL;
 }
 
@@ -706,9 +719,9 @@ void dvmCompilerShutdown(void)
         dvmUnlockMutex(&gDvmJit.compilerLock);
 
         if (pthread_join(gDvmJit.compilerHandle, &threadReturn) != 0)
-            ALOGW("Compiler thread join failed\n");
+            ALOGW("Compiler thread join failed");
         else if (gDvm.verboseShutdown)
-            ALOGD("Compiler thread has shut down\n");
+            ALOGD("Compiler thread has shut down");
     }
 
     /* Break loops within the translation cache */

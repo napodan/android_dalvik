@@ -57,8 +57,8 @@ static void handlePhiPlacement(CompilationUnit *cUnit)
         if (!dvmIsBitSet(phiV, i)) {
             continue;
         }
-        MIR *phi = dvmCompilerNew(sizeof(MIR), true);
-        phi->dalvikInsn.opcode = kMirOpPhi;
+        MIR *phi = (MIR*)dvmCompilerNew(sizeof(MIR), true);
+        phi->dalvikInsn.opcode = (Opcode)kMirOpPhi;
         phi->dalvikInsn.vA = i;
         dvmCompilerPrependMIR(loopBody, phi);
     }
@@ -72,11 +72,11 @@ static void fillPhiNodeContents(CompilationUnit *cUnit)
     MIR *mir;
 
     for (mir = loopBody->firstMIRInsn; mir; mir = mir->next) {
-        if (mir->dalvikInsn.opcode != kMirOpPhi) break;
+        if (mir->dalvikInsn.opcode != (Opcode)kMirOpPhi) break;
         int dalvikReg = mir->dalvikInsn.vA;
 
         mir->ssaRep->numUses = 2;
-        mir->ssaRep->uses = dvmCompilerNew(sizeof(int) * 2, false);
+        mir->ssaRep->uses = (int *)dvmCompilerNew(sizeof(int) * 2, false);
         mir->ssaRep->uses[0] =
             DECODE_REG(entry->dataFlowInfo->dalvikToSSAMap[dalvikReg]);
         mir->ssaRep->uses[1] =
@@ -91,10 +91,11 @@ static void fillPhiNodeContents(CompilationUnit *cUnit)
 static void dumpConstants(CompilationUnit *cUnit)
 {
     int i;
+    ALOGE("LOOP starting offset: %x", cUnit->entryBlock->startOffset);
     for (i = 0; i < cUnit->numSSARegs; i++) {
         if (dvmIsBitSet(cUnit->isConstantV, i)) {
             int subNReg = dvmConvertSSARegToDalvik(cUnit, i);
-            ALOGE("s%d(v%d_%d) has %d", i,
+            ALOGE("CONST: s%d(v%d_%d) has %d", i,
                  DECODE_REG(subNReg), DECODE_SUB(subNReg),
                  cUnit->constantValues[i]);
         }
@@ -105,24 +106,27 @@ static void dumpIVList(CompilationUnit *cUnit)
 {
     unsigned int i;
     GrowableList *ivList = cUnit->loopAnalysis->ivList;
-    int *ssaToDalvikMap = (int *) cUnit->ssaToDalvikMap->elemList;
 
     for (i = 0; i < ivList->numUsed; i++) {
-        InductionVariableInfo *ivInfo = ivList->elemList[i];
+        InductionVariableInfo *ivInfo =
+            (InductionVariableInfo *) ivList->elemList[i];
+        int iv = dvmConvertSSARegToDalvik(cUnit, ivInfo->ssaReg);
         /* Basic IV */
         if (ivInfo->ssaReg == ivInfo->basicSSAReg) {
-            ALOGE("BIV %d: s%d(v%d) + %d", i,
+            ALOGE("BIV %d: s%d(v%d_%d) + %d", i,
                  ivInfo->ssaReg,
-                 ssaToDalvikMap[ivInfo->ssaReg] & 0xffff,
+                 DECODE_REG(iv), DECODE_SUB(iv),
                  ivInfo->inc);
         /* Dependent IV */
         } else {
-            ALOGE("DIV %d: s%d(v%d) = %d * s%d(v%d) + %d", i,
+            int biv = dvmConvertSSARegToDalvik(cUnit, ivInfo->basicSSAReg);
+
+            ALOGE("DIV %d: s%d(v%d_%d) = %d * s%d(v%d_%d) + %d", i,
                  ivInfo->ssaReg,
-                 ssaToDalvikMap[ivInfo->ssaReg] & 0xffff,
+                 DECODE_REG(iv), DECODE_SUB(iv),
                  ivInfo->m,
                  ivInfo->basicSSAReg,
-                 ssaToDalvikMap[ivInfo->basicSSAReg] & 0xffff,
+                 DECODE_REG(biv), DECODE_SUB(biv),
                  ivInfo->c);
         }
     }
@@ -283,7 +287,8 @@ static void updateRangeCheckInfo(CompilationUnit *cUnit, int arrayReg,
             }
             if (arrayAccessInfo == NULL) {
                 arrayAccessInfo =
-                    dvmCompilerNew(sizeof(ArrayAccessInfo), false);
+                    (ArrayAccessInfo *)dvmCompilerNew(sizeof(ArrayAccessInfo),
+                                                      false);
                 arrayAccessInfo->ivReg = ivInfo->basicSSAReg;
                 arrayAccessInfo->arrayReg = arrayReg;
                 arrayAccessInfo->maxC = (ivInfo->c > 0) ? ivInfo->c : 0;
@@ -373,7 +378,7 @@ static bool doLoopBodyCodeMotion(CompilationUnit *cUnit)
             if (dvmIsBitSet(cUnit->loopAnalysis->isIndVarV,
                             mir->ssaRep->uses[useIdx])) {
                 mir->OptimizationFlags |=
-                    MIR_IGNORE_RANGE_CHECK |  MIR_IGNORE_NULL_CHECK;
+                    MIR_IGNORE_RANGE_CHECK | MIR_IGNORE_NULL_CHECK;
                 updateRangeCheckInfo(cUnit, mir->ssaRep->uses[refIdx],
                                      mir->ssaRep->uses[useIdx]);
             }
@@ -402,9 +407,9 @@ static void genHoistedChecks(CompilationUnit *cUnit)
         idxReg = DECODE_REG(
             dvmConvertSSARegToDalvik(cUnit, arrayAccessInfo->ivReg));
 
-        MIR *rangeCheckMIR = dvmCompilerNew(sizeof(MIR), true);
+        MIR *rangeCheckMIR = (MIR *)dvmCompilerNew(sizeof(MIR), true);
         rangeCheckMIR->dalvikInsn.opcode = (loopAnalysis->isCountUpLoop) ?
-            kMirOpNullNRangeUpCheck : kMirOpNullNRangeDownCheck;
+            (Opcode)kMirOpNullNRangeUpCheck : (Opcode)kMirOpNullNRangeDownCheck;
         rangeCheckMIR->dalvikInsn.vA = arrayReg;
         rangeCheckMIR->dalvikInsn.vB = idxReg;
         rangeCheckMIR->dalvikInsn.vC = loopAnalysis->endConditionReg;
@@ -422,16 +427,16 @@ static void genHoistedChecks(CompilationUnit *cUnit)
 
     if (loopAnalysis->arrayAccessInfo->numUsed != 0) {
         if (loopAnalysis->isCountUpLoop) {
-            MIR *boundCheckMIR = dvmCompilerNew(sizeof(MIR), true);
-            boundCheckMIR->dalvikInsn.opcode = kMirOpLowerBound;
+            MIR *boundCheckMIR = (MIR *)dvmCompilerNew(sizeof(MIR), true);
+            boundCheckMIR->dalvikInsn.opcode = (Opcode)kMirOpLowerBound;
             boundCheckMIR->dalvikInsn.vA = idxReg;
             boundCheckMIR->dalvikInsn.vB = globalMinC;
             dvmCompilerAppendMIR(entry, boundCheckMIR);
         } else {
             if (loopAnalysis->loopBranchOpcode == OP_IF_LT ||
                 loopAnalysis->loopBranchOpcode == OP_IF_LE) {
-                MIR *boundCheckMIR = dvmCompilerNew(sizeof(MIR), true);
-                boundCheckMIR->dalvikInsn.opcode = kMirOpLowerBound;
+                MIR *boundCheckMIR = (MIR *)dvmCompilerNew(sizeof(MIR), true);
+                boundCheckMIR->dalvikInsn.opcode = (Opcode)kMirOpLowerBound;
                 boundCheckMIR->dalvikInsn.vA = loopAnalysis->endConditionReg;
                 boundCheckMIR->dalvikInsn.vB = globalMinC;
                 /*
@@ -447,15 +452,17 @@ static void genHoistedChecks(CompilationUnit *cUnit)
             } else if (loopAnalysis->loopBranchOpcode == OP_IF_LTZ) {
                 /* Array index will fall below 0 */
                 if (globalMinC < 0) {
-                    MIR *boundCheckMIR = dvmCompilerNew(sizeof(MIR), true);
-                    boundCheckMIR->dalvikInsn.opcode = kMirOpPunt;
+                    MIR *boundCheckMIR = (MIR *)dvmCompilerNew(sizeof(MIR),
+                                                               true);
+                    boundCheckMIR->dalvikInsn.opcode = (Opcode)kMirOpPunt;
                     dvmCompilerAppendMIR(entry, boundCheckMIR);
                 }
             } else if (loopAnalysis->loopBranchOpcode == OP_IF_LEZ) {
                 /* Array index will fall below 0 */
                 if (globalMinC < -1) {
-                    MIR *boundCheckMIR = dvmCompilerNew(sizeof(MIR), true);
-                    boundCheckMIR->dalvikInsn.opcode = kMirOpPunt;
+                    MIR *boundCheckMIR = (MIR *)dvmCompilerNew(sizeof(MIR),
+                                                               true);
+                    boundCheckMIR->dalvikInsn.opcode = (Opcode)kMirOpPunt;
                     dvmCompilerAppendMIR(entry, boundCheckMIR);
                 }
             } else {
@@ -473,7 +480,8 @@ static void genHoistedChecks(CompilationUnit *cUnit)
  */
 bool dvmCompilerLoopOpt(CompilationUnit *cUnit)
 {
-    LoopAnalysis *loopAnalysis = dvmCompilerNew(sizeof(LoopAnalysis), true);
+    LoopAnalysis *loopAnalysis =
+        (LoopAnalysis *)dvmCompilerNew(sizeof(LoopAnalysis), true);
 
     assert(cUnit->blockList[0]->blockType == kTraceEntryBlock);
     assert(cUnit->blockList[2]->blockType == kDalvikByteCode);
@@ -494,14 +502,16 @@ bool dvmCompilerLoopOpt(CompilationUnit *cUnit)
 
     /* Constant propagation */
     cUnit->isConstantV = dvmAllocBitVector(cUnit->numSSARegs, false);
-    cUnit->constantValues = dvmCompilerNew(sizeof(int) * cUnit->numSSARegs,
-                                           true);
+    cUnit->constantValues =
+        (int *)dvmCompilerNew(sizeof(int) * cUnit->numSSARegs,
+                              true);
     dvmCompilerDataFlowAnalysisDispatcher(cUnit,
                                           dvmCompilerDoConstantPropagation);
     DEBUG_LOOP(dumpConstants(cUnit);)
 
     /* Find induction variables - basic and dependent */
-    loopAnalysis->ivList = dvmCompilerNew(sizeof(GrowableList), true);
+    loopAnalysis->ivList =
+        (GrowableList *)dvmCompilerNew(sizeof(GrowableList), true);
     dvmInitGrowableList(loopAnalysis->ivList, 4);
     loopAnalysis->isIndVarV = dvmAllocBitVector(cUnit->numSSARegs, false);
     dvmCompilerDataFlowAnalysisDispatcher(cUnit,
@@ -512,7 +522,8 @@ bool dvmCompilerLoopOpt(CompilationUnit *cUnit)
     if (!isLoopOptimizable(cUnit))
         return false;
 
-    loopAnalysis->arrayAccessInfo = dvmCompilerNew(sizeof(GrowableList), true);
+    loopAnalysis->arrayAccessInfo =
+        (GrowableList *)dvmCompilerNew(sizeof(GrowableList), true);
     dvmInitGrowableList(loopAnalysis->arrayAccessInfo, 4);
     loopAnalysis->bodyIsClean = doLoopBodyCodeMotion(cUnit);
     DEBUG_LOOP(dumpHoistedChecks(cUnit);)

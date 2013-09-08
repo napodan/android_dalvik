@@ -17,6 +17,10 @@
 #ifndef _DALVIK_VM_COMPILER_IR
 #define _DALVIK_VM_COMPILER_IR
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "codegen/Optimizer.h"
 
 typedef enum RegisterClass {
@@ -42,7 +46,7 @@ typedef struct RegLocation {
 } RegLocation;
 
 #define INVALID_SREG (-1)
-#define INVALID_REG (-1)
+#define INVALID_REG (0x3F)
 
 typedef enum BBType {
     /* For coding convenience reasons chaining cell types should appear first */
@@ -239,5 +243,9 @@ void dvmCompilerAbort(CompilationUnit *cUnit);
 
 /* Debug Utilities */
 void dvmCompilerDumpCompilationUnit(CompilationUnit *cUnit);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* _DALVIK_VM_COMPILER_IR */

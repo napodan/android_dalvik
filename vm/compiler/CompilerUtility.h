@@ -16,6 +16,9 @@
 
 #ifndef _DALVIK_VM_COMPILER_UTILITY
 #define _DALVIK_VM_COMPILER_UTILITY
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "Dalvik.h"
 
@@ -53,5 +56,9 @@ bool dvmCompilerSetBit(BitVector* pBits, int num);
 void dvmDebugBitVector(char *msg, const BitVector *bv, int length);
 void dvmDumpLIRInsn(struct LIR *lir, unsigned char *baseAddr);
 void dvmDumpResourceMask(struct LIR *lir, u8 mask, const char *prefix);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* _DALVIK_COMPILER_UTILITY */

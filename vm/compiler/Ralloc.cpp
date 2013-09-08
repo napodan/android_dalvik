@@ -63,8 +63,7 @@ int computeLiveRange(LiveRange *list, BasicBlock *bb, int seqNum)
 static void inferTypes(CompilationUnit *cUnit, BasicBlock *bb)
 {
     MIR *mir;
-    if (bb->blockType != kDalvikByteCode &&
-        bb->blockType != kTraceEntryBlock)
+    if (bb->blockType != kDalvikByteCode && bb->blockType != kTraceEntryBlock)
         return;
 
     for (mir = bb->firstMIRInsn; mir; mir = mir->next) {
@@ -118,6 +117,12 @@ static bool simpleTrace(CompilationUnit *cUnit)
  */
 static const RegLocation freshLoc = {kLocDalvikFrame, 0, 0, INVALID_REG,
                                      INVALID_REG, INVALID_SREG};
+
+/*
+ * Local register allocation for simple traces.  Most of the work for
+ * local allocation is done on the fly.  Here we do some initialization
+ * and type inference.
+ */
 void dvmCompilerRegAlloc(CompilationUnit *cUnit)
 {
     int i;
@@ -150,7 +155,7 @@ void dvmCompilerRegAlloc(CompilationUnit *cUnit)
         }
     } else {
         // Compute live ranges
-        ranges = dvmCompilerNew(cUnit->numSSARegs * sizeof(*ranges), true);
+        ranges = (LiveRange *)dvmCompilerNew(cUnit->numSSARegs * sizeof(*ranges), true);
         for (i=0; i < cUnit->numSSARegs; i++)
             ranges[i].active = false;
         seqNum = computeLiveRange(ranges, cUnit->blockList[i], seqNum);
