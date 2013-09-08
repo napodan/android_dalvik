@@ -174,9 +174,9 @@ LOCAL_SRC_FILES := \
 	oo/Object.cpp \
 	oo/Resolve.cpp \
 	oo/TypeCheck.cpp \
-	reflect/Annotation.c \
-	reflect/Proxy.c \
-	reflect/Reflect.c \
+	reflect/Annotation.cpp \
+	reflect/Proxy.cpp \
+	reflect/Reflect.cpp \
 	test/AtomicTest.c.arm \
 	test/TestHash.c \
 	test/TestIndirectRefTable.c

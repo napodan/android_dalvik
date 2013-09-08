@@ -161,12 +161,12 @@ bool dvmValidateBoxClasses()
 
         clazz = dvmFindClassNoInit(*ccp, NULL);
         if (clazz == NULL) {
-            ALOGE("Couldn't find '%s'\n", *ccp);
+            ALOGE("Couldn't find '%s'", *ccp);
             return false;
         }
 
         if (clazz->ifieldCount != 1) {
-            ALOGE("Found %d instance fields in '%s'\n",
+            ALOGE("Found %d instance fields in '%s'",
                 clazz->ifieldCount, *ccp);
             return false;
         }
@@ -219,7 +219,7 @@ static ClassObject* convertSignaturePartToClass(char** pSignature,
     }
 
     if (clazz == NULL) {
-        ALOGW("Unable to match class for part: '%s'\n", *pSignature);
+        ALOGW("Unable to match class for part: '%s'", *pSignature);
     }
     *pSignature = signature;
     return clazz;
@@ -237,17 +237,14 @@ static ClassObject* convertSignaturePartToClass(char** pSignature,
 static ArrayObject* convertSignatureToClassArray(char** pSignature,
     ClassObject* defClass)
 {
-    ArrayObject* classArray;
     char* signature = *pSignature;
-    char* cp;
-    int i, count;
 
     assert(*signature == '(');
     signature++;
 
     /* count up the number of parameters */
-    count = 0;
-    cp = signature;
+    size_t count = 0;
+    char* cp = signature;
     while (*cp != ')') {
         count++;
 
@@ -261,25 +258,23 @@ static ArrayObject* convertSignatureToClassArray(char** pSignature,
         }
         cp++;
     }
-    LOGVV("REFLECT found %d parameters in '%s'\n", count, *pSignature);
+    LOGVV("REFLECT found %d parameters in '%s'", count, *pSignature);
 
     /* create an array to hold them */
-    classArray = dvmAllocArray(gDvm.classJavaLangClassArray, count,
-                    kObjectArrayRefWidth, ALLOC_DEFAULT);
+    ArrayObject* classArray = dvmAllocArray(gDvm.classJavaLangClassArray,
+                     count, kObjectArrayRefWidth, ALLOC_DEFAULT);
     if (classArray == NULL)
         return NULL;
 
     /* fill it in */
     cp = signature;
-    for (i = 0; i < count; i++) {
-        ClassObject* clazz;
-
-        clazz = convertSignaturePartToClass(&cp, defClass);
+    for (size_t i = 0; i < count; i++) {
+        ClassObject* clazz = convertSignaturePartToClass(&cp, defClass);
         if (clazz == NULL) {
             assert(dvmCheckException(dvmThreadSelf()));
             return NULL;
         }
-        LOGVV("REFLECT  %d: '%s'\n", i, clazz->descriptor);
+        LOGVV("REFLECT  %d: '%s'", i, clazz->descriptor);
         dvmSetObjectArrayElement(classArray, i, (Object *)clazz);
     }
 
@@ -320,10 +315,10 @@ Field* dvmSlotToField(ClassObject* clazz, int slot)
     if (slot < 0) {
         slot = -(slot+1);
         assert(slot < clazz->sfieldCount);
-        return (Field*) &clazz->sfields[slot];
+        return (Field*)(void*)&clazz->sfields[slot];
     } else {
         assert(slot < clazz->ifieldCount);
-        return (Field*) &clazz->ifields[slot];
+        return (Field*)(void*)&clazz->ifields[slot];
     }
 }
 
@@ -367,7 +362,7 @@ static Object* createFieldObject(Field* field, const ClassObject* clazz)
     dvmCallMethod(dvmThreadSelf(), gDvm.methJavaLangReflectField_init,
         fieldObj, &unused, clazz, type, nameObj, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        ALOGD("Field class init threw exception\n");
+        ALOGD("Field class init threw exception");
         goto bail;
     }
 
@@ -389,36 +384,34 @@ bail:
  */
 ArrayObject* dvmGetDeclaredFields(ClassObject* clazz, bool publicOnly)
 {
-    ArrayObject* fieldArray = NULL;
-    int i, count;
-
     if (!dvmIsClassInitialized(gDvm.classJavaLangReflectField))
         dvmInitClass(gDvm.classJavaLangReflectField);
 
     /* count #of fields */
+    size_t count;
     if (!publicOnly)
         count = clazz->sfieldCount + clazz->ifieldCount;
     else {
         count = 0;
-        for (i = 0; i < clazz->sfieldCount; i++) {
+        for (int i = 0; i < clazz->sfieldCount; i++) {
             if ((clazz->sfields[i].field.accessFlags & ACC_PUBLIC) != 0)
                 count++;
         }
-        for (i = 0; i < clazz->ifieldCount; i++) {
+        for (int i = 0; i < clazz->ifieldCount; i++) {
             if ((clazz->ifields[i].field.accessFlags & ACC_PUBLIC) != 0)
                 count++;
         }
     }
 
     /* create the Field[] array */
-    fieldArray = dvmAllocArray(gDvm.classJavaLangReflectFieldArray, count,
-                    kObjectArrayRefWidth, ALLOC_DEFAULT);
+    ArrayObject* fieldArray =
+        dvmAllocArray(gDvm.classJavaLangReflectFieldArray, count, kObjectArrayRefWidth, ALLOC_DEFAULT);
     if (fieldArray == NULL)
         return NULL;
 
     /* populate */
     size_t fieldCount = 0;
-    for (i = 0; i < clazz->sfieldCount; i++) {
+    for (int i = 0; i < clazz->sfieldCount; i++) {
         if (!publicOnly ||
             (clazz->sfields[i].field.accessFlags & ACC_PUBLIC) != 0)
         {
@@ -431,7 +424,7 @@ ArrayObject* dvmGetDeclaredFields(ClassObject* clazz, bool publicOnly)
             ++fieldCount;
         }
     }
-    for (i = 0; i < clazz->ifieldCount; i++) {
+    for (int i = 0; i < clazz->ifieldCount; i++) {
         if (!publicOnly ||
             (clazz->ifields[i].field.accessFlags & ACC_PUBLIC) != 0)
         {
@@ -549,7 +542,7 @@ static Object* createConstructorObject(Method* meth)
     dvmCallMethod(dvmThreadSelf(), gDvm.methJavaLangReflectConstructor_init,
         consObj, &unused, meth->clazz, params, exceptions, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        ALOGD("Constructor class init threw exception\n");
+        ALOGD("Constructor class init threw exception");
         goto bail;
     }
 
@@ -572,10 +565,6 @@ bail:
  */
 ArrayObject* dvmGetDeclaredConstructors(ClassObject* clazz, bool publicOnly)
 {
-    ArrayObject* consArray;
-    Method* meth;
-    int i, count;
-
     if (!dvmIsClassInitialized(gDvm.classJavaLangReflectConstructor))
         dvmInitClass(gDvm.classJavaLangReflectConstructor);
 
@@ -589,9 +578,9 @@ ArrayObject* dvmGetDeclaredConstructors(ClassObject* clazz, bool publicOnly)
     /*
      * Count up the #of relevant methods.
      */
-    count = 0;
-    meth = clazz->directMethods;
-    for (i = 0; i < clazz->directMethodCount; i++, meth++) {
+    size_t count = 0;
+    for (int i = 0; i < clazz->directMethodCount; ++i) {
+        Method* meth = &clazz->directMethods[i];
         if ((!publicOnly || dvmIsPublicMethod(meth)) &&
             dvmIsConstructorMethod(meth) && !dvmIsStaticMethod(meth))
         {
@@ -602,37 +591,35 @@ ArrayObject* dvmGetDeclaredConstructors(ClassObject* clazz, bool publicOnly)
     /*
      * Create an array of Constructor objects.
      */
-    consArray = dvmAllocArray(gDvm.classJavaLangReflectConstructorArray, count,
-                kObjectArrayRefWidth, ALLOC_DEFAULT);
-    if (consArray == NULL)
+    ClassObject* arrayClass = gDvm.classJavaLangReflectConstructorArray;
+    ArrayObject* ctorArray = dvmAllocArray(arrayClass, count, kObjectArrayRefWidth, ALLOC_DEFAULT);
+    if (ctorArray == NULL)
         return NULL;
 
     /*
      * Fill out the array.
      */
-    meth = clazz->directMethods;
-    size_t consObjCount = 0;
-    for (i = 0; i < clazz->directMethodCount; i++, meth++) {
+    size_t ctorObjCount = 0;
+    for (int i = 0; i < clazz->directMethodCount; ++i) {
+        Method* meth = &clazz->directMethods[i];
         if ((!publicOnly || dvmIsPublicMethod(meth)) &&
             dvmIsConstructorMethod(meth) && !dvmIsStaticMethod(meth))
         {
-            Object* consObj = createConstructorObject(meth);
-            if (consObj == NULL)
-                goto fail;
-            dvmSetObjectArrayElement(consArray, consObjCount, consObj);
-            ++consObjCount;
-            dvmReleaseTrackedAlloc(consObj, NULL);
+            Object* ctorObj = createConstructorObject(meth);
+            if (ctorObj == NULL) {
+              dvmReleaseTrackedAlloc((Object*) ctorArray, NULL);
+              return NULL;
+            }
+            dvmSetObjectArrayElement(ctorArray, ctorObjCount, ctorObj);
+            ++ctorObjCount;
+            dvmReleaseTrackedAlloc(ctorObj, NULL);
         }
     }
 
-    assert(consObjCount == consArray->length);
+    assert(ctorObjCount == ctorArray->length);
 
     /* caller must call dvmReleaseTrackedAlloc */
-    return consArray;
-
-fail:
-    dvmReleaseTrackedAlloc((Object*) consArray, NULL);
-    return NULL;
+    return ctorArray;
 }
 
 /*
@@ -661,7 +648,7 @@ Object* dvmCreateReflectMethodObject(const Method* meth)
 
     if (dvmCheckException(dvmThreadSelf())) {
         ALOGW("WARNING: dvmCreateReflectMethodObject called with "
-             "exception pending\n");
+             "exception pending");
         return NULL;
     }
 
@@ -708,7 +695,7 @@ Object* dvmCreateReflectMethodObject(const Method* meth)
         methObj, &unused, meth->clazz, params, exceptions, returnType,
         nameObj, slot);
     if (dvmCheckException(dvmThreadSelf())) {
-        ALOGD("Method class init threw exception\n");
+        ALOGD("Method class init threw exception");
         goto bail;
     }
 
@@ -736,9 +723,6 @@ bail:
  */
 ArrayObject* dvmGetDeclaredMethods(ClassObject* clazz, bool publicOnly)
 {
-    ArrayObject* methodArray;
-    Method* meth;
-    int i, count;
 
     if (!dvmIsClassInitialized(gDvm.classJavaLangReflectMethod))
         dvmInitClass(gDvm.classJavaLangReflectMethod);
@@ -748,9 +732,9 @@ ArrayObject* dvmGetDeclaredMethods(ClassObject* clazz, bool publicOnly)
      *
      * Ignore virtual Miranda methods and direct class/object constructors.
      */
-    count = 0;
-    meth = clazz->virtualMethods;
-    for (i = 0; i < clazz->virtualMethodCount; i++, meth++) {
+    size_t count = 0;
+    Method* meth = clazz->virtualMethods;
+    for (int i = 0; i < clazz->virtualMethodCount; i++, meth++) {
         if ((!publicOnly || dvmIsPublicMethod(meth)) &&
             !dvmIsMirandaMethod(meth))
         {
@@ -758,10 +742,8 @@ ArrayObject* dvmGetDeclaredMethods(ClassObject* clazz, bool publicOnly)
         }
     }
     meth = clazz->directMethods;
-    for (i = 0; i < clazz->directMethodCount; i++, meth++) {
-        if ((!publicOnly || dvmIsPublicMethod(meth)) &&
-            meth->name[0] != '<')
-        {
+    for (int i = 0; i < clazz->directMethodCount; i++, meth++) {
+        if ((!publicOnly || dvmIsPublicMethod(meth)) && meth->name[0] != '<') {
             count++;
         }
     }
@@ -769,18 +751,17 @@ ArrayObject* dvmGetDeclaredMethods(ClassObject* clazz, bool publicOnly)
     /*
      * Create an array of Method objects.
      */
-    methodArray = dvmAllocArray(gDvm.classJavaLangReflectMethodArray, count,
-                kObjectArrayRefWidth, ALLOC_DEFAULT);
+    ArrayObject* methodArray =
+        dvmAllocArray(gDvm.classJavaLangReflectMethodArray, count, kObjectArrayRefWidth, ALLOC_DEFAULT);
     if (methodArray == NULL)
         return NULL;
-
 
     /*
      * Fill out the array.
      */
     meth = clazz->virtualMethods;
     size_t methObjCount = 0;
-    for (i = 0; i < clazz->virtualMethodCount; i++, meth++) {
+    for (int i = 0; i < clazz->virtualMethodCount; i++, meth++) {
         if ((!publicOnly || dvmIsPublicMethod(meth)) &&
             !dvmIsMirandaMethod(meth))
         {
@@ -793,7 +774,7 @@ ArrayObject* dvmGetDeclaredMethods(ClassObject* clazz, bool publicOnly)
         }
     }
     meth = clazz->directMethods;
-    for (i = 0; i < clazz->directMethodCount; i++, meth++) {
+    for (int i = 0; i < clazz->directMethodCount; i++, meth++) {
         if ((!publicOnly || dvmIsPublicMethod(meth)) &&
             meth->name[0] != '<')
         {
@@ -822,17 +803,15 @@ fail:
  */
 ArrayObject* dvmGetInterfaces(ClassObject* clazz)
 {
-    ArrayObject* interfaceArray;
-
     if (!dvmIsClassInitialized(gDvm.classJavaLangReflectMethod))
         dvmInitClass(gDvm.classJavaLangReflectMethod);
 
     /*
      * Create an array of Class objects.
      */
-    int count = clazz->interfaceCount;
-    interfaceArray = dvmAllocArray(gDvm.classJavaLangClassArray, count,
-                kObjectArrayRefWidth, ALLOC_DEFAULT);
+    size_t count = clazz->interfaceCount;
+    ArrayObject* interfaceArray =
+        dvmAllocArray(gDvm.classJavaLangClassArray, count, kObjectArrayRefWidth, ALLOC_DEFAULT);
     if (interfaceArray == NULL)
         return NULL;
 
@@ -856,12 +835,11 @@ ArrayObject* dvmGetInterfaces(ClassObject* clazz)
 static PrimitiveType getBoxedType(DataObject* arg)
 {
     static const int kJavaLangLen = 11;     // strlen("Ljava/lang/")
-    const char* name;
 
     if (arg == NULL)
         return PRIM_NOT;
 
-    name = arg->obj.clazz->descriptor;
+    const char* name = arg->obj.clazz->descriptor;
 
     if (strncmp(name, "Ljava/lang/", kJavaLangLen) != 0)
         return PRIM_NOT;
@@ -901,8 +879,8 @@ static PrimitiveType getBoxedType(DataObject* arg)
  *  float to double
  * Values of types byte, char, and short are "internally" widened to int.
  *
- * Returns the width in bytes of the destination primitive, or -1 if the
- * conversion is not allowed.
+ * Returns the width in 32-bit words of the destination primitive, or
+ * -1 if the conversion is not allowed.
  *
  * TODO? use JValue rather than u4 pointers
  */
@@ -987,7 +965,7 @@ int dvmConvertArgument(DataObject* arg, ClassObject* type, s4* destPtr)
 
         srcType = getBoxedType(arg);
         if (srcType < 0) {     // didn't pass a boxed primitive in
-            LOGVV("conv arg: type '%s' not boxed primitive\n",
+            LOGVV("conv arg: type '%s' not boxed primitive",
                 arg->obj.clazz->descriptor);
             return -1;
         }
@@ -1003,7 +981,7 @@ int dvmConvertArgument(DataObject* arg, ClassObject* type, s4* destPtr)
             *destPtr = (s4) arg;
             retVal = 1;
         } else {
-            LOGVV("Arg %p (%s) not compatible with %s\n",
+            LOGVV("Arg %p (%s) not compatible with %s",
                 arg, arg->obj.clazz->descriptor, type->descriptor);
             retVal = -1;
         }
@@ -1043,19 +1021,20 @@ DataObject* dvmWrapPrimitive(JValue value, ClassObject* returnType)
     if (typeIndex == PRIM_NOT) {
         /* add to tracking table so return value is always in table */
         if (value.l != NULL)
-            dvmAddTrackedAlloc(value.l, NULL);
+            dvmAddTrackedAlloc((Object*)value.l, NULL);
         return (DataObject*) value.l;
     }
 
     assert(typeIndex >= 0 && typeIndex < PRIM_MAX);
-    if (typeIndex == PRIM_VOID)
+    if (typeIndex == PRIM_VOID) {
         return NULL;
+    }
 
     classDescriptor = boxTypes[typeIndex];
 
     wrapperClass = dvmFindSystemClass(classDescriptor);
     if (wrapperClass == NULL) {
-        ALOGW("Unable to find '%s'\n", classDescriptor);
+        ALOGW("Unable to find '%s'", classDescriptor);
         assert(dvmCheckException(dvmThreadSelf()));
         return NULL;
     }
@@ -1094,7 +1073,7 @@ bool dvmUnwrapPrimitive(Object* value, ClassObject* returnType,
 
     if (typeIndex == PRIM_NOT) {
         if (value != NULL && !dvmInstanceof(value->clazz, returnType)) {
-            ALOGD("wrong object type: %s %s\n",
+            ALOGD("wrong object type: %s %s",
                 value->clazz->descriptor, returnType->descriptor);
             return false;
         }
@@ -1114,7 +1093,7 @@ bool dvmUnwrapPrimitive(Object* value, ClassObject* returnType,
     if (dvmConvertPrimitiveValue(valueIndex, typeIndex,
             (s4*) ((DataObject*)value)->instanceData, (s4*)pResult) < 0)
     {
-        ALOGV("Prim conversion failed\n");
+        ALOGV("Prim conversion failed");
         return false;
     }
 
@@ -1150,7 +1129,7 @@ ClassObject* dvmGetBoxedReturnType(const Method* meth)
     default: {
         /* should not have passed verification */
         char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        ALOGE("Bad return type in signature '%s'\n", desc);
+        ALOGE("Bad return type in signature '%s'", desc);
         free(desc);
         dvmThrowException("Ljava/lang/InternalError;", NULL);
         return NULL;
