@@ -198,14 +198,14 @@ WITH_JIT := $(strip $(WITH_JIT))
 ifeq ($(WITH_JIT),true)
   LOCAL_CFLAGS += -DWITH_JIT
   LOCAL_SRC_FILES += \
-	compiler/Compiler.c \
-	compiler/Frontend.c \
-	compiler/Utility.c \
-	compiler/InlineTransformation.c \
-	compiler/IntermediateRep.c \
-	compiler/Dataflow.c \
-	compiler/Loop.c \
-	compiler/Ralloc.c \
+	compiler/Compiler.cpp \
+	compiler/Frontend.cpp \
+	compiler/Utility.cpp \
+	compiler/InlineTransformation.cpp \
+	compiler/IntermediateRep.cpp \
+	compiler/Dataflow.cpp \
+	compiler/Loop.cpp \
+	compiler/Ralloc.cpp \
 	interp/Jit.c
 endif
 

@@ -18,6 +18,9 @@
  */
 #ifndef _DALVIK_INTERP_JIT
 #define _DALVIK_INTERP_JIT
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "InterpDefs.h"
 #include "mterp/common/jit-config.h"
@@ -122,5 +125,9 @@ s8 dvmJitd2l(double d);
 s8 dvmJitf2l(float f);
 void dvmJitSetCodeAddr(const u2* dPC, void *nPC, JitInstructionSetType set);
 void dvmJitAbortTraceSelect(InterpState* interpState);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /*_DALVIK_INTERP_JIT*/

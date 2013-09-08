@@ -27,7 +27,7 @@ bool dvmCompilerHeapInit(void)
     arenaHead =
         (ArenaMemBlock *) malloc(sizeof(ArenaMemBlock) + ARENA_DEFAULT_SIZE);
     if (arenaHead == NULL) {
-        ALOGE("No memory left to create compiler heap memory\n");
+        ALOGE("No memory left to create compiler heap memory");
         return false;
     }
     arenaHead->blockSize = ARENA_DEFAULT_SIZE;
@@ -82,7 +82,8 @@ retry:
             ALOGI("Total arena pages for JIT: %d", numArenaBlocks);
         goto retry;
     }
-    return NULL;
+    /* Should not reach here */
+    dvmAbort();
 }
 
 /* Reclaim all the arena blocks allocated so far */
@@ -102,7 +103,7 @@ void dvmInitGrowableList(GrowableList *gList, size_t initLength)
     gList->numAllocated = initLength;
     gList->numUsed = 0;
     gList->elemList = (void **) dvmCompilerNew(sizeof(void *) * initLength,
-                                               true);
+                                                  true);
 }
 
 /* Expand the capacity of a growable list */
@@ -114,7 +115,8 @@ static void expandGrowableList(GrowableList *gList)
     } else {
         newLength += 128;
     }
-    void *newArray = dvmCompilerNew(sizeof(void *) * newLength, true);
+    void **newArray = 
+        (void**)dvmCompilerNew(sizeof(void *) * newLength, true);
     memcpy(newArray, gList->elemList, sizeof(void *) * gList->numAllocated);
     gList->numAllocated = newLength;
     gList->elemList = newArray;
@@ -135,7 +137,7 @@ void dvmCompilerDumpCompilationUnit(CompilationUnit *cUnit)
 {
     int i;
     BasicBlock *bb;
-    char *blockTypeNames[] = {
+    const char *blockTypeNames[] = {
         "Normal Chaining Cell",
         "Hot Chaining Cell",
         "Singleton Chaining Cell",
@@ -166,11 +168,11 @@ void dvmCompilerDumpCompilationUnit(CompilationUnit *cUnit)
              bb->lastMIRInsn ? bb->lastMIRInsn->offset : bb->startOffset,
              bb->lastMIRInsn ? "" : " empty");
         if (bb->taken) {
-            ALOGD("  Taken branch: block %d (%04x)\n",
+            ALOGD("  Taken branch: block %d (%04x)",
                  bb->taken->id, bb->taken->startOffset);
         }
         if (bb->fallThrough) {
-            ALOGD("  Fallthrough : block %d (%04x)\n",
+            ALOGD("  Fallthrough : block %d (%04x)",
                  bb->fallThrough->id, bb->fallThrough->startOffset);
         }
     }
@@ -279,7 +281,7 @@ bool dvmCompilerSetBit(BitVector *pBits, int num)
 
         int newSize = (num + 31) >> 5;
         assert(newSize > pBits->storageSize);
-        u4 *newStorage = dvmCompilerNew(newSize * sizeof(u4), false);
+        u4 *newStorage = (u4*)dvmCompilerNew(newSize * sizeof(u4), false);
         memcpy(newStorage, pBits->storage, pBits->storageSize * sizeof(u4));
         memset(&newStorage[pBits->storageSize], 0,
                (newSize - pBits->storageSize) * sizeof(u4));
@@ -298,7 +300,7 @@ void dvmDebugBitVector(char *msg, const BitVector *bv, int length)
     ALOGE("%s", msg);
     for (i = 0; i < length; i++) {
         if (dvmIsBitSet(bv, i)) {
-            ALOGE("Bit %d is set", i);
+            ALOGE("    Bit %d is set", i);
         }
     }
 }
