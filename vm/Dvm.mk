@@ -177,9 +177,9 @@ LOCAL_SRC_FILES := \
 	reflect/Annotation.cpp \
 	reflect/Proxy.cpp \
 	reflect/Reflect.cpp \
-	test/AtomicTest.c.arm \
-	test/TestHash.c \
-	test/TestIndirectRefTable.c
+	test/AtomicTest.cpp.arm \
+	test/TestHash.cpp \
+	test/TestIndirectRefTable.cpp
 
 WITH_COPYING_GC := $(strip $(WITH_COPYING_GC))
 
