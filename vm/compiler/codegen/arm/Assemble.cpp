@@ -25,6 +25,11 @@
 
 #define MAX_ASSEMBLER_RETRIES 10
 
+extern "C" const Method *dvmJitToPatchPredictedChain(const Method *method,
+                                          InterpState *interpState,
+                                          PredictedChainingCell *cell,
+                                          const ClassObject *clazz);
+
 /*
  * opcode: ArmOpcode enum
  * skeleton: pre-designated bit-pattern for this opcode
@@ -881,7 +886,7 @@ ArmEncodingMap EncodingMap[kArmLast] = {
 
 /*
  * The fake NOP of moving r0 to r0 actually will incur data stalls if r0 is
- * not ready. Since r5 (rFP) is not updated often, it is less likely to
+ * not ready. Since r5FP is not updated often, it is less likely to
  * generate unnecessary stall cycles.
  */
 #define PADDING_MOV_R5_R5               0x1C2D
@@ -952,7 +957,7 @@ static AssemblerStatus assembleInstructions(CompilationUnit *cUnit,
             intptr_t target = lirTarget->generic.offset;
             int delta = target - pc;
             if (delta & 0x3) {
-                ALOGE("PC-rel distance is not multiples of 4: %d\n", delta);
+                ALOGE("PC-rel distance is not multiples of 4: %d", delta);
                 dvmCompilerAbort(cUnit);
             }
             if ((lir->opcode == kThumb2LdrPcRel12) && (delta > 4091)) {
@@ -973,7 +978,8 @@ static AssemblerStatus assembleInstructions(CompilationUnit *cUnit,
             int delta = target - pc;
             if (delta > 126 || delta < 0) {
                 /* Convert to cmp rx,#0 / b[eq/ne] tgt pair */
-                ArmLIR *newInst = dvmCompilerNew(sizeof(ArmLIR), true);
+                ArmLIR *newInst =
+                    (ArmLIR *)dvmCompilerNew(sizeof(ArmLIR), true);
                 /* Make new branch instruction and insert after */
                 newInst->opcode = kThumbBCond;
                 newInst->operands[0] = 0;
@@ -1008,7 +1014,7 @@ static AssemblerStatus assembleInstructions(CompilationUnit *cUnit,
             intptr_t target = targetLIR->generic.offset;
             int delta = target - pc;
             if (delta > 2046 || delta < -2048) {
-                ALOGE("Unconditional branch distance out of range: %d\n", delta);
+                ALOGE("Unconditional branch distance out of range: %d", delta);
                 dvmCompilerAbort(cUnit);
             }
             lir->operands[0] = delta >> 1;
@@ -1131,6 +1137,7 @@ static AssemblerStatus assembleInstructions(CompilationUnit *cUnit,
 }
 
 #if defined(SIGNATURE_BREAKPOINT)
+#error
 /* Inspect the assembled instruction stream to find potential matches */
 static void matchSignatureBreakpoint(const CompilationUnit *cUnit,
                                      unsigned int size)
@@ -1280,9 +1287,9 @@ void dvmCompilerAssembleLIR(CompilationUnit *cUnit, JitTranslationInfo *info)
     }
 
     /* Allocate enough space for the code block */
-    cUnit->codeBuffer = dvmCompilerNew(chainCellOffset, true);
+    cUnit->codeBuffer = (unsigned char *)dvmCompilerNew(chainCellOffset, true);
     if (cUnit->codeBuffer == NULL) {
-        ALOGE("Code buffer allocation failure\n");
+        ALOGE("Code buffer allocation failure");
         cUnit->baseAddr = NULL;
         return;
     }
@@ -1487,7 +1494,7 @@ static void inlineCachePatchEnqueue(PredictedChainingCell *cellAddr,
          * will bring the uninitialized chaining cell to life.
          */
         android_atomic_release_store((int32_t)newContent->clazz,
-            (void*) &cellAddr->clazz);
+            (volatile int32_t *)(void *)&cellAddr->clazz);
         cacheflush((intptr_t) cellAddr, (intptr_t) (cellAddr+1), 0);
         UPDATE_CODE_CACHE_PATCHES();
 
@@ -1576,6 +1583,7 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
     goto done;
 #else
     PredictedChainingCell newCell;
+    int baseAddr, branchOffset, tgtAddr;
     if (dvmIsNativeMethod(method)) {
         UNPROTECT_CODE_CACHE(cell, sizeof(*cell));
 
@@ -1584,13 +1592,13 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
          * trigger immediate patching and will continue to fail to match with
          * a real clazz pointer.
          */
-        cell->clazz = (void *) PREDICTED_CHAIN_FAKE_CLAZZ;
+        cell->clazz = (ClassObject *) PREDICTED_CHAIN_FAKE_CLAZZ;
 
         UPDATE_CODE_CACHE_PATCHES();
         PROTECT_CODE_CACHE(cell, sizeof(*cell));
         goto done;
     }
-    int tgtAddr = (int) dvmJitGetCodeAddr(method->insns);
+    tgtAddr = (int) dvmJitGetCodeAddr(method->insns);
 
     /*
      * Compilation not made yet for the callee. Reset the counter to a small
@@ -1608,8 +1616,8 @@ const Method *dvmJitToPatchPredictedChain(const Method *method,
         newRechainCount = interpState->icRechainCount;
     }
 
-    int baseAddr = (int) cell + 4;   // PC is cur_addr + 4
-    int branchOffset = tgtAddr - baseAddr;
+    baseAddr = (int) cell + 4;   // PC is cur_addr + 4
+    branchOffset = tgtAddr - baseAddr;
 
     newCell.branch = assembleChainingBranch(branchOffset, true);
     newCell.clazz = clazz;
@@ -1778,14 +1786,13 @@ void dvmJitUnchainAll()
 {
     u4* lowAddress = NULL;
     u4* highAddress = NULL;
-    unsigned int i;
     if (gDvmJit.pJitEntryTable != NULL) {
-        COMPILER_TRACE_CHAINING(ALOGD("Jit Runtime: unchaining all"));
+        COMPILER_TRACE_CHAINING(LOGD("Jit Runtime: unchaining all"));
         dvmLockMutex(&gDvmJit.tableLock);
 
         UNPROTECT_CODE_CACHE(gDvmJit.codeCache, gDvmJit.codeCacheByteUsed);
 
-        for (i = 0; i < gDvmJit.jitTableSize; i++) {
+        for (size_t i = 0; i < gDvmJit.jitTableSize; i++) {
             if (gDvmJit.pJitEntryTable[i].dPC &&
                    gDvmJit.pJitEntryTable[i].codeAddress &&
                    (gDvmJit.pJitEntryTable[i].codeAddress !=
@@ -1911,7 +1918,8 @@ static int dumpTraceProfile(JitEntry *p, bool silent, bool reset,
      * be a meta info field (only used by callsite info for now).
      */
     if (!desc->trace[idx].frag.isCode) {
-        const Method *method = desc->trace[idx+1].meta;
+        const Method *method = (const Method *)
+            desc->trace[idx+1].meta;
         char *methodDesc = dexProtoCopyMethodDescriptor(&method->prototype);
         /* Print the callee info in the trace */
         ALOGD("    -> %s%s;%s", method->clazz->descriptor, method->name,
@@ -1963,8 +1971,8 @@ static inline int getProfileCount(const JitEntry *entry)
 /* qsort callback function */
 static int sortTraceProfileCount(const void *entry1, const void *entry2)
 {
-    const JitEntry *jitEntry1 = entry1;
-    const JitEntry *jitEntry2 = entry2;
+    const JitEntry *jitEntry1 = (const JitEntry *)entry1;
+    const JitEntry *jitEntry2 = (const JitEntry *)entry2;
 
     int count1 = getProfileCount(jitEntry1);
     int count2 = getProfileCount(jitEntry2);
@@ -1983,7 +1991,7 @@ void dvmCompilerSortAndPrintTraceProfiles()
     dvmLockMutex(&gDvmJit.tableLock);
 
     /* Sort the entries by descending order */
-    sortedEntries = malloc(sizeof(JitEntry) * gDvmJit.jitTableSize);
+    sortedEntries = (JitEntry *)malloc(sizeof(JitEntry) * gDvmJit.jitTableSize);
     if (sortedEntries == NULL)
         goto done;
     memcpy(sortedEntries, gDvmJit.pJitEntryTable,

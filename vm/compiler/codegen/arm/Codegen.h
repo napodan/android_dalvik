@@ -22,6 +22,10 @@
  *
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "compiler/CompilerIR.h"
 #include "CalloutHelper.h"
 
@@ -86,3 +90,7 @@ extern void dvmCompilerFlushRegImpl(CompilationUnit *cUnit, int rBase,
 extern void dvmCompilerFlushRegWideImpl(CompilationUnit *cUnit, int rBase,
                                         int displacement, int rSrcLo,
                                         int rSrcHi);
+#ifdef __cplusplus
+};
+#endif
+

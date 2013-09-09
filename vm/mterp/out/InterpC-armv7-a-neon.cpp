@@ -4,7 +4,7 @@
  * --> DO NOT EDIT <--
  */
 
-/* File: c/header.c */
+/* File: c/header.cpp */
 /*
  * Copyright (C) 2008 The Android Open Source Project
  *
@@ -120,7 +120,7 @@
         {                                                                   \
             char* desc;                                                     \
             desc = dexProtoCopyMethodDescriptor(&curMethod->prototype);     \
-            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s\n",               \
+            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s",                 \
                 myoff, (int) (pc - curMethod->insns),                       \
                 curMethod->clazz->descriptor, curMethod->name, desc);       \
             free(desc);                                                     \
@@ -145,11 +145,11 @@
 # define ILOG(_level, ...) do {                                             \
         char debugStrBuf[128];                                              \
         snprintf(debugStrBuf, sizeof(debugStrBuf), __VA_ARGS__);            \
-        if (curMethod != NULL)                                                 \
-            LOG(_level, LOG_TAG"i", "%-2d|%04x%s\n",                        \
+        if (curMethod != NULL)                                              \
+            ALOG(_level, LOG_TAG"i", "%-2d|%04x%s",                          \
                 self->threadId, (int)(pc - curMethod->insns), debugStrBuf); \
         else                                                                \
-            LOG(_level, LOG_TAG"i", "%-2d|####%s\n",                        \
+            ALOG(_level, LOG_TAG"i", "%-2d|####%s",                          \
                 self->threadId, debugStrBuf);                               \
     } while(false)
 void dvmDumpRegs(const Method* method, const u4* framePtr, bool inOnly);
@@ -176,6 +176,7 @@ static inline s8 getLongFromArray(const u4* ptr, int idx)
     memcpy(&val, &ptr[idx], 8);
     return val;
 #else
+#error
     return *((s8*) &ptr[idx]);
 #endif
 }
@@ -193,6 +194,7 @@ static inline void putLongToArray(u4* ptr, int idx, s8 val)
 #elif defined(NO_UNALIGN_64__MEMCPY)
     memcpy(&ptr[idx], &val, 8);
 #else
+#error
     *((s8*) &ptr[idx]) = val;
 #endif
 }

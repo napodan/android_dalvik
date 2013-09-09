@@ -55,6 +55,12 @@ bool dvmCheckAsmConstants(void);
 bool dvmMterpStdRun(MterpGlue* glue);
 void dvmMterpStdBail(MterpGlue* glue, bool changeInterp);
 
+/*
+ * Helper for common_printMethod(), invoked from the assembly
+ * interpreter.
+ */
+extern "C" void dvmMterpPrintMethod(Method* method);
+
 #ifdef __cplusplus
 };
 #endif

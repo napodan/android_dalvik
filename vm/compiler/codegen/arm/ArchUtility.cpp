@@ -18,7 +18,7 @@
 #include "libdex/DexOpcodes.h"
 #include "ArmLIR.h"
 
-static char *shiftNames[4] = {
+static const char *shiftNames[4] = {
     "lsl",
     "lsr",
     "asr",
@@ -67,14 +67,14 @@ static int expandImmediate(int value)
  * Interpret a format string and build a string no longer than size
  * See format key in Assemble.c.
  */
-static void buildInsnString(char *fmt, ArmLIR *lir, char* buf,
+static void buildInsnString(const char *fmt, ArmLIR *lir, char* buf,
                             unsigned char *baseAddr, int size)
 {
     int i;
     char *bufEnd = &buf[size-1];
-    char *fmtEnd = &fmt[strlen(fmt)];
+    const char *fmtEnd = &fmt[strlen(fmt)];
     char tbuf[256];
-    char *name;
+    const char *name;
     char nc;
     while (fmt < fmtEnd) {
         int operand;
@@ -291,7 +291,7 @@ void dvmDumpLIRInsn(LIR *arg, unsigned char *baseAddr)
             ALOGD("-------- BARRIER");
             break;
         case kArmPseudoExtended:
-            ALOGD("-------- %s\n", (char *) dest);
+            ALOGD("-------- %s", (char *) dest);
             break;
         case kArmPseudoSSARep:
             DUMP_SSA_REP(ALOGD("-------- %s\n", (char *) dest));
@@ -336,7 +336,7 @@ void dvmDumpLIRInsn(LIR *arg, unsigned char *baseAddr)
             /* Do nothing */
             break;
         case kArmPseudoEHBlockLabel:
-            ALOGD("Exception_Handling:\n");
+            ALOGD("Exception_Handling:");
             break;
         case kArmPseudoNormalBlockLabel:
             ALOGD("L%#06x:\n", dest);
@@ -349,7 +349,7 @@ void dvmDumpLIRInsn(LIR *arg, unsigned char *baseAddr)
                             baseAddr, 256);
             buildInsnString(EncodingMap[lir->opcode].fmt, lir, buf, baseAddr,
                             256);
-            ALOGD("%p (%04x): %-8s%s%s\n",
+            ALOGD("%p (%04x): %-8s%s%s",
                  baseAddr + offset, offset, opName, buf,
                  lir->isNop ? "(nop)" : "");
             break;
@@ -368,14 +368,14 @@ void dvmDumpLIRInsn(LIR *arg, unsigned char *baseAddr)
 /* Dump instructions and constant pool contents */
 void dvmCompilerCodegenDump(CompilationUnit *cUnit)
 {
-    ALOGD("Dumping LIR insns\n");
+    ALOGD("Dumping LIR insns");
     LIR *lirInsn;
     ArmLIR *armLIR;
 
-    ALOGD("installed code is at %p\n", cUnit->baseAddr);
-    ALOGD("total size is %d bytes\n", cUnit->totalSize);
+    ALOGD("installed code is at %p", cUnit->baseAddr);
+    ALOGD("total size is %d bytes", cUnit->totalSize);
     for (lirInsn = cUnit->firstLIRInsn; lirInsn; lirInsn = lirInsn->next) {
-        dvmDumpLIRInsn(lirInsn, cUnit->baseAddr);
+        dvmDumpLIRInsn(lirInsn, (unsigned char *) cUnit->baseAddr);
     }
     for (lirInsn = cUnit->wordList; lirInsn; lirInsn = lirInsn->next) {
         armLIR = (ArmLIR *) lirInsn;

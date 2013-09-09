@@ -55,8 +55,16 @@ void dvmSelfVerificationShadowSpaceFree(Thread* self)
 }
 
 /*
- * Save out PC, FP, InterpState, and registers to shadow space.
+ * Save out PC, FP, thread state, and registers to shadow space.
  * Return a pointer to the shadow space for JIT to use.
+ *
+ * The set of saved state from the Thread structure is:
+ *     pc  (Dalvik PC)
+ *     fp  (Dalvik FP)
+ *     retval
+ *     method
+ *     methodClassDex
+ *     interpStackEnd
  */
 void* dvmSelfVerificationSaveState(const u2* pc, const void* fp,
                                    InterpState* interpState, int targetTrace)
@@ -764,12 +772,14 @@ int dvmCheckJit(const u2* pc, Thread* self, InterpState* interpState,
              * If the last instruction is an invoke, we will try to sneak in
              * the move-result* (if existent) into a separate trace run.
              */
-            int needReservedRun = (flags & kInstrInvoke) ? 1 : 0;
+            {
+              int needReservedRun = (flags & kInstrInvoke) ? 1 : 0;
 
-            /* Will probably never hit this with the current trace buildier */
-            if (interpState->currTraceRun ==
-                (MAX_JIT_RUN_LEN - 1 - needReservedRun)) {
+              /* Will probably never hit this with the current trace builder */
+              if (interpState->currTraceRun ==
+                   (MAX_JIT_RUN_LEN - 1 - needReservedRun)) {
                 interpState->jitState = kJitTSelectEnd;
+              }
             }
 
             if (!dexIsGoto(flags) &&

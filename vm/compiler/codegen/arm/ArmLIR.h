@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
-#include "Dalvik.h"
-#include "compiler/CompilerInternals.h"
-
 #ifndef _DALVIK_VM_COMPILER_CODEGEN_ARM_ARMLIR_H
 #define _DALVIK_VM_COMPILER_CODEGEN_ARM_ARMLIR_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "Dalvik.h"
+#include "compiler/CompilerInternals.h"
 
 /*
  * r0, r1, r2, r3 are always scratch
@@ -730,8 +734,8 @@ typedef struct ArmEncodingMap {
     } fieldLoc[4];
     ArmOpcode opcode;
     int flags;
-    char *name;
-    char* fmt;
+    const char* name;
+    const char* fmt;
     int size;
 } ArmEncodingMap;
 
@@ -785,5 +789,9 @@ typedef struct ArmLIR {
 
 #define CHAIN_CELL_NORMAL_SIZE 12
 #define CHAIN_CELL_PREDICTED_SIZE 16
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif /* _DALVIK_VM_COMPILER_CODEGEN_ARM_ARMLIR_H */

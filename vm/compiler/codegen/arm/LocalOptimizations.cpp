@@ -42,12 +42,12 @@ static inline bool isDalvikStore(ArmLIR *lir)
 
 static inline bool isDalvikRegisterClobbered(ArmLIR *lir1, ArmLIR *lir2)
 {
-  int reg1Lo = DECODE_ALIAS_INFO_REG(lir1->aliasInfo);
-  int reg1Hi = reg1Lo + DECODE_ALIAS_INFO_WIDE(lir1->aliasInfo);
-  int reg2Lo = DECODE_ALIAS_INFO_REG(lir2->aliasInfo);
-  int reg2Hi = reg2Lo + DECODE_ALIAS_INFO_WIDE(lir2->aliasInfo);
+    int reg1Lo = DECODE_ALIAS_INFO_REG(lir1->aliasInfo);
+    int reg1Hi = reg1Lo + DECODE_ALIAS_INFO_WIDE(lir1->aliasInfo);
+    int reg2Lo = DECODE_ALIAS_INFO_REG(lir2->aliasInfo);
+    int reg2Hi = reg2Lo + DECODE_ALIAS_INFO_WIDE(lir2->aliasInfo);
 
-  return (reg1Lo == reg2Lo) || (reg1Lo == reg2Hi) || (reg1Hi == reg2Lo);
+    return (reg1Lo == reg2Lo) || (reg1Lo == reg2Hi) || (reg1Hi == reg2Lo);
 }
 
 #if 0
@@ -147,7 +147,7 @@ static void applyLoadStoreElimination(CompilationUnit *cUnit,
                         /* The store can be sunk for at least one cycle */
                         if (sinkDistance != 0) {
                             ArmLIR *newStoreLIR =
-                                dvmCompilerNew(sizeof(ArmLIR), true);
+                                (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
                             *newStoreLIR = *thisLIR;
                             newStoreLIR->age = cUnit->optRound;
                             /*
@@ -174,6 +174,10 @@ static void applyLoadStoreElimination(CompilationUnit *cUnit,
     }
 }
 
+/*
+ * Perform a pass of bottom-up walk, from the second instruction in the
+ * superblock, to try to hoist loads to earlier slots.
+ */
 static void applyLoadHoisting(CompilationUnit *cUnit,
                               ArmLIR *headLIR,
                               ArmLIR *tailLIR)
@@ -369,7 +373,7 @@ static void applyLoadHoisting(CompilationUnit *cUnit,
                         /* The load can be hoisted for at least one cycle */
                         if (hoistDistance != 0) {
                             ArmLIR *newLoadLIR =
-                                dvmCompilerNew(sizeof(ArmLIR), true);
+                                (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
                             *newLoadLIR = *thisLIR;
                             newLoadLIR->age = cUnit->optRound;
                             /*
@@ -473,7 +477,7 @@ static void applyLoadHoisting(CompilationUnit *cUnit,
                     /* The store can be hoisted for at least one cycle */
                     if (hoistDistance != 0) {
                         ArmLIR *newLoadLIR =
-                            dvmCompilerNew(sizeof(ArmLIR), true);
+                            (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
                         *newLoadLIR = *thisLIR;
                         newLoadLIR->age = cUnit->optRound;
                         /*

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 #define _CODEGEN_C
-#define _ARMV7_A
+#define _ARMV5TE_VFP
+#define TGT_LIR ArmLIR
 
 #include "Dalvik.h"
 #include "interp/InterpDefs.h"
@@ -22,29 +23,34 @@
 #include "compiler/CompilerInternals.h"
 #include "compiler/codegen/arm/ArmLIR.h"
 #include "mterp/common/FindInterface.h"
-#include "compiler/codegen/arm/Ralloc.h"
+#include "compiler/codegen/Ralloc.h"
 #include "compiler/codegen/arm/Codegen.h"
 #include "compiler/Loop.h"
 #include "ArchVariant.h"
 
-/* Architectural independent building blocks */
-#include "../CodegenCommon.c"
+/* Arm codegen building blocks */
+#include "../CodegenCommon.cpp"
 
-/* Thumb2-specific factory utilities */
-#include "../Thumb2/Factory.c"
-/* Factory utilities dependent on arch-specific features */
-#include "../CodegenFactory.c"
+/* Thumb-specific factory utilities */
+#include "../Thumb/Factory.cpp"
+/* Target independent factory utilities */
+#include "../../CodegenFactory.cpp"
+/* Arm-specific factory utilities */
+#include "../ArchFactory.cpp"
 
-/* Thumb2-specific codegen routines */
-#include "../Thumb2/Gen.c"
-/* Thumb2+VFP codegen routines */
-#include "../FP/Thumb2VFP.c"
+/* Thumb-specific codegen routines */
+#include "../Thumb/Gen.cpp"
+/* Thumb+VFP codegen routines */
+#include "../FP/ThumbVFP.cpp"
 
-/* Thumb2-specific register allocation */
-#include "../Thumb2/Ralloc.c"
+/* Thumb-specific register allocation */
+#include "../Thumb/Ralloc.cpp"
 
 /* MIR2LIR dispatcher and architectural independent codegen routines */
-#include "../CodegenDriver.c"
+#include "../CodegenDriver.cpp"
+
+/* Dummy driver for method-based JIT */
+#include "../armv5te/MethodCodegenDriver.cpp"
 
 /* Architecture manifest */
-#include "ArchVariant.c"
+#include "ArchVariant.cpp"
