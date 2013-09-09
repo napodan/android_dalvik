@@ -206,7 +206,7 @@ ifeq ($(WITH_JIT),true)
 	compiler/Dataflow.cpp \
 	compiler/Loop.cpp \
 	compiler/Ralloc.cpp \
-	interp/Jit.c
+	interp/Jit.cpp
 endif
 
 LOCAL_C_INCLUDES += \
@@ -227,19 +227,19 @@ ifeq ($(dvm_arch),arm)
   LOCAL_SRC_FILES += \
 		arch/arm/CallOldABI.S \
 		arch/arm/CallEABI.S \
-		arch/arm/HintsEABI.c \
-		mterp/out/InterpC-$(dvm_arch_variant).c.arm \
+		arch/arm/HintsEABI.cpp \
+		mterp/out/InterpC-$(dvm_arch_variant).cpp.arm \
 		mterp/out/InterpAsm-$(dvm_arch_variant).S
 
   ifeq ($(WITH_JIT),true)
     LOCAL_SRC_FILES += \
-		compiler/codegen/arm/RallocUtil.c \
 		compiler/codegen/arm/$(dvm_arch_variant)/Codegen.c \
 		compiler/codegen/arm/$(dvm_arch_variant)/CallingConvention.S \
-		compiler/codegen/arm/Assemble.c \
-		compiler/codegen/arm/ArchUtility.c \
-		compiler/codegen/arm/LocalOptimizations.c \
+		compiler/codegen/arm/Assemble.cpp \
+		compiler/codegen/arm/ArchUtility.cpp \
+		compiler/codegen/arm/LocalOptimizations.cpp \
 		compiler/codegen/arm/GlobalOptimizations.c \
+		compiler/codegen/arm/RallocUtil.c \
 		compiler/template/out/CompilerTemplateAsm-$(dvm_arch_variant).S
   endif
 endif
