@@ -233,13 +233,14 @@ ifeq ($(dvm_arch),arm)
 
   ifeq ($(WITH_JIT),true)
     LOCAL_SRC_FILES += \
+		compiler/codegen/RallocUtil.c \
 		compiler/codegen/arm/$(dvm_arch_variant)/Codegen.c \
 		compiler/codegen/arm/$(dvm_arch_variant)/CallingConvention.S \
 		compiler/codegen/arm/Assemble.cpp \
 		compiler/codegen/arm/ArchUtility.cpp \
 		compiler/codegen/arm/LocalOptimizations.cpp \
 		compiler/codegen/arm/GlobalOptimizations.cpp \
-		compiler/codegen/arm/RallocUtil.c \
+		compiler/codegen/arm/ArmRallocUtil.c \
 		compiler/template/out/CompilerTemplateAsm-$(dvm_arch_variant).S
   endif
 endif
