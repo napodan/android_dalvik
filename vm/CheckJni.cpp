@@ -21,22 +21,23 @@
  * ensure that JNI's semantic expectations are being met.  JNI seems to
  * be relatively lax when it comes to requirements for permission checks,
  * e.g. access to private methods is generally allowed from anywhere.
- *
- * TODO: keep a counter on global Get/Release.  Report a warning if some Gets
- * were not Released.  Do not count explicit Add/DeleteGlobalRef calls (or
- * count them separately, so we can complain if they exceed a certain
- * threshold).
- *
- * TODO: verify that the methodID passed into the Call functions is for
- * a method in the specified class.
  */
+
 #include "Dalvik.h"
 #include "JniInternal.h"
 
 #include <zlib.h>
 
-static void abortMaybe(void);       // fwd
-
+/*
+ * Abort if we are configured to bail out on JNI warnings.
+ */
+static void abortMaybe() {
+    JavaVMExt* vm = (JavaVMExt*) gDvm.vmList;
+    if (vm->warnError) {
+        dvmDumpThread(dvmThreadSelf(), false);
+        dvmAbort();
+    }
+}
 
 /*
  * ===========================================================================
@@ -61,10 +62,10 @@ static void abortMaybe(void);       // fwd
  * At this point, pResult->l has already been converted to an object pointer.
  */
 static void checkCallResultCommon(const u4* args, JValue* pResult,
-    const Method* method, Thread* self)
+        const Method* method, Thread* self)
 {
     assert(pResult->l != NULL);
-    Object* resultObj = (Object*) pResult->l;
+    const Object* resultObj = (const Object*) pResult->l;
     ClassObject* objClazz = resultObj->clazz;
 
     /*
@@ -75,7 +76,7 @@ static void checkCallResultCommon(const u4* args, JValue* pResult,
     const char* objType = objClazz->descriptor;
     if (strcmp(declType, objType) == 0) {
         /* names match; ignore class loader issues and allow it */
-        ALOGV("Check %s.%s: %s io %s (FAST-OK)\n",
+        ALOGV("Check %s.%s: %s io %s (FAST-OK)",
             method->clazz->descriptor, method->name, objType, declType);
     } else {
         /*
@@ -89,26 +90,24 @@ static void checkCallResultCommon(const u4* args, JValue* pResult,
          * not be listed as an initiating loader, so we can't just look for
          * it in the loaded-classes list.
          */
-        ClassObject* declClazz;
-
-        declClazz = dvmFindClassNoInit(declType, method->clazz->classLoader);
+        ClassObject* declClazz = dvmFindClassNoInit(declType, method->clazz->classLoader);
         if (declClazz == NULL) {
-            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
+            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'",
                 declType, objType);
-            ALOGW("             failed in %s.%s ('%s' not found)\n",
+            ALOGW("             failed in %s.%s ('%s' not found)",
                 method->clazz->descriptor, method->name, declType);
             abortMaybe();
             return;
         }
         if (!dvmInstanceof(objClazz, declClazz)) {
-            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'\n",
+            ALOGW("JNI WARNING: method declared to return '%s' returned '%s'",
                 declType, objType);
-            ALOGW("             failed in %s.%s\n",
+            ALOGW("             failed in %s.%s",
                 method->clazz->descriptor, method->name);
             abortMaybe();
             return;
         } else {
-            ALOGV("Check %s.%s: %s io %s (SLOW-OK)\n",
+            ALOGV("Check %s.%s: %s io %s (SLOW-OK)",
                 method->clazz->descriptor, method->name, objType, declType);
         }
     }
@@ -117,14 +116,13 @@ static void checkCallResultCommon(const u4* args, JValue* pResult,
 /*
  * Determine if we need to check the return type coming out of the call.
  *
- * (We don't do this at the top of checkCallResultCommon() because this is on
- * the critical path for native method calls.)
+ * (We don't simply do this at the top of checkCallResultCommon() because
+ * this is on the critical path for native method calls.)
  */
 static inline bool callNeedsCheck(const u4* args, JValue* pResult,
     const Method* method, Thread* self)
 {
-    return (method->shorty[0] == 'L' && !dvmCheckException(self) &&
-            pResult->l != NULL);
+    return (method->shorty[0] == 'L' && !dvmCheckException(self) && pResult->l != NULL);
 }
 
 /*
@@ -134,8 +132,9 @@ void dvmCheckCallJNIMethod_general(const u4* args, JValue* pResult,
     const Method* method, Thread* self)
 {
     dvmCallJNIMethod_general(args, pResult, method, self);
-    if (callNeedsCheck(args, pResult, method, self))
+    if (callNeedsCheck(args, pResult, method, self)) {
         checkCallResultCommon(args, pResult, method, self);
+    }
 }
 
 /*
@@ -172,17 +171,24 @@ void dvmCheckCallJNIMethod_staticNoRef(const u4* args, JValue* pResult,
 }
 
 
+
 /*
  * ===========================================================================
  *      JNI function helpers
  * ===========================================================================
  */
 
+static inline const JNINativeInterface* baseEnv(JNIEnv* env) {
+    return ((JNIEnvExt*) env)->baseFuncTable;
+}
+
+static inline const JNIInvokeInterface* baseVm(JavaVM* vm) {
+    return ((JavaVMExt*) vm)->baseFuncTable;
+}
+
 #define JNI_ENTER()     dvmChangeStatus(NULL, THREAD_RUNNING)
 #define JNI_EXIT()      dvmChangeStatus(NULL, THREAD_NATIVE)
 
-#define BASE_ENV(_env)  (((JNIEnvExt*)_env)->baseFuncTable)
-#define BASE_VM(_vm)    (((JavaVMExt*)_vm)->baseFuncTable)
 
 /*
  * Flags passed into checkThread().
@@ -291,625 +297,601 @@ static void showLocation(const Method* meth, const char* func)
     free(desc);
 }
 
-/*
- * Abort if we are configured to bail out on JNI warnings.
- */
-static void abortMaybe(void)
-{
-    JavaVMExt* vm = (JavaVMExt*) gDvm.vmList;
-    if (vm->warnError) {
-        dvmDumpThread(dvmThreadSelf(), false);
-        dvmAbort();
+    /*
+     * In some circumstances the VM will screen class names, but it doesn't
+     * for class lookup.  When things get bounced through a class loader, they
+     * can actually get normalized a couple of times; as a result, passing in
+     * a class name like "java.lang.Thread" instead of "java/lang/Thread" will
+     * work in some circumstances.
+     *
+     * This is incorrect and could cause strange behavior or compatibility
+     * problems, so we want to screen that out here.
+     *
+     * We expect "full-qualified" class names, like "java/lang/Thread" or
+     * "[Ljava/lang/Object;".
+     */
+    static void checkClassName(JNIEnv* env, const char* className, const char* func)
+    {
+        const char* cp;
+    
+        /* quick check for illegal chars */
+        cp = className;
+        while (*cp != '\0') {
+            if (*cp == '.')     /* catch "java.lang.String" */
+                goto fail;
+            cp++;
+        }
+        if (*(cp-1) == ';' && *className == 'L')
+            goto fail;         /* catch "Ljava/lang/String;" */
+    
+        // TODO: need a more rigorous check here
+    
+        return;
+    
+    fail:
+        ALOGW("JNI WARNING: illegal class name '%s' (%s)\n", className, func);
+        ALOGW("             (should be formed like 'java/lang/String')\n");
+        abortMaybe();
     }
-}
-
-/*
- * Verify that the current thread is (a) attached and (b) associated with
- * this particular instance of JNIEnv.
- *
- * Verify that, if this thread previously made a critical "get" call, we
- * do the corresponding "release" call before we try anything else.
- *
- * Verify that, if an exception has been raised, the native code doesn't
- * make any JNI calls other than the Exception* methods.
- *
- * TODO? if we add support for non-JNI native calls, make sure that the
- * method at the top of the interpreted stack is a JNI method call.  (Or
- * set a flag in the Thread/JNIEnv when the call is made and clear it on
- * return?)
- *
- * NOTE: we are still in THREAD_NATIVE mode.  A GC could happen at any time.
- */
-static void checkThread(JNIEnv* env, int flags, const char* func)
-{
-    JNIEnvExt* threadEnv;
-    bool printWarn = false;
-    bool printException = false;
-
-    /* get the *correct* JNIEnv by going through our TLS pointer */
-    threadEnv = dvmGetJNIEnvForThread();
 
     /*
-     * Verify that the JNIEnv we've been handed matches what we expected
-     * to receive.
+     * Verify that the current thread is (a) attached and (b) associated with
+     * this particular instance of JNIEnv.
+     *
+     * Verify that, if this thread previously made a critical "get" call, we
+     * do the corresponding "release" call before we try anything else.
+     *
+     * Verify that, if an exception has been raised, the native code doesn't
+     * make any JNI calls other than the Exception* methods.
+     *
+     * TODO? if we add support for non-JNI native calls, make sure that the
+     * method at the top of the interpreted stack is a JNI method call.  (Or
+     * set a flag in the Thread/JNIEnv when the call is made and clear it on
+     * return?)
+     *
+     * NOTE: we are still in THREAD_NATIVE mode.  A GC could happen at any time.
      */
-    if (threadEnv == NULL) {
-        ALOGE("JNI ERROR: non-VM thread making JNI calls\n");
-        // don't set printWarn -- it'll try to call showLocation()
-        dvmAbort();
-    } else if ((JNIEnvExt*) env != threadEnv) {
-        if (dvmThreadSelf()->threadId != threadEnv->envThreadId) {
-            ALOGE("JNI: threadEnv != thread->env?\n");
+    static void checkThread(JNIEnv* env, int flags, const char* func)
+    {
+        JNIEnvExt* threadEnv;
+        bool printWarn = false;
+        bool printException = false;
+    
+        /* get the *correct* JNIEnv by going through our TLS pointer */
+        threadEnv = dvmGetJNIEnvForThread();
+    
+        /*
+         * Verify that the JNIEnv we've been handed matches what we expected
+         * to receive.
+         */
+        if (threadEnv == NULL) {
+            ALOGE("JNI ERROR: non-VM thread making JNI calls\n");
+            // don't set printWarn -- it'll try to call showLocation()
+            dvmAbort();
+        } else if ((JNIEnvExt*) env != threadEnv) {
+            if (dvmThreadSelf()->threadId != threadEnv->envThreadId) {
+                ALOGE("JNI: threadEnv != thread->env?\n");
+                dvmAbort();
+            }
+    
+            ALOGW("JNI WARNING: threadid=%d using env from threadid=%d\n",
+                threadEnv->envThreadId, ((JNIEnvExt*)env)->envThreadId);
+            printWarn = true;
+    
+            /* this is a bad idea -- need to throw as we exit, or abort func */
+            //dvmThrowException("Ljava/lang/RuntimeException;",
+            //    "invalid use of JNI env ptr");
+        } else if (((JNIEnvExt*) env)->self != dvmThreadSelf()) {
+            /* correct JNIEnv*; make sure the "self" pointer is correct */
+            ALOGE("JNI ERROR: env->self != thread-self (%p vs. %p)\n",
+                ((JNIEnvExt*) env)->self, dvmThreadSelf());
             dvmAbort();
         }
 
-        ALOGW("JNI WARNING: threadid=%d using env from threadid=%d\n",
-            threadEnv->envThreadId, ((JNIEnvExt*)env)->envThreadId);
-        printWarn = true;
+        /*
+         * Check for critical resource misuse.
+         */
+        switch (flags & kFlag_CritMask) {
+        case kFlag_CritOkay:    // okay to call this method
+            break;
+        case kFlag_CritBad:     // not okay to call
+            if (threadEnv->critical) {
+                ALOGW("JNI WARNING: threadid=%d using JNI after critical get\n",
+                    threadEnv->envThreadId);
+                printWarn = true;
+            }
+            break;
+        case kFlag_CritGet:     // this is a "get" call
+            /* don't check here; we allow nested gets */
+            threadEnv->critical++;
+            break;
+        case kFlag_CritRelease: // this is a "release" call
+            threadEnv->critical--;
+            if (threadEnv->critical < 0) {
+                ALOGW("JNI WARNING: threadid=%d called too many crit releases\n",
+                    threadEnv->envThreadId);
+                printWarn = true;
+            }
+            break;
+        default:
+            assert(false);
+        }
+    
+        /*
+         * Check for raised exceptions.
+         */
+        if ((flags & kFlag_ExcepOkay) == 0 && dvmCheckException(dvmThreadSelf())) {
+            ALOGW("JNI WARNING: JNI method called with exception raised\n");
+            printWarn = true;
+            printException = true;
+        }
 
-        /* this is a bad idea -- need to throw as we exit, or abort func */
-        //dvmThrowException("Ljava/lang/RuntimeException;",
-        //    "invalid use of JNI env ptr");
-    } else if (((JNIEnvExt*) env)->self != dvmThreadSelf()) {
-        /* correct JNIEnv*; make sure the "self" pointer is correct */
-        ALOGE("JNI ERROR: env->self != thread-self (%p vs. %p)\n",
-            ((JNIEnvExt*) env)->self, dvmThreadSelf());
-        dvmAbort();
+        if (printWarn)
+            showLocation(dvmGetCurrentJNIMethod(), func);
+        if (printException) {
+            ALOGW("Pending exception is:\n");
+            dvmLogExceptionStackTrace();
+        }
+        if (printWarn) {
+            abortMaybe();
+        }
     }
 
     /*
-     * Check for critical resource misuse.
+     * Verify that the field is of the appropriate type.  If the field has an
+     * object type, "obj" is the object we're trying to assign into it.
+     *
+     * Works for both static and instance fields.
      */
-    switch (flags & kFlag_CritMask) {
-    case kFlag_CritOkay:    // okay to call this method
-        break;
-    case kFlag_CritBad:     // not okay to call
-        if (threadEnv->critical) {
-            ALOGW("JNI WARNING: threadid=%d using JNI after critical get\n",
-                threadEnv->envThreadId);
+    static void checkFieldType(JNIEnv* env, jobject jobj, jfieldID fieldID, PrimitiveType prim, bool isStatic, const char* func) {
+        static const char* primNameList[] = {
+            "Object/Array", "boolean", "char", "float", "double",
+            "byte", "short", "int", "long", "void"
+        };
+        const char** primNames = &primNameList[1];      // shift up for PRIM_NOT
+        Field* field = (Field*) fieldID;
+        bool printWarn = false;
+    
+        if (fieldID == NULL) {
+            ALOGW("JNI WARNING: null field ID\n");
+            abortMaybe();
+        }
+
+        if (field->signature[0] == 'L' || field->signature[0] == '[') {
+            Object* obj = dvmDecodeIndirectRef(env, jobj);
+            if (obj != NULL) {
+                ClassObject* fieldClass =
+                    dvmFindLoadedClass(field->signature);
+                ClassObject* objClass = obj->clazz;
+
+                assert(fieldClass != NULL);
+                assert(objClass != NULL);
+
+                if (!dvmInstanceof(objClass, fieldClass)) {
+                    ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
+                            field->name, field->signature, objClass->descriptor);
+                    printWarn = true;
+                }
+            }
+        } else if (field->signature[0] != PRIM_TYPE_TO_LETTER[prim]) {
+            ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)",
+                field->name, field->signature, primNames[prim]);
+            printWarn = true;
+        } else if (isStatic && !dvmIsStaticField(field)) {
+            if (isStatic) {
+                ALOGW("JNI WARNING: accessing non-static field %s as static", field->name);
+            } else {
+                ALOGW("JNI WARNING: accessing static field %s as non-static", field->name);
+            }
             printWarn = true;
         }
-        break;
-    case kFlag_CritGet:     // this is a "get" call
-        /* don't check here; we allow nested gets */
-        threadEnv->critical++;
-        break;
-    case kFlag_CritRelease: // this is a "release" call
-        threadEnv->critical--;
-        if (threadEnv->critical < 0) {
-            ALOGW("JNI WARNING: threadid=%d called too many crit releases\n",
-                threadEnv->envThreadId);
-            printWarn = true;
+
+        if (printWarn) {
+            showLocation(dvmGetCurrentJNIMethod(), func);
+            abortMaybe();
         }
-        break;
-    default:
-        assert(false);
     }
 
     /*
-     * Check for raised exceptions.
+     * Verify that this instance field ID is valid for this object.
      */
-    if ((flags & kFlag_ExcepOkay) == 0 && dvmCheckException(dvmThreadSelf())) {
-        ALOGW("JNI WARNING: JNI method called with exception raised\n");
-        printWarn = true;
-        printException = true;
-    }
+    static void checkInstanceFieldID(JNIEnv* env, jobject jobj, jfieldID fieldID, const char* func) {
+        JNI_ENTER();
 
-    if (printWarn)
-        showLocation(dvmGetCurrentJNIMethod(), func);
-    if (printException) {
-        ALOGW("Pending exception is:\n");
-        dvmLogExceptionStackTrace();
-    }
-    if (printWarn)
-        abortMaybe();
-}
+        if (jobj == NULL) {
+            ALOGW("JNI WARNING: invalid null object (%s)\n", func);
+            abortMaybe();
+            JNI_EXIT();
+            return;
+        }
 
-/*
- * Verify that the field is of the appropriate type.  If the field has an
- * object type, "obj" is the object we're trying to assign into it.
- *
- * Works for both static and instance fields.
- */
-static void checkFieldType(JNIEnv* env, jobject jobj, jfieldID fieldID,
-    PrimitiveType prim, bool isStatic, const char* func)
-{
-    static const char* primNameList[] = {
-        "Object/Array", "boolean", "char", "float", "double",
-        "byte", "short", "int", "long", "void"
-    };
-    const char** primNames = &primNameList[1];      // shift up for PRIM_NOT
-    Field* field = (Field*) fieldID;
-    bool printWarn = false;
-
-    if (fieldID == NULL) {
-        ALOGE("JNI ERROR: null field ID\n");
-        abortMaybe();
-    }
-
-    if (field->signature[0] == 'L' || field->signature[0] == '[') {
         Object* obj = dvmDecodeIndirectRef(env, jobj);
-        if (obj != NULL) {
-            ClassObject* fieldClass =
-                dvmFindLoadedClass(field->signature);
-            ClassObject* objClass = obj->clazz;
+    
+        /*
+         * Check this class and all of its superclasses for a matching field.
+         * Don't need to scan interfaces.
+         */
+        ClassObject* clazz = obj->clazz;
+        while (clazz != NULL) {
+            if ((InstField*) fieldID >= clazz->ifields &&
+                    (InstField*) fieldID < clazz->ifields + clazz->ifieldCount) {
+            JNI_EXIT();
+            return;
+            }
 
-            assert(fieldClass != NULL);
-            assert(objClass != NULL);
+            clazz = clazz->super;
+        }
 
-            if (!dvmInstanceof(objClass, fieldClass)) {
-                ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
-                    field->name, field->signature, objClass->descriptor);
+        ALOGW("JNI WARNING: inst fieldID %p not valid for class %s\n",
+                fieldID, obj->clazz->descriptor);
+        abortMaybe();
+    
+        JNI_EXIT();
+    }    
+
+    /*
+     * Verify that the pointer value is non-NULL.
+     */
+    static void checkNonNull(JNIEnv* env, const void* ptr, const char* func) {
+        if (ptr == NULL) {
+            ALOGW("JNI WARNING: invalid null pointer (%s)", func);
+            abortMaybe();
+        }
+    }
+
+    /*
+     * Verify that the method's return type matches the type of call.
+     * "expectedSigByte" will be 'L' for all objects, including arrays.
+     */
+    static void checkSig(JNIEnv* env, jmethodID methodID, char expectedSigByte, bool isStatic, const char* func) {
+        const Method* method = (const Method*) methodID;
+        bool printWarn = false;
+
+        if (expectedSigByte != method->shorty[0]) {
+            ALOGW("JNI WARNING: expected return type '%c'", expectedSigByte);
+            printWarn = true;
+        } else if (isStatic && !dvmIsStaticMethod(method)) {
+            if (isStatic) {
+                ALOGW("JNI WARNING: calling non-static method with static call");
+            } else {
+                ALOGW("JNI WARNING: calling static method with non-static call");
+            }
+            printWarn = true;
+        }
+
+        if (printWarn) {
+            char* desc = dexProtoCopyMethodDescriptor(&method->prototype);
+            ALOGW("             calling %s.%s %s", method->clazz->descriptor, method->name, desc);
+            free(desc);
+            showLocation(dvmGetCurrentJNIMethod(), func);
+            abortMaybe();
+        }
+    }
+
+    /*
+     * Verify that this static field ID is valid for this class.
+     */
+    static void checkStaticFieldID(JNIEnv* env, jclass jclazz, jfieldID fieldID) {
+
+        ClassObject* clazz = (ClassObject*) dvmDecodeIndirectRef(env, jclazz);
+        StaticField* base = &clazz->sfields[0];
+        int fieldCount = clazz->sfieldCount;
+        if ((StaticField*) fieldID < base || (StaticField*) fieldID >= base + fieldCount) {
+            ALOGW("JNI WARNING: static fieldID %p not valid for class %s",
+                    fieldID, clazz->descriptor);
+            ALOGW("             base=%p count=%d", base, fieldCount);
+            abortMaybe();
+        }
+    }
+
+    /*
+     * Verify that "methodID" is appropriate for "clazz".
+     *
+     * A mismatch isn't dangerous, because the jmethodID defines the class.  In
+     * fact, jclazz is unused in the implementation.  It's best if we don't
+     * allow bad code in the system though.
+     *
+     * Instances of "jclazz" must be instances of the method's declaring class.
+     */
+    static void checkStaticMethod(JNIEnv* env, jclass jclazz, jmethodID methodID, const char* func) {
+        JNI_ENTER();
+
+        ClassObject* clazz = (ClassObject*) dvmDecodeIndirectRef(env, jclazz);
+        const Method* method = (const Method*) methodID;
+
+        if (!dvmInstanceof(clazz, method->clazz)) {
+            ALOGW("JNI WARNING: can't call static %s.%s on class %s",
+                    method->clazz->descriptor, method->name, clazz->descriptor);
+            // no abort?
+        }
+    
+        JNI_EXIT();
+    }
+
+    /*
+     * Verify that "methodID" is appropriate for "jobj".
+     *
+     * Make sure the object is an instance of the method's declaring class.
+     * (Note the methodID might point to a declaration in an interface; this
+     * will be handled automatically by the instanceof check.)
+     */
+    static void checkVirtualMethod(JNIEnv* env, jobject jobj, jmethodID methodID, const char* func) {
+        JNI_ENTER();
+
+        Object* obj = dvmDecodeIndirectRef(env, jobj);
+        const Method* method = (const Method*) methodID;
+
+        if (!dvmInstanceof(obj->clazz, method->clazz)) {
+            ALOGW("JNI WARNING: can't call %s.%s on instance of %s",
+                    method->clazz->descriptor, method->name, obj->clazz->descriptor);
+            abortMaybe();
+        }
+    
+        JNI_EXIT();
+    }
+
+    /*
+     * Verify that "jobj" is a valid object, and that it's an object that JNI
+     * is allowed to know about.  We allow NULL references.
+     *
+     * Must be in "running" mode before calling here.
+     */
+    static void checkObject0(JNIEnv* env, jobject jobj, const char* func)
+    {
+        UNUSED_PARAMETER(env);
+        bool printWarn = false;
+    
+        if (jobj == NULL)
+            return;
+    
+        if (dvmIsWeakGlobalRef(jobj)) {
+            /*
+             * Normalize and continue.  This will tell us if the PhantomReference
+             * object is valid.
+             */
+            jobj = dvmNormalizeWeakGlobalRef((jweak) jobj);
+        }
+
+        if (dvmGetJNIRefType(env, jobj) == JNIInvalidRefType) {
+            ALOGW("JNI WARNING: %p is not a valid JNI reference\n", jobj);
+            printWarn = true;
+        } else {
+            Object* obj = dvmDecodeIndirectRef(env, jobj);
+    
+            if (obj == NULL || !dvmIsValidObject(obj)) {
+                ALOGW("JNI WARNING: native code passing in bad object %p %p (%s)\n",
+                    jobj, obj, func);
                 printWarn = true;
             }
         }
-    } else if (field->signature[0] != PRIM_TYPE_TO_LETTER[prim]) {
-        ALOGW("JNI WARNING: field '%s' with type '%s' set with wrong type (%s)\n",
-            field->name, field->signature, primNames[prim]);
-        printWarn = true;
-    } else if (isStatic && !dvmIsStaticField(field)) {
-        if (isStatic)
-            ALOGW("JNI WARNING: accessing non-static field %s as static\n",
-                field->name);
-        else
-            ALOGW("JNI WARNING: accessing static field %s as non-static\n",
-                field->name);
-        printWarn = true;
-    }
 
-    if (printWarn) {
-        showLocation(dvmGetCurrentJNIMethod(), func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that "jobj" is a valid object, and that it's an object that JNI
- * is allowed to know about.  We allow NULL references.
- *
- * Must be in "running" mode before calling here.
- */
-static void checkObject0(JNIEnv* env, jobject jobj, const char* func)
-{
-    UNUSED_PARAMETER(env);
-    bool printWarn = false;
-
-    if (jobj == NULL)
-        return;
-
-    if (dvmIsWeakGlobalRef(jobj)) {
-        /*
-         * Normalize and continue.  This will tell us if the PhantomReference
-         * object is valid.
-         */
-        jobj = dvmNormalizeWeakGlobalRef((jweak) jobj);
-    }
-
-    if (dvmGetJNIRefType(env, jobj) == JNIInvalidRefType) {
-        ALOGW("JNI WARNING: %p is not a valid JNI reference\n", jobj);
-        printWarn = true;
-    } else {
-        Object* obj = dvmDecodeIndirectRef(env, jobj);
-
-        if (obj == NULL || !dvmIsValidObject(obj)) {
-            ALOGW("JNI WARNING: native code passing in bad object %p %p (%s)\n",
-                jobj, obj, func);
-            printWarn = true;
+        if (printWarn) {
+            showLocation(dvmGetCurrentJNIMethod(), func);
+            abortMaybe();
         }
     }
-
-    if (printWarn) {
-        showLocation(dvmGetCurrentJNIMethod(), func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that "jobj" is a valid object, and that it's an object that JNI
- * is allowed to know about.  We allow NULL references.
- *
- * Switches to "running" mode before performing checks.
- */
-static void checkObject(JNIEnv* env, jobject jobj, const char* func)
-{
-    JNI_ENTER();
-    checkObject0(env, jobj, func);
-    JNI_EXIT();
-}
-
-/*
- * Verify that "clazz" actually points to a class object.  (Also performs
- * checkObject.)
- *
- * We probably don't need to identify where we're being called from,
- * because the VM is most likely about to crash and leave a core dump
- * if something is wrong.
- *
- * Because we're looking at an object on the GC heap, we have to switch
- * to "running" mode before doing the checks.
- */
-static void checkClass(JNIEnv* env, jclass jclazz, const char* func)
-{
-    JNI_ENTER();
-    bool printWarn = false;
-
-    Object* obj = dvmDecodeIndirectRef(env, jclazz);
-
-    if (obj == NULL) {
-        ALOGW("JNI WARNING: received null jclass\n");
-        printWarn = true;
-    } else if (!dvmIsValidObject(obj)) {
-        ALOGW("JNI WARNING: jclass points to invalid object %p\n", obj);
-        printWarn = true;
-    } else if (obj->clazz != gDvm.classJavaLangClass) {
-        ALOGW("JNI WARNING: jclass arg is not a Class reference "
-             "(%p is instance of %s)\n",
-            jclazz, obj->clazz->descriptor);
-        printWarn = true;
-    }
-    JNI_EXIT();
-
-    if (printWarn)
-        abortMaybe();
-    else
-        checkObject(env, jclazz, func);
-}
-
-/*
- * Verify that "str" is non-NULL and points to a String object.
- *
- * Since we're dealing with objects, switch to "running" mode.
- */
-static void checkString(JNIEnv* env, jstring jstr, const char* func)
-{
-    JNI_ENTER();
-    bool printWarn = false;
-
-    Object* obj = dvmDecodeIndirectRef(env, jstr);
-
-    if (obj == NULL) {
-        ALOGW("JNI WARNING: received null jstring (%s)\n", func);
-        printWarn = true;
-    } else if (obj->clazz != gDvm.classJavaLangString) {
-        /*
-         * TODO: we probably should test dvmIsValidObject first, because
-         * this will crash if "obj" is non-null but pointing to an invalid
-         * memory region.  However, the "is valid" test is a little slow,
-         * we're doing it again over in checkObject().
-         */
-        if (dvmIsValidObject(obj))
-            ALOGW("JNI WARNING: jstring %p points to non-string object (%s)\n",
-                jstr, func);
-        else
-            ALOGW("JNI WARNING: jstring %p is bogus (%s)\n", jstr, func);
-        printWarn = true;
-    }
-    JNI_EXIT();
-
-    if (printWarn)
-        abortMaybe();
-    else
-        checkObject(env, jstr, func);
-}
-
-/*
- * Verify that "bytes" points to valid "modified UTF-8" data.
- */
-static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
-    const char* func)
-{
-    const char* origBytes = bytes;
-
-    if (bytes == NULL) {
-        if (!nullOk) {
-            ALOGW("JNI WARNING: unexpectedly null UTF string\n");
-            goto fail;
-        }
-
-        return;
-    }
-
-    while (*bytes != '\0') {
-        u1 utf8 = *(bytes++);
-        // Switch on the high four bits.
-        switch (utf8 >> 4) {
-            case 0x00:
-            case 0x01:
-            case 0x02:
-            case 0x03:
-            case 0x04:
-            case 0x05:
-            case 0x06:
-            case 0x07: {
-                // Bit pattern 0xxx. No need for any extra bytes.
-                break;
-            }
-            case 0x08:
-            case 0x09:
-            case 0x0a:
-            case 0x0b:
-            case 0x0f: {
-                /*
-                 * Bit pattern 10xx or 1111, which are illegal start bytes.
-                 * Note: 1111 is valid for normal UTF-8, but not the
-                 * modified UTF-8 used here.
-                 */
-                ALOGW("JNI WARNING: illegal start byte 0x%x\n", utf8);
-                goto fail;
-            }
-            case 0x0e: {
-                // Bit pattern 1110, so there are two additional bytes.
-                utf8 = *(bytes++);
-                if ((utf8 & 0xc0) != 0x80) {
-                    ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
-                    goto fail;
-                }
-                // Fall through to take care of the final byte.
-            }
-            case 0x0c:
-            case 0x0d: {
-                // Bit pattern 110x, so there is one additional byte.
-                utf8 = *(bytes++);
-                if ((utf8 & 0xc0) != 0x80) {
-                    ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
-                    goto fail;
-                }
-                break;
-            }
-        }
-    }
-
-    return;
-
-fail:
-    ALOGW("             string: '%s'\n", origBytes);
-    showLocation(dvmGetCurrentJNIMethod(), func);
-    abortMaybe();
-}
-
-/*
- * In some circumstances the VM will screen class names, but it doesn't
- * for class lookup.  When things get bounced through a class loader, they
- * can actually get normalized a couple of times; as a result, passing in
- * a class name like "java.lang.Thread" instead of "java/lang/Thread" will
- * work in some circumstances.
- *
- * This is incorrect and could cause strange behavior or compatibility
- * problems, so we want to screen that out here.
- *
- * We expect "full-qualified" class names, like "java/lang/Thread" or
- * "[Ljava/lang/Object;".
- */
-static void checkClassName(JNIEnv* env, const char* className, const char* func)
-{
-    const char* cp;
-
-    /* quick check for illegal chars */
-    cp = className;
-    while (*cp != '\0') {
-        if (*cp == '.')     /* catch "java.lang.String" */
-            goto fail;
-        cp++;
-    }
-    if (*(cp-1) == ';' && *className == 'L')
-        goto fail;         /* catch "Ljava/lang/String;" */
-
-    // TODO: need a more rigorous check here
-
-    return;
-
-fail:
-    ALOGW("JNI WARNING: illegal class name '%s' (%s)\n", className, func);
-    ALOGW("             (should be formed like 'java/lang/String')\n");
-    abortMaybe();
-}
-
-/*
- * Verify that "array" is non-NULL and points to an Array object.
- *
- * Since we're dealing with objects, switch to "running" mode.
- */
-static void checkArray(JNIEnv* env, jarray jarr, const char* func)
-{
-    JNI_ENTER();
-    bool printWarn = false;
-
-    Object* obj = dvmDecodeIndirectRef(env, jarr);
-
-    if (obj == NULL) {
-        ALOGW("JNI WARNING: received null array (%s)\n", func);
-        printWarn = true;
-    } else if (obj->clazz->descriptor[0] != '[') {
-        if (dvmIsValidObject(obj))
-            ALOGW("JNI WARNING: jarray %p points to non-array object (%s)\n",
-                jarr, obj->clazz->descriptor);
-        else
-            ALOGW("JNI WARNING: jarray %p is bogus\n", jarr);
-        printWarn = true;
-    }
-
-    JNI_EXIT();
-
-    if (printWarn)
-        abortMaybe();
-    else
-        checkObject(env, jarr, func);
-}
-
-/*
- * Verify that the "mode" argument passed to a primitive array Release
- * function is one of the valid values.
- */
-static void checkReleaseMode(JNIEnv* env, jint mode, const char* func)
-{
-    if (mode != 0 && mode != JNI_COMMIT && mode != JNI_ABORT) {
-        ALOGW("JNI WARNING: bad value for mode (%d) (%s)\n", mode, func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that the length argument to array-creation calls is >= 0.
- */
-static void checkLengthPositive(JNIEnv* env, jsize length, const char* func)
-{
-    if (length < 0) {
-        ALOGW("JNI WARNING: negative length for array allocation (%s)\n", func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that the pointer value is non-NULL.
- */
-static void checkNonNull(JNIEnv* env, const void* ptr, const char* func)
-{
-    if (ptr == NULL) {
-        ALOGW("JNI WARNING: invalid null pointer (%s)\n", func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that the method's return type matches the type of call.
- *
- * "expectedSigByte" will be 'L' for all objects, including arrays.
- */
-static void checkSig(JNIEnv* env, jmethodID methodID, char expectedSigByte,
-    bool isStatic, const char* func)
-{
-    const Method* meth = (const Method*) methodID;
-    bool printWarn = false;
-
-    if (expectedSigByte != meth->shorty[0]) {
-        ALOGW("JNI WARNING: expected return type '%c'\n", expectedSigByte);
-        printWarn = true;
-    } else if (isStatic && !dvmIsStaticMethod(meth)) {
-        if (isStatic)
-            ALOGW("JNI WARNING: calling non-static method with static call\n");
-        else
-            ALOGW("JNI WARNING: calling static method with non-static call\n");
-        printWarn = true;
-    }
-
-    if (printWarn) {
-        char* desc = dexProtoCopyMethodDescriptor(&meth->prototype);
-        ALOGW("             calling %s.%s %s\n",
-            meth->clazz->descriptor, meth->name, desc);
-        free(desc);
-        showLocation(dvmGetCurrentJNIMethod(), func);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that this static field ID is valid for this class.
- */
-static void checkStaticFieldID(JNIEnv* env, jclass jclazz, jfieldID fieldID)
-{
-    ClassObject* clazz = (ClassObject*) dvmDecodeIndirectRef(env, jclazz);
-    StaticField* base = &clazz->sfields[0];
-    int fieldCount = clazz->sfieldCount;
-
-    if ((StaticField*) fieldID < base ||
-        (StaticField*) fieldID >= base + fieldCount)
-    {
-        ALOGW("JNI WARNING: static fieldID %p not valid for class %s\n",
-            fieldID, clazz->descriptor);
-        ALOGW("             base=%p count=%d\n", base, fieldCount);
-        abortMaybe();
-    }
-}
-
-/*
- * Verify that this instance field ID is valid for this object.
- */
-static void checkInstanceFieldID(JNIEnv* env, jobject jobj, jfieldID fieldID,
-    const char* func)
-{
-    JNI_ENTER();
-
-    if (jobj == NULL) {
-        ALOGW("JNI WARNING: invalid null object (%s)\n", func);
-        abortMaybe();
-        goto bail;
-    }
-
-    Object* obj = dvmDecodeIndirectRef(env, jobj);
-    ClassObject* clazz = obj->clazz;
 
     /*
-     * Check this class and all of its superclasses for a matching field.
-     * Don't need to scan interfaces.
+     * Verify that "jobj" is a valid object, and that it's an object that JNI
+     * is allowed to know about.  We allow NULL references.
+     *
+     * Switches to "running" mode before performing checks.
      */
-    while (clazz != NULL) {
-        if ((InstField*) fieldID >= clazz->ifields &&
-            (InstField*) fieldID < clazz->ifields + clazz->ifieldCount)
-        {
-            goto bail;
+    static void checkObject(JNIEnv* env, jobject jobj, const char* func) {
+        JNI_ENTER();
+        checkObject0(env, jobj, func);
+        JNI_EXIT();
+    }
+
+    /*
+     * Verify that "array" is non-NULL and points to an Array object.
+     *
+     * Since we're dealing with objects, switch to "running" mode.
+     */
+    static void checkArray(JNIEnv* env, jarray jarr, const char* func) {
+        JNI_ENTER();
+        bool printWarn = false;
+
+        Object* obj = dvmDecodeIndirectRef(env, jarr);
+    
+        if (obj == NULL) {
+            ALOGW("JNI WARNING: received null array (%s)\n", func);
+            printWarn = true;
+        } else if (obj->clazz->descriptor[0] != '[') {
+            if (dvmIsValidObject(obj))
+                ALOGW("JNI WARNING: jarray %p points to non-array object (%s)",
+                    jarr, obj->clazz->descriptor);
+            else
+                ALOGW("JNI WARNING: jarray %p is bogus\n", jarr);
+            printWarn = true;
         }
 
-        clazz = clazz->super;
+        JNI_EXIT();
+    
+        if (printWarn) {
+            abortMaybe();
+        } else {
+            checkObject(env, jarr, func);
+        }
     }
 
-    ALOGW("JNI WARNING: inst fieldID %p not valid for class %s\n",
-        fieldID, obj->clazz->descriptor);
-    abortMaybe();
 
-bail:
-    JNI_EXIT();
-}
+    /*
+     * Verify that "clazz" actually points to a class object.  (Also performs
+     * checkObject.)
+     *
+     * We probably don't need to identify where we're being called from,
+     * because the VM is most likely about to crash and leave a core dump
+     * if something is wrong.
+     *
+     * Because we're looking at an object on the GC heap, we have to switch
+     * to "running" mode before doing the checks.
+     */
+    static void checkClass(JNIEnv* env, jclass jclazz, const char* func)
+    {
+        JNI_ENTER();
+        bool printWarn = false;
+    
+        Object* obj = dvmDecodeIndirectRef(env, jclazz);
+    
+        if (obj == NULL) {
+            ALOGW("JNI WARNING: received null jclass\n");
+            printWarn = true;
+        } else if (!dvmIsValidObject(obj)) {
+            ALOGW("JNI WARNING: jclass points to invalid object %p\n", obj);
+            printWarn = true;
+        } else if (obj->clazz != gDvm.classJavaLangClass) {
+            ALOGW("JNI WARNING: jclass arg is not a Class reference "
+                 "(%p is instance of %s)\n",
+                jclazz, obj->clazz->descriptor);
+            printWarn = true;
+        }
+        JNI_EXIT();
+    
+        if (printWarn)
+            abortMaybe();
+        else
+            checkObject(env, jclazz, func);
+    }
 
-/*
- * Verify that "methodID" is appropriate for "jobj".
- *
- * Make sure the object is an instance of the method's declaring class.
- * (Note the methodID might point to a declaration in an interface; this
- * will be handled automatically by the instanceof check.)
- */
-static void checkVirtualMethod(JNIEnv* env, jobject jobj, jmethodID methodID,
-    const char* func)
-{
-    JNI_ENTER();
+    /*
+     * Verify that "str" is non-NULL and points to a String object.
+     *
+     * Since we're dealing with objects, switch to "running" mode.
+     */
+    static void checkString(JNIEnv* env, jstring jstr, const char* func)
+    {
+        JNI_ENTER();
+        bool printWarn = false;
+    
+        Object* obj = dvmDecodeIndirectRef(env, jstr);
+    
+        if (obj == NULL) {
+            ALOGW("JNI WARNING: received null jstring (%s)\n", func);
+            printWarn = true;
+        } else if (obj->clazz != gDvm.classJavaLangString) {
+            /*
+             * TODO: we probably should test dvmIsValidObject first, because
+             * this will crash if "obj" is non-null but pointing to an invalid
+             * memory region.  However, the "is valid" test is a little slow,
+             * we're doing it again over in checkObject().
+             */
+            if (dvmIsValidObject(obj))
+                ALOGW("JNI WARNING: jstring %p points to non-string object (%s)\n",
+                    jstr, func);
+            else
+                ALOGW("JNI WARNING: jstring %p is bogus (%s)\n", jstr, func);
+            printWarn = true;
+        }
+        JNI_EXIT();
+    
+        if (printWarn)
+            abortMaybe();
+        else
+            checkObject(env, jstr, func);
+    }
 
-    Object* obj = dvmDecodeIndirectRef(env, jobj);
-    const Method* meth = (const Method*) methodID;
-
-    if (!dvmInstanceof(obj->clazz, meth->clazz)) {
-        ALOGW("JNI WARNING: can't call %s.%s on instance of %s\n",
-            meth->clazz->descriptor, meth->name, obj->clazz->descriptor);
+    /*
+     * Verify that "bytes" points to valid "modified UTF-8" data.
+     */
+    static void checkUtfString(JNIEnv* env, const char* bytes, bool nullOk,
+        const char* func)
+    {
+        const char* origBytes = bytes;
+    
+        if (bytes == NULL) {
+            if (!nullOk) {
+                ALOGW("JNI WARNING: unexpectedly null UTF string\n");
+                goto fail;
+            }
+    
+            return;
+        }
+    
+        while (*bytes != '\0') {
+            u1 utf8 = *(bytes++);
+            // Switch on the high four bits.
+            switch (utf8 >> 4) {
+                case 0x00:
+                case 0x01:
+                case 0x02:
+                case 0x03:
+                case 0x04:
+                case 0x05:
+                case 0x06:
+                case 0x07: {
+                    // Bit pattern 0xxx. No need for any extra bytes.
+                    break;
+                }
+                case 0x08:
+                case 0x09:
+                case 0x0a:
+                case 0x0b:
+                case 0x0f: {
+                    /*
+                     * Bit pattern 10xx or 1111, which are illegal start bytes.
+                     * Note: 1111 is valid for normal UTF-8, but not the
+                     * modified UTF-8 used here.
+                     */
+                    ALOGW("JNI WARNING: illegal start byte 0x%x\n", utf8);
+                    goto fail;
+                }
+                case 0x0e: {
+                    // Bit pattern 1110, so there are two additional bytes.
+                    utf8 = *(bytes++);
+                    if ((utf8 & 0xc0) != 0x80) {
+                        ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
+                        goto fail;
+                    }
+                    // Fall through to take care of the final byte.
+                }
+                case 0x0c:
+                case 0x0d: {
+                    // Bit pattern 110x, so there is one additional byte.
+                    utf8 = *(bytes++);
+                    if ((utf8 & 0xc0) != 0x80) {
+                        ALOGW("JNI WARNING: illegal continuation byte 0x%x\n", utf8);
+                        goto fail;
+                    }
+                    break;
+                }
+            }
+        }
+    
+        return;
+    
+    fail:
+        ALOGW("             string: '%s'\n", origBytes);
+        showLocation(dvmGetCurrentJNIMethod(), func);
         abortMaybe();
     }
-
-    JNI_EXIT();
-}
-
-/*
- * Verify that "methodID" is appropriate for "clazz".
- *
- * A mismatch isn't dangerous, because the method defines the class.  In
- * fact, jclazz is unused in the implementation.  It's best if we don't
- * allow bad code in the system though.
- *
- * Instances of "jclazz" must be instances of the method's declaring class.
- */
-static void checkStaticMethod(JNIEnv* env, jclass jclazz, jmethodID methodID,
-    const char* func)
-{
-    JNI_ENTER();
-
-    ClassObject* clazz = (ClassObject*) dvmDecodeIndirectRef(env, jclazz);
-    const Method* meth = (const Method*) methodID;
-
-    if (!dvmInstanceof(clazz, meth->clazz)) {
-        ALOGW("JNI WARNING: can't call static %s.%s on class %s\n",
-            meth->clazz->descriptor, meth->name, clazz->descriptor);
-        // no abort
+    
+    
+    
+    /*
+     * Verify that the "mode" argument passed to a primitive array Release
+     * function is one of the valid values.
+     */
+    static void checkReleaseMode(JNIEnv* env, jint mode, const char* func)
+    {
+        if (mode != 0 && mode != JNI_COMMIT && mode != JNI_ABORT) {
+            ALOGW("JNI WARNING: bad value for mode (%d) (%s)\n", mode, func);
+            abortMaybe();
+        }
     }
-
-    JNI_EXIT();
-}
-
+    
+    /*
+     * Verify that the length argument to array-creation calls is >= 0.
+     */
+    static void checkLengthPositive(JNIEnv* env, jsize length, const char* func)
+    {
+        if (length < 0) {
+            ALOGW("JNI WARNING: negative length for array allocation (%s)\n", func);
+            abortMaybe();
+        }
+    }
+    
+    
 /*
  * Verify that the reference arguments being passed in are appropriate for
  * this method.
@@ -1014,134 +996,127 @@ inline static GuardExtra* getGuardExtra(const void* dataBuf)
     return (GuardExtra*) fullBuf;
 }
 
-/*
- * Create an oversized buffer to hold the contents of "buf".  Copy it in,
- * filling in the area around it with guard data.
- *
- * We use a 16-bit pattern to make a rogue memset less likely to elude us.
- */
-static void* createGuardedCopy(const void* buf, size_t len, bool modOkay)
-{
-    GuardExtra* pExtra;
-    size_t newLen = (len + kGuardLen +1) & ~0x01;
-    u1* newBuf;
-    u2* pat;
-    int i;
-
-    newBuf = (u1*)malloc(newLen);
-    if (newBuf == NULL) {
-        ALOGE("createGuardedCopy failed on alloc of %d bytes\n", newLen);
-        dvmAbort();
-    }
-
-    /* fill it in with a pattern */
-    pat = (u2*) newBuf;
-    for (i = 0; i < (int)newLen / 2; i++)
-        *pat++ = kGuardPattern;
-
-    /* copy the data in; note "len" could be zero */
-    memcpy(newBuf + kGuardLen / 2, buf, len);
-
-    /* if modification is not expected, grab a checksum */
-    uLong adler = 0;
-    if (!modOkay) {
-        adler = adler32(0L, Z_NULL, 0);
-        adler = adler32(adler, buf, len);
-        *(uLong*)newBuf = adler;
-    }
-
-    pExtra = (GuardExtra*) newBuf;
-    pExtra->magic = kGuardMagic;
-    pExtra->adler = adler;
-    pExtra->originalPtr = buf;
-    pExtra->originalLen = len;
-
-    return newBuf + kGuardLen / 2;
-}
-
-/*
- * Verify the guard area and, if "modOkay" is false, that the data itself
- * has not been altered.
- *
- * The caller has already checked that "dataBuf" is non-NULL.
- */
-static bool checkGuardedCopy(const void* dataBuf, bool modOkay)
-{
-    static const u4 kMagicCmp = kGuardMagic;
-    const u1* fullBuf = ((const u1*) dataBuf) - kGuardLen / 2;
-    const GuardExtra* pExtra = getGuardExtra(dataBuf);
-    size_t len;
-    const u2* pat;
-    int i;
-
     /*
-     * Before we do anything with "pExtra", check the magic number.  We
-     * do the check with memcmp rather than "==" in case the pointer is
-     * unaligned.  If it points to completely bogus memory we're going
-     * to crash, but there's no easy way around that.
+     * Create an over-sized buffer to hold the contents of "buf".  Copy it in,
+     * filling in the area around it with guard data.
+     *
+     * We use a 16-bit pattern to make a rogue memset less likely to elude us.
      */
-    if (memcmp(&pExtra->magic, &kMagicCmp, 4) != 0) {
-        u1 buf[4];
-        memcpy(buf, &pExtra->magic, 4);
-        ALOGE("JNI: guard magic does not match (found 0x%02x%02x%02x%02x) "
-             "-- incorrect data pointer %p?\n",
-            buf[3], buf[2], buf[1], buf[0], dataBuf); /* assume little endian */
-        return false;
-    }
+    static void* createGuardedCopy(const void* buf, size_t len, bool modOkay) {
+        size_t newLen = (len + kGuardLen +1) & ~0x01;
+        u1* newBuf = (u1*)malloc(newLen);
 
-    len = pExtra->originalLen;
-
-    /* check bottom half of guard; skip over optional checksum storage */
-    pat = (u2*) fullBuf;
-    for (i = kGuardExtra / 2; i < (int) (kGuardLen / 2 - kGuardExtra) / 2; i++)
-    {
-        if (pat[i] != kGuardPattern) {
-            ALOGE("JNI: guard pattern(1) disturbed at %p + %d\n",
-                fullBuf, i*2);
-            return false;
+        if (newBuf == NULL) {
+            ALOGE("createGuardedCopy failed on alloc of %d bytes\n", newLen);
+            dvmAbort();
         }
-    }
 
-    int offset = kGuardLen / 2 + len;
-    if (offset & 0x01) {
-        /* odd byte; expected value depends on endian-ness of host */
-        const u2 patSample = kGuardPattern;
-        if (fullBuf[offset] != ((const u1*) &patSample)[1]) {
-            ALOGE("JNI: guard pattern disturbed in odd byte after %p "
-                 "(+%d) 0x%02x 0x%02x\n",
-                fullBuf, offset, fullBuf[offset], ((const u1*) &patSample)[1]);
-            return false;
+        /* fill it in with a pattern */
+        u2* pat = (u2*) newBuf;
+        for (size_t i = 0; i < newLen / 2; i++) {
+            *pat++ = kGuardPattern;
         }
-        offset++;
-    }
 
-    /* check top half of guard */
-    pat = (u2*) (fullBuf + offset);
-    for (i = 0; i < kGuardLen / 4; i++) {
-        if (pat[i] != kGuardPattern) {
-            ALOGE("JNI: guard pattern(2) disturbed at %p + %d\n",
-                fullBuf, offset + i*2);
-            return false;
+        /* copy the data in; note "len" could be zero */
+        memcpy(newBuf + kGuardLen / 2, buf, len);
+
+        /* if modification is not expected, grab a checksum */
+        uLong adler = 0;
+        if (!modOkay) {
+            adler = adler32(0L, Z_NULL, 0);
+            adler = adler32(adler, (const Bytef*)buf, len);
+            *(uLong*)newBuf = adler;
         }
+
+        GuardExtra* pExtra = (GuardExtra*) newBuf;
+        pExtra->magic = kGuardMagic;
+        pExtra->adler = adler;
+        pExtra->originalPtr = buf;
+        pExtra->originalLen = len;
+
+        return newBuf + kGuardLen / 2;
     }
 
     /*
-     * If modification is not expected, verify checksum.  Strictly speaking
-     * this is wrong: if we told the client that we made a copy, there's no
-     * reason they can't alter the buffer.
+     * Verify the guard area and, if "modOkay" is false, that the data itself
+     * has not been altered.
+     *
+     * The caller has already checked that "dataBuf" is non-NULL.
      */
-    if (!modOkay) {
-        uLong adler = adler32(0L, Z_NULL, 0);
-        adler = adler32(adler, dataBuf, len);
-        if (pExtra->adler != adler) {
-            ALOGE("JNI: buffer modified (0x%08lx vs 0x%08lx) at addr %p\n",
-                pExtra->adler, adler, dataBuf);
+    static bool checkGuardedCopy(const void* dataBuf, bool modOkay) {
+        static const u4 kMagicCmp = kGuardMagic;
+        const u1* fullBuf = ((const u1*) dataBuf) - kGuardLen / 2;
+        const GuardExtra* pExtra = getGuardExtra(dataBuf);
+        size_t len;
+        const u2* pat;
+        int i;
+    
+        /*
+         * Before we do anything with "pExtra", check the magic number.  We
+         * do the check with memcmp rather than "==" in case the pointer is
+         * unaligned.  If it points to completely bogus memory we're going
+         * to crash, but there's no easy way around that.
+         */
+        if (memcmp(&pExtra->magic, &kMagicCmp, 4) != 0) {
+            u1 buf[4];
+            memcpy(buf, &pExtra->magic, 4);
+            ALOGE("JNI: guard magic does not match (found 0x%02x%02x%02x%02x) "
+                 "-- incorrect data pointer %p?\n",
+                buf[3], buf[2], buf[1], buf[0], dataBuf); /* assume little endian */
             return false;
         }
-    }
 
-    return true;
-}
+        len = pExtra->originalLen;
+
+        /* check bottom half of guard; skip over optional checksum storage */
+        pat = (u2*) fullBuf;
+        for (i = kGuardExtra / 2; i < (int) (kGuardLen / 2 - kGuardExtra) / 2; i++)
+        {
+            if (pat[i] != kGuardPattern) {
+                ALOGE("JNI: guard pattern(1) disturbed at %p + %d", fullBuf, i*2);
+                return false;
+            }
+        }
+
+        int offset = kGuardLen / 2 + len;
+        if (offset & 0x01) {
+            /* odd byte; expected value depends on endian-ness of host */
+            const u2 patSample = kGuardPattern;
+            if (fullBuf[offset] != ((const u1*) &patSample)[1]) {
+                ALOGE("JNI: guard pattern disturbed in odd byte after %p "
+                     "(+%d) 0x%02x 0x%02x\n",
+                    fullBuf, offset, fullBuf[offset], ((const u1*) &patSample)[1]);
+                return false;
+            }
+            offset++;
+        }
+
+        /* check top half of guard */
+        pat = (u2*) (fullBuf + offset);
+        for (i = 0; i < kGuardLen / 4; i++) {
+            if (pat[i] != kGuardPattern) {
+                ALOGE("JNI: guard pattern(2) disturbed at %p + %d", fullBuf, offset + i*2);
+                return false;
+            }
+        }
+
+        /*
+         * If modification is not expected, verify checksum.  Strictly speaking
+         * this is wrong: if we told the client that we made a copy, there's no
+         * reason they can't alter the buffer.
+         */
+        if (!modOkay) {
+            uLong adler = adler32(0L, Z_NULL, 0);
+            adler = adler32(adler, (const Bytef*)dataBuf, len);
+            if (pExtra->adler != adler) {
+                ALOGE("JNI: buffer modified (0x%08lx vs 0x%08lx) at addr %p",
+                        pExtra->adler, adler, dataBuf);
+                return false;
+            }
+        }
+
+        return true;
+    }
 
 /*
  * Free up the guard buffer, scrub it, and return the original pointer.
@@ -1259,12 +1234,11 @@ static void* releaseGuardedPACopy(JNIEnv* env, jarray jarr, void* dataBuf,
     if (release) {
         result = (u1*) freeGuardedCopy(dataBuf);
     } else {
-        result = (u1*) getGuardedCopyOriginalPtr(dataBuf);
+        result = (u1*) (void*) getGuardedCopyOriginalPtr(dataBuf);
     }
 
     /* pointer is to the array contents; back up to the array object */
     result -= offsetof(ArrayObject, contents);
-
     return result;
 }
 
@@ -1275,11 +1249,10 @@ static void* releaseGuardedPACopy(JNIEnv* env, jarray jarr, void* dataBuf,
  * ===========================================================================
  */
 
-static jint Check_GetVersion(JNIEnv* env)
-{
+static jint Check_GetVersion(JNIEnv* env) {
     CHECK_ENTER(env, kFlag_Default);
     jint result;
-    result = BASE_ENV(env)->GetVersion(env);
+    result = baseEnv(env)->GetVersion(env);
     CHECK_EXIT(env);
     return result;
 }
@@ -1292,71 +1265,65 @@ static jclass Check_DefineClass(JNIEnv* env, const char* name, jobject loader,
     CHECK_UTF_STRING(env, name, false);
     CHECK_CLASS_NAME(env, name);
     jclass result;
-    result = BASE_ENV(env)->DefineClass(env, name, loader, buf, bufLen);
+    result = baseEnv(env)->DefineClass(env, name, loader, buf, bufLen);
     CHECK_EXIT(env);
     return result;
 }
 
-static jclass Check_FindClass(JNIEnv* env, const char* name)
-{
+static jclass Check_FindClass(JNIEnv* env, const char* name) {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_UTF_STRING(env, name, false);
     CHECK_CLASS_NAME(env, name);
     jclass result;
-    result = BASE_ENV(env)->FindClass(env, name);
+    result = baseEnv(env)->FindClass(env, name);
     CHECK_EXIT(env);
     return result;
 }
 
-static jclass Check_GetSuperclass(JNIEnv* env, jclass clazz)
-{
+static jclass Check_GetSuperclass(JNIEnv* env, jclass clazz) {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, clazz);
     jclass result;
-    result = BASE_ENV(env)->GetSuperclass(env, clazz);
+    result = baseEnv(env)->GetSuperclass(env, clazz);
     CHECK_EXIT(env);
     return result;
 }
 
-static jboolean Check_IsAssignableFrom(JNIEnv* env, jclass clazz1,
-    jclass clazz2)
-{
+static jboolean Check_IsAssignableFrom(JNIEnv* env, jclass clazz1, jclass clazz2) {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, clazz1);
     CHECK_CLASS(env, clazz2);
     jboolean result;
-    result = BASE_ENV(env)->IsAssignableFrom(env, clazz1, clazz2);
+    result = baseEnv(env)->IsAssignableFrom(env, clazz1, clazz2);
     CHECK_EXIT(env);
     return result;
 }
 
-static jmethodID Check_FromReflectedMethod(JNIEnv* env, jobject method)
-{
+static jmethodID Check_FromReflectedMethod(JNIEnv* env, jobject method) {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, method);
     jmethodID result;
-    result = BASE_ENV(env)->FromReflectedMethod(env, method);
+    result = baseEnv(env)->FromReflectedMethod(env, method);
     CHECK_EXIT(env);
     return result;
 }
 
-static jfieldID Check_FromReflectedField(JNIEnv* env, jobject field)
-{
+static jfieldID Check_FromReflectedField(JNIEnv* env, jobject field) {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, field);
     jfieldID result;
-    result = BASE_ENV(env)->FromReflectedField(env, field);
+    result = baseEnv(env)->FromReflectedField(env, field);
     CHECK_EXIT(env);
     return result;
 }
 
 static jobject Check_ToReflectedMethod(JNIEnv* env, jclass cls,
-    jmethodID methodID, jboolean isStatic)
+        jmethodID methodID, jboolean isStatic)
 {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, cls);
     jobject result;
-    result = BASE_ENV(env)->ToReflectedMethod(env, cls, methodID, isStatic);
+    result = baseEnv(env)->ToReflectedMethod(env, cls, methodID, isStatic);
     CHECK_EXIT(env);
     return result;
 }
@@ -1367,7 +1334,7 @@ static jobject Check_ToReflectedField(JNIEnv* env, jclass cls, jfieldID fieldID,
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, cls);
     jobject result;
-    result = BASE_ENV(env)->ToReflectedField(env, cls, fieldID, isStatic);
+    result = baseEnv(env)->ToReflectedField(env, cls, fieldID, isStatic);
     CHECK_EXIT(env);
     return result;
 }
@@ -1377,7 +1344,7 @@ static jint Check_Throw(JNIEnv* env, jthrowable obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jint result;
-    result = BASE_ENV(env)->Throw(env, obj);
+    result = baseEnv(env)->Throw(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -1388,7 +1355,7 @@ static jint Check_ThrowNew(JNIEnv* env, jclass clazz, const char* message)
     CHECK_CLASS(env, clazz);
     CHECK_UTF_STRING(env, message, true);
     jint result;
-    result = BASE_ENV(env)->ThrowNew(env, clazz, message);
+    result = baseEnv(env)->ThrowNew(env, clazz, message);
     CHECK_EXIT(env);
     return result;
 }
@@ -1397,7 +1364,7 @@ static jthrowable Check_ExceptionOccurred(JNIEnv* env)
 {
     CHECK_ENTER(env, kFlag_ExcepOkay);
     jthrowable result;
-    result = BASE_ENV(env)->ExceptionOccurred(env);
+    result = baseEnv(env)->ExceptionOccurred(env);
     CHECK_EXIT(env);
     return result;
 }
@@ -1405,14 +1372,14 @@ static jthrowable Check_ExceptionOccurred(JNIEnv* env)
 static void Check_ExceptionDescribe(JNIEnv* env)
 {
     CHECK_ENTER(env, kFlag_ExcepOkay);
-    BASE_ENV(env)->ExceptionDescribe(env);
+    baseEnv(env)->ExceptionDescribe(env);
     CHECK_EXIT(env);
 }
 
 static void Check_ExceptionClear(JNIEnv* env)
 {
     CHECK_ENTER(env, kFlag_ExcepOkay);
-    BASE_ENV(env)->ExceptionClear(env);
+    baseEnv(env)->ExceptionClear(env);
     CHECK_EXIT(env);
 }
 
@@ -1420,7 +1387,7 @@ static void Check_FatalError(JNIEnv* env, const char* msg)
 {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_UTF_STRING(env, msg, true);
-    BASE_ENV(env)->FatalError(env, msg);
+    baseEnv(env)->FatalError(env, msg);
     CHECK_EXIT(env);
 }
 
@@ -1428,7 +1395,7 @@ static jint Check_PushLocalFrame(JNIEnv* env, jint capacity)
 {
     CHECK_ENTER(env, kFlag_Default | kFlag_ExcepOkay);
     jint result;
-    result = BASE_ENV(env)->PushLocalFrame(env, capacity);
+    result = baseEnv(env)->PushLocalFrame(env, capacity);
     CHECK_EXIT(env);
     return result;
 }
@@ -1438,7 +1405,7 @@ static jobject Check_PopLocalFrame(JNIEnv* env, jobject res)
     CHECK_ENTER(env, kFlag_Default | kFlag_ExcepOkay);
     CHECK_OBJECT(env, res);
     jobject result;
-    result = BASE_ENV(env)->PopLocalFrame(env, res);
+    result = baseEnv(env)->PopLocalFrame(env, res);
     CHECK_EXIT(env);
     return result;
 }
@@ -1448,7 +1415,7 @@ static jobject Check_NewGlobalRef(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jobject result;
-    result = BASE_ENV(env)->NewGlobalRef(env, obj);
+    result = baseEnv(env)->NewGlobalRef(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -1467,7 +1434,7 @@ static void Check_DeleteGlobalRef(JNIEnv* env, jobject globalRef)
     } else
 #endif
     {
-        BASE_ENV(env)->DeleteGlobalRef(env, globalRef);
+        baseEnv(env)->DeleteGlobalRef(env, globalRef);
     }
     CHECK_EXIT(env);
 }
@@ -1477,7 +1444,7 @@ static jobject Check_NewLocalRef(JNIEnv* env, jobject ref)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, ref);
     jobject result;
-    result = BASE_ENV(env)->NewLocalRef(env, ref);
+    result = baseEnv(env)->NewLocalRef(env, ref);
     CHECK_EXIT(env);
     return result;
 }
@@ -1496,7 +1463,7 @@ static void Check_DeleteLocalRef(JNIEnv* env, jobject localRef)
     } else
 #endif
     {
-        BASE_ENV(env)->DeleteLocalRef(env, localRef);
+        baseEnv(env)->DeleteLocalRef(env, localRef);
     }
     CHECK_EXIT(env);
 }
@@ -1505,7 +1472,7 @@ static jint Check_EnsureLocalCapacity(JNIEnv *env, jint capacity)
 {
     CHECK_ENTER(env, kFlag_Default);
     jint result;
-    result = BASE_ENV(env)->EnsureLocalCapacity(env, capacity);
+    result = baseEnv(env)->EnsureLocalCapacity(env, capacity);
     CHECK_EXIT(env);
     return result;
 }
@@ -1516,7 +1483,7 @@ static jboolean Check_IsSameObject(JNIEnv* env, jobject ref1, jobject ref2)
     CHECK_OBJECT(env, ref1);
     CHECK_OBJECT(env, ref2);
     jboolean result;
-    result = BASE_ENV(env)->IsSameObject(env, ref1, ref2);
+    result = baseEnv(env)->IsSameObject(env, ref1, ref2);
     CHECK_EXIT(env);
     return result;
 }
@@ -1526,7 +1493,7 @@ static jobject Check_AllocObject(JNIEnv* env, jclass clazz)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, clazz);
     jobject result;
-    result = BASE_ENV(env)->AllocObject(env, clazz);
+    result = baseEnv(env)->AllocObject(env, clazz);
     CHECK_EXIT(env);
     return result;
 }
@@ -1545,7 +1512,7 @@ static jobject Check_NewObject(JNIEnv* env, jclass clazz, jmethodID methodID,
     CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);
     va_end(tmpArgs);
 
-    result = BASE_ENV(env)->NewObjectV(env, clazz, methodID, args);
+    result = baseEnv(env)->NewObjectV(env, clazz, methodID, args);
     va_end(args);
 
     CHECK_EXIT(env);
@@ -1563,7 +1530,7 @@ static jobject Check_NewObjectV(JNIEnv* env, jclass clazz, jmethodID methodID,
     CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);
     va_end(tmpArgs);
 
-    result = BASE_ENV(env)->NewObjectV(env, clazz, methodID, args);
+    result = baseEnv(env)->NewObjectV(env, clazz, methodID, args);
     CHECK_EXIT(env);
     return result;
 }
@@ -1575,7 +1542,7 @@ static jobject Check_NewObjectA(JNIEnv* env, jclass clazz, jmethodID methodID,
     jobject result;
 
     CHECK_METHOD_ARGS_A(env, methodID, args);
-    result = BASE_ENV(env)->NewObjectA(env, clazz, methodID, args);
+    result = baseEnv(env)->NewObjectA(env, clazz, methodID, args);
     CHECK_EXIT(env);
     return result;
 }
@@ -1585,7 +1552,7 @@ static jclass Check_GetObjectClass(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jclass result;
-    result = BASE_ENV(env)->GetObjectClass(env, obj);
+    result = baseEnv(env)->GetObjectClass(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -1596,7 +1563,7 @@ static jboolean Check_IsInstanceOf(JNIEnv* env, jobject obj, jclass clazz)
     CHECK_OBJECT(env, obj);
     CHECK_CLASS(env, clazz);
     jboolean result;
-    result = BASE_ENV(env)->IsInstanceOf(env, obj, clazz);
+    result = baseEnv(env)->IsInstanceOf(env, obj, clazz);
     CHECK_EXIT(env);
     return result;
 }
@@ -1609,7 +1576,7 @@ static jmethodID Check_GetMethodID(JNIEnv* env, jclass clazz, const char* name,
     CHECK_UTF_STRING(env, name, false);
     CHECK_UTF_STRING(env, sig, false);
     jmethodID result;
-    result = BASE_ENV(env)->GetMethodID(env, clazz, name, sig);
+    result = baseEnv(env)->GetMethodID(env, clazz, name, sig);
     CHECK_EXIT(env);
     return result;
 }
@@ -1622,7 +1589,7 @@ static jfieldID Check_GetFieldID(JNIEnv* env, jclass clazz,
     CHECK_UTF_STRING(env, name, false);
     CHECK_UTF_STRING(env, sig, false);
     jfieldID result;
-    result = BASE_ENV(env)->GetFieldID(env, clazz, name, sig);
+    result = baseEnv(env)->GetFieldID(env, clazz, name, sig);
     CHECK_EXIT(env);
     return result;
 }
@@ -1635,7 +1602,7 @@ static jmethodID Check_GetStaticMethodID(JNIEnv* env, jclass clazz,
     CHECK_UTF_STRING(env, name, false);
     CHECK_UTF_STRING(env, sig, false);
     jmethodID result;
-    result = BASE_ENV(env)->GetStaticMethodID(env, clazz, name, sig);
+    result = baseEnv(env)->GetStaticMethodID(env, clazz, name, sig);
     CHECK_EXIT(env);
     return result;
 }
@@ -1648,7 +1615,7 @@ static jfieldID Check_GetStaticFieldID(JNIEnv* env, jclass clazz,
     CHECK_UTF_STRING(env, name, false);
     CHECK_UTF_STRING(env, sig, false);
     jfieldID result;
-    result = BASE_ENV(env)->GetStaticFieldID(env, clazz, name, sig);
+    result = baseEnv(env)->GetStaticFieldID(env, clazz, name, sig);
     CHECK_EXIT(env);
     return result;
 }
@@ -1661,7 +1628,7 @@ static jfieldID Check_GetStaticFieldID(JNIEnv* env, jclass clazz,
         CHECK_CLASS(env, clazz);                                            \
         _ctype result;                                                      \
         checkStaticFieldID(env, clazz, fieldID);                            \
-        result = BASE_ENV(env)->GetStatic##_jname##Field(env, clazz,        \
+        result = baseEnv(env)->GetStatic##_jname##Field(env, clazz,        \
             fieldID);                                                       \
         CHECK_EXIT(env);                                                    \
         return result;                                                      \
@@ -1685,7 +1652,7 @@ GET_STATIC_TYPE_FIELD(jdouble, Double);
         checkStaticFieldID(env, clazz, fieldID);                            \
         /* "value" arg only used when type == ref */                        \
         CHECK_FIELD_TYPE(env, (jobject)(u4)value, fieldID, _ftype, true);   \
-        BASE_ENV(env)->SetStatic##_jname##Field(env, clazz, fieldID,        \
+        baseEnv(env)->SetStatic##_jname##Field(env, clazz, fieldID,        \
             value);                                                         \
         CHECK_EXIT(env);                                                    \
     }
@@ -1707,7 +1674,7 @@ SET_STATIC_TYPE_FIELD(jdouble, Double, PRIM_DOUBLE);
         CHECK_OBJECT(env, obj);                                             \
         _ctype result;                                                      \
         CHECK_INST_FIELD_ID(env, obj, fieldID);                             \
-        result = BASE_ENV(env)->Get##_jname##Field(env, obj, fieldID);      \
+        result = baseEnv(env)->Get##_jname##Field(env, obj, fieldID);      \
         CHECK_EXIT(env);                                                    \
         return result;                                                      \
     }
@@ -1730,7 +1697,7 @@ GET_TYPE_FIELD(jdouble, Double);
         CHECK_INST_FIELD_ID(env, obj, fieldID);                             \
         /* "value" arg only used when type == ref */                        \
         CHECK_FIELD_TYPE(env, (jobject)(u4) value, fieldID, _ftype, false); \
-        BASE_ENV(env)->Set##_jname##Field(env, obj, fieldID, value);        \
+        baseEnv(env)->Set##_jname##Field(env, obj, fieldID, value);        \
         CHECK_EXIT(env);                                                    \
     }
 SET_TYPE_FIELD(jobject, Object, PRIM_NOT);
@@ -1757,7 +1724,7 @@ SET_TYPE_FIELD(jdouble, Double, PRIM_DOUBLE);
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->Call##_jname##MethodV(env, obj, methodID,   \
+        _retasgn baseEnv(env)->Call##_jname##MethodV(env, obj, methodID,   \
             args);                                                          \
         va_end(args);                                                       \
         CHECK_EXIT(env);                                                    \
@@ -1775,7 +1742,7 @@ SET_TYPE_FIELD(jdouble, Double, PRIM_DOUBLE);
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->Call##_jname##MethodV(env, obj, methodID,   \
+        _retasgn baseEnv(env)->Call##_jname##MethodV(env, obj, methodID,   \
             args);                                                          \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
@@ -1789,12 +1756,12 @@ SET_TYPE_FIELD(jdouble, Double, PRIM_DOUBLE);
         CHECK_VIRTUAL_METHOD(env, obj, methodID);                           \
         _retdecl;                                                           \
         CHECK_METHOD_ARGS_A(env, methodID, args);                           \
-        _retasgn BASE_ENV(env)->Call##_jname##MethodA(env, obj, methodID,   \
+        _retasgn baseEnv(env)->Call##_jname##MethodA(env, obj, methodID,   \
             args);                                                          \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
     }
-CALL_VIRTUAL(jobject, Object, Object* result, result=, result, 'L');
+CALL_VIRTUAL(jobject, Object, Object* result, result=(Object*), (jobject)result, 'L');
 CALL_VIRTUAL(jboolean, Boolean, jboolean result, result=, result, 'Z');
 CALL_VIRTUAL(jbyte, Byte, jbyte result, result=, result, 'B');
 CALL_VIRTUAL(jchar, Char, jchar result, result=, result, 'C');
@@ -1821,7 +1788,7 @@ CALL_VIRTUAL(void, Void, , , , 'V');
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->CallNonvirtual##_jname##MethodV(env, obj,   \
+        _retasgn baseEnv(env)->CallNonvirtual##_jname##MethodV(env, obj,   \
             clazz, methodID, args);                                         \
         va_end(args);                                                       \
         CHECK_EXIT(env);                                                    \
@@ -1840,7 +1807,7 @@ CALL_VIRTUAL(void, Void, , , , 'V');
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->CallNonvirtual##_jname##MethodV(env, obj,   \
+        _retasgn baseEnv(env)->CallNonvirtual##_jname##MethodV(env, obj,   \
             clazz, methodID, args);                                         \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
@@ -1855,12 +1822,12 @@ CALL_VIRTUAL(void, Void, , , , 'V');
         CHECK_VIRTUAL_METHOD(env, obj, methodID);                           \
         _retdecl;                                                           \
         CHECK_METHOD_ARGS_A(env, methodID, args);                           \
-        _retasgn BASE_ENV(env)->CallNonvirtual##_jname##MethodA(env, obj,   \
+        _retasgn baseEnv(env)->CallNonvirtual##_jname##MethodA(env, obj,   \
             clazz, methodID, args);                                         \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
     }
-CALL_NONVIRTUAL(jobject, Object, Object* result, result=, result, 'L');
+CALL_NONVIRTUAL(jobject, Object, Object* result, result=(Object*), (jobject)result, 'L');
 CALL_NONVIRTUAL(jboolean, Boolean, jboolean result, result=, result, 'Z');
 CALL_NONVIRTUAL(jbyte, Byte, jbyte result, result=, result, 'B');
 CALL_NONVIRTUAL(jchar, Char, jchar result, result=, result, 'C');
@@ -1886,7 +1853,7 @@ CALL_NONVIRTUAL(void, Void, , , , 'V');
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->CallStatic##_jname##MethodV(env, clazz,     \
+        _retasgn baseEnv(env)->CallStatic##_jname##MethodV(env, clazz,     \
             methodID, args);                                                \
         va_end(args);                                                       \
         CHECK_EXIT(env);                                                    \
@@ -1904,7 +1871,7 @@ CALL_NONVIRTUAL(void, Void, , , , 'V');
         va_copy(tmpArgs, args);                                             \
         CHECK_METHOD_ARGS_V(env, methodID, tmpArgs);                        \
         va_end(tmpArgs);                                                    \
-        _retasgn BASE_ENV(env)->CallStatic##_jname##MethodV(env, clazz,     \
+        _retasgn baseEnv(env)->CallStatic##_jname##MethodV(env, clazz,     \
             methodID, args);                                                \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
@@ -1918,12 +1885,12 @@ CALL_NONVIRTUAL(void, Void, , , , 'V');
         CHECK_STATIC_METHOD(env, clazz, methodID);                          \
         _retdecl;                                                           \
         CHECK_METHOD_ARGS_A(env, methodID, args);                           \
-        _retasgn BASE_ENV(env)->CallStatic##_jname##MethodA(env, clazz,     \
+        _retasgn baseEnv(env)->CallStatic##_jname##MethodA(env, clazz,     \
             methodID, args);                                                \
         CHECK_EXIT(env);                                                    \
         return _retok;                                                      \
     }
-CALL_STATIC(jobject, Object, Object* result, result=, result, 'L');
+CALL_STATIC(jobject, Object, Object* result, result=(Object*), (jobject)result, 'L');
 CALL_STATIC(jboolean, Boolean, jboolean result, result=, result, 'Z');
 CALL_STATIC(jbyte, Byte, jbyte result, result=, result, 'B');
 CALL_STATIC(jchar, Char, jchar result, result=, result, 'C');
@@ -1939,7 +1906,7 @@ static jstring Check_NewString(JNIEnv* env, const jchar* unicodeChars,
 {
     CHECK_ENTER(env, kFlag_Default);
     jstring result;
-    result = BASE_ENV(env)->NewString(env, unicodeChars, len);
+    result = baseEnv(env)->NewString(env, unicodeChars, len);
     CHECK_EXIT(env);
     return result;
 }
@@ -1949,7 +1916,7 @@ static jsize Check_GetStringLength(JNIEnv* env, jstring string)
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, string);
     jsize result;
-    result = BASE_ENV(env)->GetStringLength(env, string);
+    result = baseEnv(env)->GetStringLength(env, string);
     CHECK_EXIT(env);
     return result;
 }
@@ -1960,10 +1927,10 @@ static const jchar* Check_GetStringChars(JNIEnv* env, jstring string,
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, string);
     const jchar* result;
-    result = BASE_ENV(env)->GetStringChars(env, string, isCopy);
+    result = baseEnv(env)->GetStringChars(env, string, isCopy);
     if (((JNIEnvExt*)env)->forceDataCopy && result != NULL) {
         // TODO: fix for indirect
-        int len = dvmStringLen(string) * 2;
+        int len = dvmStringLen((StringObject*)string) * 2;
         result = (const jchar*) createGuardedCopy(result, len, false);
         if (isCopy != NULL)
             *isCopy = JNI_TRUE;
@@ -1986,7 +1953,7 @@ static void Check_ReleaseStringChars(JNIEnv* env, jstring string,
         }
         chars = (const jchar*) freeGuardedCopy((jchar*)chars);
     }
-    BASE_ENV(env)->ReleaseStringChars(env, string, chars);
+    baseEnv(env)->ReleaseStringChars(env, string, chars);
     CHECK_EXIT(env);
 }
 
@@ -1995,7 +1962,7 @@ static jstring Check_NewStringUTF(JNIEnv* env, const char* bytes)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_UTF_STRING(env, bytes, true);
     jstring result;
-    result = BASE_ENV(env)->NewStringUTF(env, bytes);
+    result = baseEnv(env)->NewStringUTF(env, bytes);
     CHECK_EXIT(env);
     return result;
 }
@@ -2005,7 +1972,7 @@ static jsize Check_GetStringUTFLength(JNIEnv* env, jstring string)
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, string);
     jsize result;
-    result = BASE_ENV(env)->GetStringUTFLength(env, string);
+    result = baseEnv(env)->GetStringUTFLength(env, string);
     CHECK_EXIT(env);
     return result;
 }
@@ -2015,11 +1982,10 @@ static const char* Check_GetStringUTFChars(JNIEnv* env, jstring string,
 {
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, string);
-    const char* result;
-    result = BASE_ENV(env)->GetStringUTFChars(env, string, isCopy);
+    const char* result = baseEnv(env)->GetStringUTFChars(env, string, isCopy);
     if (((JNIEnvExt*)env)->forceDataCopy && result != NULL) {
         // TODO: fix for indirect
-        int len = dvmStringUtf8ByteLen(string) + 1;
+        int len = dvmStringUtf8ByteLen((StringObject*)string) + 1;
         result = (const char*) createGuardedCopy(result, len, false);
         if (isCopy != NULL)
             *isCopy = JNI_TRUE;
@@ -2043,7 +2009,7 @@ static void Check_ReleaseStringUTFChars(JNIEnv* env, jstring string,
         }
         utf = (const char*) freeGuardedCopy((char*)utf);
     }
-    BASE_ENV(env)->ReleaseStringUTFChars(env, string, utf);
+    baseEnv(env)->ReleaseStringUTFChars(env, string, utf);
     CHECK_EXIT(env);
 }
 
@@ -2052,7 +2018,7 @@ static jsize Check_GetArrayLength(JNIEnv* env, jarray array)
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_ARRAY(env, array);
     jsize result;
-    result = BASE_ENV(env)->GetArrayLength(env, array);
+    result = baseEnv(env)->GetArrayLength(env, array);
     CHECK_EXIT(env);
     return result;
 }
@@ -2065,7 +2031,7 @@ static jobjectArray Check_NewObjectArray(JNIEnv* env, jsize length,
     CHECK_OBJECT(env, initialElement);
     CHECK_LENGTH_POSITIVE(env, length);
     jobjectArray result;
-    result = BASE_ENV(env)->NewObjectArray(env, length, elementClass,
+    result = baseEnv(env)->NewObjectArray(env, length, elementClass,
                                             initialElement);
     CHECK_EXIT(env);
     return result;
@@ -2077,7 +2043,7 @@ static jobject Check_GetObjectArrayElement(JNIEnv* env, jobjectArray array,
     CHECK_ENTER(env, kFlag_Default);
     CHECK_ARRAY(env, array);
     jobject result;
-    result = BASE_ENV(env)->GetObjectArrayElement(env, array, index);
+    result = baseEnv(env)->GetObjectArrayElement(env, array, index);
     CHECK_EXIT(env);
     return result;
 }
@@ -2087,7 +2053,7 @@ static void Check_SetObjectArrayElement(JNIEnv* env, jobjectArray array,
 {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_ARRAY(env, array);
-    BASE_ENV(env)->SetObjectArrayElement(env, array, index, value);
+    baseEnv(env)->SetObjectArrayElement(env, array, index, value);
     CHECK_EXIT(env);
 }
 
@@ -2097,7 +2063,7 @@ static void Check_SetObjectArrayElement(JNIEnv* env, jobjectArray array,
         CHECK_ENTER(env, kFlag_Default);                                    \
         CHECK_LENGTH_POSITIVE(env, length);                                 \
         _artype result;                                                     \
-        result = BASE_ENV(env)->New##_jname##Array(env, length);            \
+        result = baseEnv(env)->New##_jname##Array(env, length);            \
         CHECK_EXIT(env);                                                    \
         return result;                                                      \
     }
@@ -2118,7 +2084,7 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double);
         CHECK_ENTER(env, kFlag_Default);                                    \
         CHECK_ARRAY(env, array);                                            \
         _ctype* result;                                                     \
-        result = BASE_ENV(env)->Get##_jname##ArrayElements(env,             \
+        result = baseEnv(env)->Get##_jname##ArrayElements(env,             \
             array, isCopy);                                                 \
         if (((JNIEnvExt*)env)->forceDataCopy && result != NULL) {           \
             result = (_ctype*) createGuardedPACopy(env, array, isCopy);     \
@@ -2138,7 +2104,7 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double);
         if (((JNIEnvExt*)env)->forceDataCopy) {                             \
             elems = (_ctype*) releaseGuardedPACopy(env, array, elems, mode);\
         }                                                                   \
-        BASE_ENV(env)->Release##_jname##ArrayElements(env,                  \
+        baseEnv(env)->Release##_jname##ArrayElements(env,                  \
             array, elems, mode);                                            \
         CHECK_EXIT(env);                                                    \
     }
@@ -2149,7 +2115,7 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double);
     {                                                                       \
         CHECK_ENTER(env, kFlag_Default);                                    \
         CHECK_ARRAY(env, array);                                            \
-        BASE_ENV(env)->Get##_jname##ArrayRegion(env, array, start,          \
+        baseEnv(env)->Get##_jname##ArrayRegion(env, array, start,          \
             len, buf);                                                      \
         CHECK_EXIT(env);                                                    \
     }
@@ -2160,7 +2126,7 @@ NEW_PRIMITIVE_ARRAY(jdoubleArray, Double);
     {                                                                       \
         CHECK_ENTER(env, kFlag_Default);                                    \
         CHECK_ARRAY(env, array);                                            \
-        BASE_ENV(env)->Set##_jname##ArrayRegion(env, array, start,          \
+        baseEnv(env)->Set##_jname##ArrayRegion(env, array, start,          \
             len, buf);                                                      \
         CHECK_EXIT(env);                                                    \
     }
@@ -2187,7 +2153,7 @@ static jint Check_RegisterNatives(JNIEnv* env, jclass clazz,
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, clazz);
     jint result;
-    result = BASE_ENV(env)->RegisterNatives(env, clazz, methods, nMethods);
+    result = baseEnv(env)->RegisterNatives(env, clazz, methods, nMethods);
     CHECK_EXIT(env);
     return result;
 }
@@ -2197,7 +2163,7 @@ static jint Check_UnregisterNatives(JNIEnv* env, jclass clazz)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_CLASS(env, clazz);
     jint result;
-    result = BASE_ENV(env)->UnregisterNatives(env, clazz);
+    result = baseEnv(env)->UnregisterNatives(env, clazz);
     CHECK_EXIT(env);
     return result;
 }
@@ -2207,7 +2173,7 @@ static jint Check_MonitorEnter(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jint result;
-    result = BASE_ENV(env)->MonitorEnter(env, obj);
+    result = baseEnv(env)->MonitorEnter(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -2217,7 +2183,7 @@ static jint Check_MonitorExit(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default | kFlag_ExcepOkay);
     CHECK_OBJECT(env, obj);
     jint result;
-    result = BASE_ENV(env)->MonitorExit(env, obj);
+    result = baseEnv(env)->MonitorExit(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -2226,7 +2192,7 @@ static jint Check_GetJavaVM(JNIEnv *env, JavaVM **vm)
 {
     CHECK_ENTER(env, kFlag_Default);
     jint result;
-    result = BASE_ENV(env)->GetJavaVM(env, vm);
+    result = baseEnv(env)->GetJavaVM(env, vm);
     CHECK_EXIT(env);
     return result;
 }
@@ -2236,7 +2202,7 @@ static void Check_GetStringRegion(JNIEnv* env, jstring str, jsize start,
 {
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, str);
-    BASE_ENV(env)->GetStringRegion(env, str, start, len, buf);
+    baseEnv(env)->GetStringRegion(env, str, start, len, buf);
     CHECK_EXIT(env);
 }
 
@@ -2245,7 +2211,7 @@ static void Check_GetStringUTFRegion(JNIEnv* env, jstring str, jsize start,
 {
     CHECK_ENTER(env, kFlag_CritOkay);
     CHECK_STRING(env, str);
-    BASE_ENV(env)->GetStringUTFRegion(env, str, start, len, buf);
+    baseEnv(env)->GetStringUTFRegion(env, str, start, len, buf);
     CHECK_EXIT(env);
 }
 
@@ -2255,7 +2221,7 @@ static void* Check_GetPrimitiveArrayCritical(JNIEnv* env, jarray array,
     CHECK_ENTER(env, kFlag_CritGet);
     CHECK_ARRAY(env, array);
     void* result;
-    result = BASE_ENV(env)->GetPrimitiveArrayCritical(env, array, isCopy);
+    result = baseEnv(env)->GetPrimitiveArrayCritical(env, array, isCopy);
     if (((JNIEnvExt*)env)->forceDataCopy && result != NULL) {
         result = createGuardedPACopy(env, array, isCopy);
     }
@@ -2273,43 +2239,39 @@ static void Check_ReleasePrimitiveArrayCritical(JNIEnv* env, jarray array,
     if (((JNIEnvExt*)env)->forceDataCopy) {
         carray = releaseGuardedPACopy(env, array, carray, mode);
     }
-    BASE_ENV(env)->ReleasePrimitiveArrayCritical(env, array, carray, mode);
+    baseEnv(env)->ReleasePrimitiveArrayCritical(env, array, carray, mode);
     CHECK_EXIT(env);
 }
 
-static const jchar* Check_GetStringCritical(JNIEnv* env, jstring string,
-    jboolean* isCopy)
-{
+static const jchar* Check_GetStringCritical(JNIEnv* env, jstring string, jboolean* isCopy) {
     CHECK_ENTER(env, kFlag_CritGet);
     CHECK_STRING(env, string);
-    const jchar* result;
-    result = BASE_ENV(env)->GetStringCritical(env, string, isCopy);
+    const jchar* result = baseEnv(env)->GetStringCritical(env, string, isCopy);
     if (((JNIEnvExt*)env)->forceDataCopy && result != NULL) {
         // TODO: fix for indirect
-        int len = dvmStringLen(string) * 2;
-        result = (const jchar*) createGuardedCopy(result, len, false);
-        if (isCopy != NULL)
+        int byteCount = dvmStringLen((StringObject*)string) * 2;
+        result = (const jchar*) createGuardedCopy(result, byteCount, false);
+        if (isCopy != NULL) {
             *isCopy = JNI_TRUE;
+        }
     }
     CHECK_EXIT(env);
     return result;
 }
 
-static void Check_ReleaseStringCritical(JNIEnv* env, jstring string,
-    const jchar* carray)
-{
+static void Check_ReleaseStringCritical(JNIEnv* env, jstring string, const jchar* carray) {
     CHECK_ENTER(env, kFlag_CritRelease | kFlag_ExcepOkay);
     CHECK_STRING(env, string);
     CHECK_NON_NULL(env, carray);
     if (((JNIEnvExt*)env)->forceDataCopy) {
         if (!checkGuardedCopy(carray, false)) {
-            ALOGE("JNI: failed guarded copy check in ReleaseStringCritical\n");
+            ALOGE("JNI: failed guarded copy check in ReleaseStringCritical");
             abortMaybe();
             return;
         }
         carray = (const jchar*) freeGuardedCopy((jchar*)carray);
     }
-    BASE_ENV(env)->ReleaseStringCritical(env, string, carray);
+    baseEnv(env)->ReleaseStringCritical(env, string, carray);
     CHECK_EXIT(env);
 }
 
@@ -2318,7 +2280,7 @@ static jweak Check_NewWeakGlobalRef(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jweak result;
-    result = BASE_ENV(env)->NewWeakGlobalRef(env, obj);
+    result = baseEnv(env)->NewWeakGlobalRef(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -2327,7 +2289,7 @@ static void Check_DeleteWeakGlobalRef(JNIEnv* env, jweak obj)
 {
     CHECK_ENTER(env, kFlag_Default | kFlag_ExcepOkay);
     CHECK_OBJECT(env, obj);
-    BASE_ENV(env)->DeleteWeakGlobalRef(env, obj);
+    baseEnv(env)->DeleteWeakGlobalRef(env, obj);
     CHECK_EXIT(env);
 }
 
@@ -2335,7 +2297,7 @@ static jboolean Check_ExceptionCheck(JNIEnv* env)
 {
     CHECK_ENTER(env, kFlag_CritOkay | kFlag_ExcepOkay);
     jboolean result;
-    result = BASE_ENV(env)->ExceptionCheck(env);
+    result = baseEnv(env)->ExceptionCheck(env);
     CHECK_EXIT(env);
     return result;
 }
@@ -2345,7 +2307,7 @@ static jobjectRefType Check_GetObjectRefType(JNIEnv* env, jobject obj)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, obj);
     jobjectRefType result;
-    result = BASE_ENV(env)->GetObjectRefType(env, obj);
+    result = baseEnv(env)->GetObjectRefType(env, obj);
     CHECK_EXIT(env);
     return result;
 }
@@ -2361,7 +2323,7 @@ static jobject Check_NewDirectByteBuffer(JNIEnv* env, void* address,
         abortMaybe();
         return NULL;
     }
-    result = BASE_ENV(env)->NewDirectByteBuffer(env, address, capacity);
+    result = baseEnv(env)->NewDirectByteBuffer(env, address, capacity);
     CHECK_EXIT(env);
     return result;
 }
@@ -2370,7 +2332,7 @@ static void* Check_GetDirectBufferAddress(JNIEnv* env, jobject buf)
 {
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, buf);
-    void* result = BASE_ENV(env)->GetDirectBufferAddress(env, buf);
+    void* result = baseEnv(env)->GetDirectBufferAddress(env, buf);
     CHECK_EXIT(env);
     return result;
 }
@@ -2380,7 +2342,7 @@ static jlong Check_GetDirectBufferCapacity(JNIEnv* env, jobject buf)
     CHECK_ENTER(env, kFlag_Default);
     CHECK_OBJECT(env, buf);
     /* TODO: verify "buf" is an instance of java.nio.Buffer */
-    jlong result = BASE_ENV(env)->GetDirectBufferCapacity(env, buf);
+    jlong result = baseEnv(env)->GetDirectBufferCapacity(env, buf);
     CHECK_EXIT(env);
     return result;
 }
@@ -2396,7 +2358,7 @@ static jint Check_DestroyJavaVM(JavaVM* vm)
 {
     CHECK_VMENTER(vm, false);
     jint result;
-    result = BASE_VM(vm)->DestroyJavaVM(vm);
+    result = baseVm(vm)->DestroyJavaVM(vm);
     CHECK_VMEXIT(vm, false);
     return result;
 }
@@ -2406,7 +2368,7 @@ static jint Check_AttachCurrentThread(JavaVM* vm, JNIEnv** p_env,
 {
     CHECK_VMENTER(vm, false);
     jint result;
-    result = BASE_VM(vm)->AttachCurrentThread(vm, p_env, thr_args);
+    result = baseVm(vm)->AttachCurrentThread(vm, p_env, thr_args);
     CHECK_VMEXIT(vm, true);
     return result;
 }
@@ -2416,7 +2378,7 @@ static jint Check_AttachCurrentThreadAsDaemon(JavaVM* vm, JNIEnv** p_env,
 {
     CHECK_VMENTER(vm, false);
     jint result;
-    result = BASE_VM(vm)->AttachCurrentThreadAsDaemon(vm, p_env, thr_args);
+    result = baseVm(vm)->AttachCurrentThreadAsDaemon(vm, p_env, thr_args);
     CHECK_VMEXIT(vm, true);
     return result;
 }
@@ -2425,7 +2387,7 @@ static jint Check_DetachCurrentThread(JavaVM* vm)
 {
     CHECK_VMENTER(vm, true);
     jint result;
-    result = BASE_VM(vm)->DetachCurrentThread(vm);
+    result = baseVm(vm)->DetachCurrentThread(vm);
     CHECK_VMEXIT(vm, false);
     return result;
 }
@@ -2434,7 +2396,7 @@ static jint Check_GetEnv(JavaVM* vm, void** env, jint version)
 {
     CHECK_VMENTER(vm, true);
     jint result;
-    result = BASE_VM(vm)->GetEnv(vm, env, version);
+    result = baseVm(vm)->GetEnv(vm, env, version);
     CHECK_VMEXIT(vm, true);
     return result;
 }
