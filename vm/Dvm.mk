@@ -85,7 +85,7 @@ LOCAL_SRC_FILES := \
 	Atomic.cpp.arm \
 	AtomicCache.cpp \
 	BitVector.cpp.arm \
-	CheckJni.c \
+	CheckJni.cpp \
 	Ddm.cpp \
 	Debugger.cpp \
 	DvmDex.cpp \
@@ -238,7 +238,7 @@ ifeq ($(dvm_arch),arm)
 		compiler/codegen/arm/Assemble.cpp \
 		compiler/codegen/arm/ArchUtility.cpp \
 		compiler/codegen/arm/LocalOptimizations.cpp \
-		compiler/codegen/arm/GlobalOptimizations.c \
+		compiler/codegen/arm/GlobalOptimizations.cpp \
 		compiler/codegen/arm/RallocUtil.c \
 		compiler/template/out/CompilerTemplateAsm-$(dvm_arch_variant).S
   endif
