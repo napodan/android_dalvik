@@ -41,7 +41,7 @@
 /* Thumb2-specific codegen routines */
 #include "../Thumb2/Gen.cpp"
 /* Thumb2+VFP codegen routines */
-#include "../FP/Thumb2VFP.c"
+#include "../FP/Thumb2VFP.cpp"
 
 /* Thumb2-specific register allocation */
 #include "../Thumb2/Ralloc.c"
