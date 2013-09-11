@@ -18,6 +18,10 @@
  * This file contains target independent register alloction support.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "compiler/CompilerUtility.h"
 #include "compiler/CompilerIR.h"
 #include "compiler/Dataflow.h"
@@ -222,3 +226,8 @@ extern void dvmCompilerFlushRegImpl(CompilationUnit *cUnit, int rBase,
 extern void dvmCompilerFlushRegWideImpl(CompilationUnit *cUnit, int rBase,
                                         int displacement, int rSrcLo,
                                         int rSrcHi);
+
+#ifdef __cplusplus
+};
+#endif
+
