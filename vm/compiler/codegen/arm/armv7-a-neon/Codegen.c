@@ -32,7 +32,7 @@
 #include "../CodegenCommon.cpp"
 
 /* Thumb2-specific factory utilities */
-#include "../Thumb2/Factory.c"
+#include "../Thumb2/Factory.cpp"
 /* Factory utilities dependent on arch-specific features */
 #include "../CodegenFactory.c"
 
