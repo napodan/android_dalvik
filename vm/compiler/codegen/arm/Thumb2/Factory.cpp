@@ -60,7 +60,7 @@ static ArmLIR *loadFPConstantValue(CompilationUnit *cUnit, int rDest,
     if (dataTarget == NULL) {
         dataTarget = addWordData(cUnit, value, false);
     }
-    ArmLIR *loadPcRel = dvmCompilerNew(sizeof(ArmLIR), true);
+    ArmLIR *loadPcRel = (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
     loadPcRel->opcode = kThumb2Vldrs;
     loadPcRel->generic.target = (LIR *) dataTarget;
     loadPcRel->operands[0] = rDest;
@@ -170,7 +170,7 @@ static ArmLIR *loadConstantNoClobber(CompilationUnit *cUnit, int rDest,
     if (dataTarget == NULL) {
         dataTarget = addWordData(cUnit, value, false);
     }
-    ArmLIR *loadPcRel = dvmCompilerNew(sizeof(ArmLIR), true);
+    ArmLIR *loadPcRel = (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
     loadPcRel->opcode = kThumb2LdrPcRel12;
     loadPcRel->generic.target = (LIR *) dataTarget;
     loadPcRel->operands[0] = rDest;
@@ -659,9 +659,11 @@ static ArmLIR *loadConstantValueWide(CompilationUnit *cUnit, int rDestLo,
 {
     int encodedImm = encodeImmDouble(valLo, valHi);
     ArmLIR *res;
-    if (FPREG(rDestLo) && (encodedImm >= 0)) {
-        res = newLIR2(cUnit, kThumb2Vmovd_IMM8, S2D(rDestLo, rDestHi),
-                      encodedImm);
+    int targetReg = S2D(rDestLo, rDestHi);
+    if (FPREG(rDestLo)) {
+        if (encodedImm >= 0) {
+            res = newLIR2(cUnit, kThumb2Vmovd_IMM8, targetReg, encodedImm);
+        }
     } else {
         res = loadConstantNoClobber(cUnit, rDestLo, valLo);
         loadConstantNoClobber(cUnit, rDestHi, valHi);
@@ -1088,7 +1090,6 @@ static void loadPair(CompilationUnit *cUnit, int base, int lowReg, int highReg)
     loadBaseDispWide(cUnit, NULL, base, 0, lowReg, highReg, INVALID_SREG);
 }
 
-
 /*
  * Perform a "reg cmp imm" operation and jump to the PCR region if condition
  * satisfies.
@@ -1123,7 +1124,7 @@ static ArmLIR *genRegImmCheck(CompilationUnit *cUnit,
 
 static ArmLIR *fpRegCopy(CompilationUnit *cUnit, int rDest, int rSrc)
 {
-    ArmLIR* res = dvmCompilerNew(sizeof(ArmLIR), true);
+    ArmLIR* res = (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
     res->operands[0] = rDest;
     res->operands[1] = rSrc;
     if (rDest == rSrc) {
@@ -1153,7 +1154,7 @@ static ArmLIR* genRegCopyNoInsert(CompilationUnit *cUnit, int rDest, int rSrc)
     ArmOpcode opcode;
     if (FPREG(rDest) || FPREG(rSrc))
         return fpRegCopy(cUnit, rDest, rSrc);
-    res = dvmCompilerNew(sizeof(ArmLIR), true);
+    res = (ArmLIR *) dvmCompilerNew(sizeof(ArmLIR), true);
     if (LOWREG(rDest) && LOWREG(rSrc))
         opcode = kThumbMovRR;
     else if (!LOWREG(rDest) && !LOWREG(rSrc))
