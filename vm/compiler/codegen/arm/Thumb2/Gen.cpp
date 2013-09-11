@@ -89,13 +89,13 @@ void dvmCompilerInitializeRegAlloc(CompilationUnit *cUnit)
 {
     int numTemps = sizeof(coreTemps)/sizeof(int);
     int numFPTemps = sizeof(fpTemps)/sizeof(int);
-    RegisterPool *pool = dvmCompilerNew(sizeof(*pool), true);
+    RegisterPool *pool = (RegisterPool *)dvmCompilerNew(sizeof(*pool), true);
     cUnit->regPool = pool;
     pool->numCoreTemps = numTemps;
-    pool->coreTemps =
+    pool->coreTemps = (RegisterInfo *)
             dvmCompilerNew(numTemps * sizeof(*cUnit->regPool->coreTemps), true);
     pool->numFPTemps = numFPTemps;
-    pool->FPTemps =
+    pool->FPTemps = (RegisterInfo *)
             dvmCompilerNew(numFPTemps * sizeof(*cUnit->regPool->FPTemps), true);
     pool->numCoreRegs = 0;
     pool->coreRegs = NULL;
@@ -120,7 +120,7 @@ void dvmCompilerInitializeRegAlloc(CompilationUnit *cUnit)
  * is not met.
  */
 static ArmLIR *genIT(CompilationUnit *cUnit, ArmConditionCode code,
-                     char *guide)
+                     const char *guide)
 {
     int mask;
     int condBit = code & 1;
