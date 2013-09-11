@@ -15,25 +15,31 @@
  */
 
 /*
- * This file contains codegen and support common to all supported
- * ARM variants.  It is included by:
+ * This file contains target-independent codegen and support, and is
+ * included by:
  *
- *        Codegen-$(TARGET_ARCH_VARIANT).c
+ *        $(TARGET_ARCH)/Codegen-$(TARGET_ARCH_VARIANT).c
  *
  * which combines this common code with specific support found in the
- * applicable directory below this one.
+ * applicable directories below this one.
+ *
+ * Prior to including this file, TGT_LIR should be #defined.
+ * For example, for arm:
+ *    #define TGT_LIR ArmLIR
+ * and for x86:
+ *    #define TGT_LIR X86LIR
  */
 
 
 /* Load a word at base + displacement.  Displacement must be word multiple */
-static ArmLIR *loadWordDisp(CompilationUnit *cUnit, int rBase, int displacement,
-                            int rDest)
+static TGT_LIR *loadWordDisp(CompilationUnit *cUnit, int rBase,
+                             int displacement, int rDest)
 {
     return loadBaseDisp(cUnit, NULL, rBase, displacement, rDest, kWord,
                         INVALID_SREG);
 }
 
-static ArmLIR *storeWordDisp(CompilationUnit *cUnit, int rBase,
+static TGT_LIR *storeWordDisp(CompilationUnit *cUnit, int rBase,
                              int displacement, int rSrc)
 {
     return storeBaseDisp(cUnit, rBase, displacement, rSrc, kWord);
@@ -45,7 +51,7 @@ static ArmLIR *storeWordDisp(CompilationUnit *cUnit, int rBase,
  * register liveness.  That is the responsibility of the caller.
  */
 static void loadValueDirect(CompilationUnit *cUnit, RegLocation rlSrc,
-                                int reg1)
+                            int reg1)
 {
     rlSrc = dvmCompilerUpdateLoc(cUnit, rlSrc);
     if (rlSrc.location == kLocPhysReg) {
@@ -84,7 +90,8 @@ static void loadValueDirectWide(CompilationUnit *cUnit, RegLocation rlSrc,
     if (rlSrc.location == kLocPhysReg) {
         genRegCopyWide(cUnit, regLo, regHi, rlSrc.lowReg, rlSrc.highReg);
     } else if (rlSrc.location == kLocRetval) {
-        loadBaseDispWide(cUnit, NULL, rGLUE, offsetof(InterpState, retval),
+        loadBaseDispWide(cUnit, NULL, rGLUE,
+                         offsetof(InterpState, retval),
                          regLo, regHi, INVALID_SREG);
     } else {
         assert(rlSrc.location == kLocDalvikFrame);
@@ -118,7 +125,8 @@ static RegLocation loadValue(CompilationUnit *cUnit, RegLocation rlSrc,
         rlSrc.location = kLocPhysReg;
         dvmCompilerMarkLive(cUnit, rlSrc.lowReg, rlSrc.sRegLow);
     } else if (rlSrc.location == kLocRetval) {
-        loadWordDisp(cUnit, rGLUE, offsetof(InterpState, retval), rlSrc.lowReg);
+        loadWordDisp(cUnit, rGLUE, offsetof(InterpState, retval),
+                     rlSrc.lowReg);
         rlSrc.location = kLocPhysReg;
         dvmCompilerClobber(cUnit, rlSrc.lowReg);
     }
@@ -186,7 +194,8 @@ static RegLocation loadValueWide(CompilationUnit *cUnit, RegLocation rlSrc,
         dvmCompilerMarkLive(cUnit, rlSrc.highReg,
                             dvmCompilerSRegHi(rlSrc.sRegLow));
     } else if (rlSrc.location == kLocRetval) {
-        loadBaseDispWide(cUnit, NULL, rGLUE, offsetof(InterpState, retval),
+        loadBaseDispWide(cUnit, NULL, rGLUE,
+                         offsetof(InterpState, retval),
                          rlSrc.lowReg, rlSrc.highReg, INVALID_SREG);
         rlSrc.location = kLocPhysReg;
         dvmCompilerClobber(cUnit, rlSrc.lowReg);
@@ -196,7 +205,7 @@ static RegLocation loadValueWide(CompilationUnit *cUnit, RegLocation rlSrc,
 }
 
 static void storeValueWide(CompilationUnit *cUnit, RegLocation rlDest,
-                       RegLocation rlSrc)
+                           RegLocation rlSrc)
 {
     LIR *defStart;
     LIR *defEnd;
@@ -256,78 +265,4 @@ static void storeValueWide(CompilationUnit *cUnit, RegLocation rlDest,
             dvmCompilerMarkDefWide(cUnit, rlDest, defStart, defEnd);
         }
     }
-}
-/*
- * Perform null-check on a register. sReg is the ssa register being checked,
- * and mReg is the machine register holding the actual value. If internal state
- * indicates that sReg has been checked before the check request is ignored.
- */
-static ArmLIR *genNullCheck(CompilationUnit *cUnit, int sReg, int mReg,
-                                int dOffset, ArmLIR *pcrLabel)
-{
-    /* This particular Dalvik register has been null-checked */
-    if (dvmIsBitSet(cUnit->regPool->nullCheckedRegs, sReg)) {
-        return pcrLabel;
-    }
-    dvmSetBit(cUnit->regPool->nullCheckedRegs, sReg);
-    return genRegImmCheck(cUnit, kArmCondEq, mReg, 0, dOffset, pcrLabel);
-}
-
-
-
-/*
- * Perform a "reg cmp reg" operation and jump to the PCR region if condition
- * satisfies.
- */
-static ArmLIR *genRegRegCheck(CompilationUnit *cUnit,
-                              ArmConditionCode cond,
-                              int reg1, int reg2, int dOffset,
-                              ArmLIR *pcrLabel)
-{
-    ArmLIR *res;
-    res = opRegReg(cUnit, kOpCmp, reg1, reg2);
-    ArmLIR *branch = opCondBranch(cUnit, cond);
-    genCheckCommon(cUnit, dOffset, branch, pcrLabel);
-    return res;
-}
-
-/*
- * Perform zero-check on a register. Similar to genNullCheck but the value being
- * checked does not have a corresponding Dalvik register.
- */
-static ArmLIR *genZeroCheck(CompilationUnit *cUnit, int mReg,
-                                int dOffset, ArmLIR *pcrLabel)
-{
-    return genRegImmCheck(cUnit, kArmCondEq, mReg, 0, dOffset, pcrLabel);
-}
-
-/* Perform bound check on two registers */
-static ArmLIR *genBoundsCheck(CompilationUnit *cUnit, int rIndex,
-                                  int rBound, int dOffset, ArmLIR *pcrLabel)
-{
-    return genRegRegCheck(cUnit, kArmCondCs, rIndex, rBound, dOffset,
-                            pcrLabel);
-}
-
-/*
- * Jump to the out-of-line handler in ARM mode to finish executing the
- * remaining of more complex instructions.
- */
-static void genDispatchToHandler(CompilationUnit *cUnit, TemplateOpcode opcode)
-{
-    /*
-     * NOTE - In practice BLX only needs one operand, but since the assembler
-     * may abort itself and retry due to other out-of-range conditions we
-     * cannot really use operand[0] to store the absolute target address since
-     * it may get clobbered by the final relative offset. Therefore,
-     * we fake BLX_1 is a two operand instruction and the absolute target
-     * address is stored in operand[1].
-     */
-    dvmCompilerClobberHandlerRegs(cUnit);
-    newLIR2(cUnit, kThumbBlx1,
-            (int) gDvmJit.codeCache + templateEntryOffsets[opcode],
-            (int) gDvmJit.codeCache + templateEntryOffsets[opcode]);
-    newLIR2(cUnit, kThumbBlx2,
-            (int) gDvmJit.codeCache + templateEntryOffsets[opcode],
-            (int) gDvmJit.codeCache + templateEntryOffsets[opcode]);
 }

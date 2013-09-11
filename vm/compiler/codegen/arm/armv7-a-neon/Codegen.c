@@ -33,8 +33,10 @@
 
 /* Thumb2-specific factory utilities */
 #include "../Thumb2/Factory.cpp"
-/* Factory utilities dependent on arch-specific features */
-#include "../CodegenFactory.c"
+/* Target indepedent factory utilities */
+#include "../../CodegenFactory.cpp"
+/* Arm-specific factory utilities */
+#include "../ArchFactory.cpp"
 
 /* Thumb2-specific codegen routines */
 #include "../Thumb2/Gen.c"
