@@ -39,7 +39,7 @@
 #include "../ArchFactory.cpp"
 
 /* Thumb2-specific codegen routines */
-#include "../Thumb2/Gen.c"
+#include "../Thumb2/Gen.cpp"
 /* Thumb2+VFP codegen routines */
 #include "../FP/Thumb2VFP.c"
 
