@@ -15,6 +15,7 @@
  */
 #define _CODEGEN_C
 #define _ARMV7_A_NEON
+#define TGT_LIR ArmLIR
 
 #include "Dalvik.h"
 #include "interp/InterpDefs.h"
@@ -27,8 +28,8 @@
 #include "compiler/Loop.h"
 #include "ArchVariant.h"
 
-/* Architectural independent building blocks */
-#include "../CodegenCommon.c"
+/* Arm codegen building blocks */
+#include "../CodegenCommon.cpp"
 
 /* Thumb2-specific factory utilities */
 #include "../Thumb2/Factory.c"
