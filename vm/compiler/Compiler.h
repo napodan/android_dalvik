@@ -288,7 +288,7 @@ void dvmCompilerDoConstantPropagation(struct CompilationUnit *cUnit,
                                       struct BasicBlock *bb);
 void dvmCompilerFindInductionVariables(struct CompilationUnit *cUnit,
                                        struct BasicBlock *bb);
-char *dvmCompilerGetDalvikDisassembly(DecodedInstruction *insn, char *note);
+char *dvmCompilerGetDalvikDisassembly(DecodedInstruction *insn, const char *note);
 char *dvmCompilerGetSSAString(struct CompilationUnit *cUnit,
                               struct SSARepresentation *ssaRep);
 void dvmCompilerDataFlowAnalysisDispatcher(struct CompilationUnit *cUnit,

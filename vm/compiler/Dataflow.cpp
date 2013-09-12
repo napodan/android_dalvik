@@ -819,7 +819,7 @@ int dvmConvertSSARegToDalvik(CompilationUnit *cUnit, int ssaReg)
  * ssaToDalvikMap list to get the subscript[31..16]/dalvik_reg[15..0] mapping.
  */
 char *dvmCompilerGetDalvikDisassembly(DecodedInstruction *insn,
-                                      char *note)
+                                      const char *note)
 {
     char buffer[256];
     Opcode opcode = insn->opcode;
