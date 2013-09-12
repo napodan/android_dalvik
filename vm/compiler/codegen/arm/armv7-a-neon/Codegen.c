@@ -44,10 +44,10 @@
 #include "../FP/Thumb2VFP.cpp"
 
 /* Thumb2-specific register allocation */
-#include "../Thumb2/Ralloc.c"
+#include "../Thumb2/Ralloc.cpp"
 
 /* MIR2LIR dispatcher and architectural independent codegen routines */
-#include "../CodegenDriver.c"
+#include "../CodegenDriver.cpp"
 
 /* Architecture manifest */
 #include "ArchVariant.c"
