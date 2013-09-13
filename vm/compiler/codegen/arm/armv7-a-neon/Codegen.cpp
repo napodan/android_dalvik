@@ -50,4 +50,4 @@
 #include "../CodegenDriver.cpp"
 
 /* Architecture manifest */
-#include "ArchVariant.c"
+#include "ArchVariant.cpp"

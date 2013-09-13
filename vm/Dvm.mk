@@ -234,7 +234,7 @@ ifeq ($(dvm_arch),arm)
   ifeq ($(WITH_JIT),true)
     LOCAL_SRC_FILES += \
 		compiler/codegen/RallocUtil.cpp \
-		compiler/codegen/arm/$(dvm_arch_variant)/Codegen.c \
+		compiler/codegen/arm/$(dvm_arch_variant)/Codegen.cpp \
 		compiler/codegen/arm/$(dvm_arch_variant)/CallingConvention.S \
 		compiler/codegen/arm/Assemble.cpp \
 		compiler/codegen/arm/ArchUtility.cpp \
