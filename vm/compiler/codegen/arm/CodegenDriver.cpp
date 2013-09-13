@@ -723,7 +723,7 @@ static bool genArithOpInt(CompilationUnit *cUnit, MIR *mir,
     bool checkZero = false;
     bool unary = false;
     int retReg = r0;
-    void *callTgt;
+    int (*callTgt)(int, int);
     RegLocation rlResult;
     bool shiftOp = false;
 
@@ -3843,7 +3843,7 @@ static void handleExtendedMIR(CompilationUnit *cUnit, MIR *mir)
     strcpy(msg, extendedMIROpNames[opOffset]);
     newLIR1(cUnit, kArmPseudoExtended, (int) msg);
 
-    switch (mir->dalvikInsn.opcode) {
+    switch ((ExtendedMIROpcode)mir->dalvikInsn.opcode) {
         case kMirOpPhi: {
             char *ssaString = dvmCompilerGetSSAString(cUnit, mir->ssaRep);
             newLIR1(cUnit, kArmPseudoSSARep, (int) ssaString);
