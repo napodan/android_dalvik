@@ -21,10 +21,6 @@
 #ifndef LIBDEX_DEXDEBUGINFO_H_
 #define LIBDEX_DEXDEBUGINFO_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "DexFile.h"
 
 /*
@@ -55,9 +51,5 @@ void dexDecodeDebugInfo(
             u4 accessFlags,
             DexDebugNewPositionCb posCb, DexDebugNewLocalCb localCb,
             void* cnxt);
-
-#ifdef __cplusplus
-};
-#endif
 
 #endif  // LIBDEX_DEXDEBUGINFO_H_

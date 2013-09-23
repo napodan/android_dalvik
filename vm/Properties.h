@@ -35,8 +35,6 @@ bool dvmAddCommandLineProperty(const char* argStr);
 void dvmCreateDefaultProperties(Object* propObj);
 void dvmSetCommandLineProperties(Object* propObj);
 
-char* dvmGetProperty(const char* key);
-
 #ifdef __cplusplus
 };
 #endif
