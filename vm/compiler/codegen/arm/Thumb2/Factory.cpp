@@ -660,10 +660,8 @@ static ArmLIR *loadConstantValueWide(CompilationUnit *cUnit, int rDestLo,
     int encodedImm = encodeImmDouble(valLo, valHi);
     ArmLIR *res;
     int targetReg = S2D(rDestLo, rDestHi);
-    if (FPREG(rDestLo)) {
-        if (encodedImm >= 0) {
+    if (FPREG(rDestLo) && (encodedImm >= 0)) {
             res = newLIR2(cUnit, kThumb2Vmovd_IMM8, targetReg, encodedImm);
-        }
     } else {
         res = loadConstantNoClobber(cUnit, rDestLo, valLo);
         loadConstantNoClobber(cUnit, rDestHi, valHi);
