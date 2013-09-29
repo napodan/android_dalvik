@@ -193,11 +193,11 @@ static void dumpWhiteReferenceVisitor(void *addr, void *arg)
         return;
     }
     assert(dvmIsValidObject(obj));
-    ctx = arg;
+    ctx = (WhiteReferenceCounter*)arg;
     if (dvmHeapBitmapIsObjectBitSet(ctx->markBits, obj)) {
         return;
     }
-    LOGE("object %p is white", obj);
+    ALOGE("object %p is white", obj);
 }
 
 /*
@@ -214,14 +214,14 @@ static void dumpReferencesVisitor(void *pObj, void *arg)
 
 static void dumpReferencesCallback(void *ptr, void *arg)
 {
-    Object *obj = arg;
-    if (ptr == obj) {
+    Object *obj = (Object *)ptr;
+    if (obj == (Object *)arg) {
         return;
     }
-    dvmVisitObject(dumpReferencesVisitor, ptr, &obj);
-    if (obj == NULL) {
-        LOGD("Found %p in the heap @ %p", arg, ptr);
-        dvmDumpObject(ptr);
+    dvmVisitObject(dumpReferencesVisitor, obj, &arg);
+    if (arg == NULL) {
+        ALOGD("Found %p in the heap @ %p", arg, obj);
+        dvmDumpObject(obj);
     }
 }
 
@@ -233,7 +233,7 @@ static void dumpReferencesRootVisitor(void *ptr, void *arg)
     Object *obj = *(Object **)ptr;
     Object *lookingFor = *(Object **)arg;
     if (obj == lookingFor) {
-        LOGD("Found %p in a root @ %p", arg, ptr);
+        ALOGD("Found %p in a root @ %p", arg, ptr);
     }
 }
 
@@ -336,7 +336,7 @@ static void verifyCardTableCallback(void *ptr, void *arg)
 /*
  * Verifies that gray objects are on a dirty card.
  */
-void dvmVerifyCardTable(void)
+void dvmVerifyCardTable()
 {
     HeapBitmap *markBits = gDvm.gcHeap->markContext.bitmap;
     dvmHeapBitmapWalk(markBits, verifyCardTableCallback, markBits);

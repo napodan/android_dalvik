@@ -2919,7 +2919,7 @@ void dvmDbgExecuteMethod(DebugInvokeReq* pReq)
          * We can't use the "tracked allocation" mechanism here because
          * the object is going to be handed off to a different thread.
          */
-        (void) objectToObjectId(pReq->resultValue.l);
+        objectToObjectId((Object*)pReq->resultValue.l);
     }
 
     if (oldExcept != NULL) {
