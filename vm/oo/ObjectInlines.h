@@ -28,6 +28,7 @@ extern "C" {
  * Store a single value in the array, and if the value isn't null,
  * note in the write barrier.
  */
+#ifdef __cplusplus
 INLINE void dvmSetObjectArrayElement(const ArrayObject* obj, int index,
                                      Object* val) {
     ((Object **)(void *)(obj)->contents)[index] = val;
@@ -35,6 +36,7 @@ INLINE void dvmSetObjectArrayElement(const ArrayObject* obj, int index,
         dvmWriteBarrierArray(obj, index, index + 1);
     }
 }
+#endif
 
 
 /*
