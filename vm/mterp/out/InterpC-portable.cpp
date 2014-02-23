@@ -1,10 +1,10 @@
 /*
- * This file was generated automatically by gen-mterp.py for 'x86-atom'.
+ * This file was generated automatically by gen-mterp.py for 'portable'.
  *
  * --> DO NOT EDIT <--
  */
 
-/* File: c/header.c */
+/* File: c/header.cpp */
 /*
  * Copyright (C) 2008 The Android Open Source Project
  *
@@ -37,20 +37,7 @@
  *   WITH_TRACKREF_CHECKS
  *   EASY_GDB
  *   NDEBUG
- *
- * If THREADED_INTERP is not defined, we use a classic "while true / switch"
- * interpreter.  If it is defined, then the tail end of each instruction
- * handler fetches the next instruction and jumps directly to the handler.
- * This increases the size of the "Std" interpreter by about 10%, but
- * provides a speedup of about the same magnitude.
- *
- * There's a "hybrid" approach that uses a goto table instead of a switch
- * statement, avoiding the "is the opcode in range" tests required for switch.
- * The performance is close to the threaded version, and without the 10%
- * size increase, but the benchmark results are off enough that it's not
- * worth adding as a third option.
  */
-#define THREADED_INTERP             /* threaded vs. while-loop interpreter */
 
 #ifdef WITH_INSTR_CHECKS            /* instruction-level paranoia (slow!) */
 # define CHECK_BRANCH_OFFSETS
@@ -58,38 +45,41 @@
 #endif
 
 /*
- * ARM EABI requires 64-bit alignment for access to 64-bit data types.  We
- * can't just use pointers to copy 64-bit values out of our interpreted
- * register set, because gcc will generate ldrd/strd.
+ * Some architectures require 64-bit alignment for access to 64-bit data
+ * types.  We can't just use pointers to copy 64-bit values out of our
+ * interpreted register set, because gcc may assume the pointer target is
+ * aligned and generate invalid code.
  *
- * The __UNION version copies data in and out of a union.  The __MEMCPY
- * version uses a memcpy() call to do the transfer; gcc is smart enough to
- * not actually call memcpy().  The __UNION version is very bad on ARM;
- * it only uses one more instruction than __MEMCPY, but for some reason
- * gcc thinks it needs separate storage for every instance of the union.
- * On top of that, it feels the need to zero them out at the start of the
- * method.  Net result is we zero out ~700 bytes of stack space at the top
- * of the interpreter using ARM STM instructions.
+ * There are two common approaches:
+ *  (1) Use a union that defines a 32-bit pair and a 64-bit value.
+ *  (2) Call memcpy().
+ *
+ * Depending upon what compiler you're using and what options are specified,
+ * one may be faster than the other.  For example, the compiler might
+ * convert a memcpy() of 8 bytes into a series of instructions and omit
+ * the call.  The union version could cause some strange side-effects,
+ * e.g. for a while ARM gcc thought it needed separate storage for each
+ * inlined instance, and generated instructions to zero out ~700 bytes of
+ * stack space at the top of the interpreter.
+ *
+ * The default is to use memcpy().  The current gcc for ARM seems to do
+ * better with the union.
  */
 #if defined(__ARM_EABI__)
-//# define NO_UNALIGN_64__UNION
-# define NO_UNALIGN_64__MEMCPY
+# define NO_UNALIGN_64__UNION
 #endif
+/*
+ * MIPS ABI requires 64-bit alignment for access to 64-bit data types.
+ *
+ * Use memcpy() to do the transfer
+ */
+#if defined(__mips__)
+/* # define NO_UNALIGN_64__UNION */
+#endif
+
 
 //#define LOG_INSTR                   /* verbose debugging */
 /* set and adjust ANDROID_LOG_TAGS='*:i jdwp:i dalvikvm:i dalvikvmi:i' */
-
-/*
- * Keep a tally of accesses to fields.  Currently only works if full DEX
- * optimization is disabled.
- */
-#ifdef PROFILE_FIELD_ACCESS
-# define UPDATE_FIELD_GET(_field) { (_field)->gets++; }
-# define UPDATE_FIELD_PUT(_field) { (_field)->puts++; }
-#else
-# define UPDATE_FIELD_GET(_field) ((void)0)
-# define UPDATE_FIELD_PUT(_field) ((void)0)
-#endif
 
 /*
  * Export another copy of the PC on every instruction; this is largely
@@ -120,7 +110,7 @@
         {                                                                   \
             char* desc;                                                     \
             desc = dexProtoCopyMethodDescriptor(&curMethod->prototype);     \
-            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s\n",               \
+            ALOGE("Invalid branch %d at 0x%04x in %s.%s %s",                 \
                 myoff, (int) (pc - curMethod->insns),                       \
                 curMethod->clazz->descriptor, curMethod->name, desc);       \
             free(desc);                                                     \
@@ -145,11 +135,11 @@
 # define ILOG(_level, ...) do {                                             \
         char debugStrBuf[128];                                              \
         snprintf(debugStrBuf, sizeof(debugStrBuf), __VA_ARGS__);            \
-        if (curMethod != NULL)                                                 \
-            LOG(_level, LOG_TAG"i", "%-2d|%04x%s\n",                        \
+        if (curMethod != NULL)                                              \
+            ALOG(_level, LOG_TAG"i", "%-2d|%04x%s",                          \
                 self->threadId, (int)(pc - curMethod->insns), debugStrBuf); \
         else                                                                \
-            LOG(_level, LOG_TAG"i", "%-2d|####%s\n",                        \
+            ALOG(_level, LOG_TAG"i", "%-2d|####%s",                          \
                 self->threadId, debugStrBuf);                               \
     } while(false)
 void dvmDumpRegs(const Method* method, const u4* framePtr, bool inOnly);
@@ -171,12 +161,10 @@ static inline s8 getLongFromArray(const u4* ptr, int idx)
     conv.parts[0] = ptr[0];
     conv.parts[1] = ptr[1];
     return conv.ll;
-#elif defined(NO_UNALIGN_64__MEMCPY)
+#else
     s8 val;
     memcpy(&val, &ptr[idx], 8);
     return val;
-#else
-    return *((s8*) &ptr[idx]);
 #endif
 }
 
@@ -190,10 +178,8 @@ static inline void putLongToArray(u4* ptr, int idx, s8 val)
     conv.ll = val;
     ptr[0] = conv.parts[0];
     ptr[1] = conv.parts[1];
-#elif defined(NO_UNALIGN_64__MEMCPY)
-    memcpy(&ptr[idx], &val, 8);
 #else
-    *((s8*) &ptr[idx]) = val;
+    memcpy(&ptr[idx], &val, 8);
 #endif
 }
 
@@ -207,12 +193,10 @@ static inline double getDoubleFromArray(const u4* ptr, int idx)
     conv.parts[0] = ptr[0];
     conv.parts[1] = ptr[1];
     return conv.d;
-#elif defined(NO_UNALIGN_64__MEMCPY)
+#else
     double dval;
     memcpy(&dval, &ptr[idx], 8);
     return dval;
-#else
-    return *((double*) &ptr[idx]);
 #endif
 }
 
@@ -226,10 +210,8 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
     conv.d = dval;
     ptr[0] = conv.parts[0];
     ptr[1] = conv.parts[1];
-#elif defined(NO_UNALIGN_64__MEMCPY)
-    memcpy(&ptr[idx], &dval, 8);
 #else
-    *((double*) &ptr[idx]) = dval;
+    memcpy(&ptr[idx], &dval, 8);
 #endif
 }
 
@@ -257,7 +239,7 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
         getLongFromArray(fp, (_idx)) : (assert(!"bad reg"),1969) )
 # define SET_REGISTER_WIDE(_idx, _val) \
     ( (_idx) < curMethod->registersSize-1 ? \
-        putLongToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969) )
+        (void)putLongToArray(fp, (_idx), (_val)) : assert(!"bad reg") )
 # define GET_REGISTER_FLOAT(_idx) \
     ( (_idx) < curMethod->registersSize ? \
         (*((float*) &fp[(_idx)])) : (assert(!"bad reg"),1969.0f) )
@@ -269,7 +251,7 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
         getDoubleFromArray(fp, (_idx)) : (assert(!"bad reg"),1969.0) )
 # define SET_REGISTER_DOUBLE(_idx, _val) \
     ( (_idx) < curMethod->registersSize-1 ? \
-        putDoubleToArray(fp, (_idx), (_val)) : (assert(!"bad reg"),1969.0) )
+        (void)putDoubleToArray(fp, (_idx), (_val)) : assert(!"bad reg") )
 #else
 # define GET_REGISTER(_idx)                 (fp[(_idx)])
 # define SET_REGISTER(_idx, _val)           (fp[(_idx)] = (_val))
@@ -318,34 +300,16 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
 
 /*
  * The current PC must be available to Throwable constructors, e.g.
- * those created by dvmThrowException(), so that the exception stack
- * trace can be generated correctly.  If we don't do this, the offset
- * within the current method won't be shown correctly.  See the notes
- * in Exception.c.
+ * those created by the various exception throw routines, so that the
+ * exception stack trace can be generated correctly.  If we don't do this,
+ * the offset within the current method won't be shown correctly.  See the
+ * notes in Exception.c.
  *
  * This is also used to determine the address for precise GC.
  *
  * Assumes existence of "u4* fp" and "const u2* pc".
  */
 #define EXPORT_PC()         (SAVEAREA_FROM_FP(fp)->xtra.currentPc = pc)
-
-/*
- * Determine if we need to switch to a different interpreter.  "_current"
- * is either INTERP_STD or INTERP_DBG.  It should be fixed for a given
- * interpreter generation file, which should remove the outer conditional
- * from the following.
- *
- * If we're building without debug and profiling support, we never switch.
- */
-#if defined(WITH_JIT)
-# define NEED_INTERP_SWITCH(_current) (                                     \
-    (_current == INTERP_STD) ?                                              \
-        dvmJitDebuggerOrProfilerActive() : !dvmJitDebuggerOrProfilerActive() )
-#else
-# define NEED_INTERP_SWITCH(_current) (                                     \
-    (_current == INTERP_STD) ?                                              \
-        dvmDebuggerOrProfilerActive() : !dvmDebuggerOrProfilerActive() )
-#endif
 
 /*
  * Check to see if "obj" is NULL.  If so, throw an exception.  Assumes the
@@ -360,19 +324,19 @@ static inline void putDoubleToArray(u4* ptr, int idx, double dval)
 static inline bool checkForNull(Object* obj)
 {
     if (obj == NULL) {
-        dvmThrowException("Ljava/lang/NullPointerException;", NULL);
+        dvmThrowNullPointerException(NULL);
         return false;
     }
 #ifdef WITH_EXTRA_OBJECT_VALIDATION
-    if (!dvmIsValidObject(obj)) {
-        ALOGE("Invalid object %p\n", obj);
+    if (!dvmIsHeapAddress(obj)) {
+        ALOGE("Invalid object %p", obj);
         dvmAbort();
     }
 #endif
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)", obj->clazz, obj);
         dvmAbort();
     }
 #endif
@@ -392,135 +356,95 @@ static inline bool checkForNullExportPC(Object* obj, u4* fp, const u2* pc)
 {
     if (obj == NULL) {
         EXPORT_PC();
-        dvmThrowException("Ljava/lang/NullPointerException;", NULL);
+        dvmThrowNullPointerException(NULL);
         return false;
     }
 #ifdef WITH_EXTRA_OBJECT_VALIDATION
-    if (!dvmIsValidObject(obj)) {
-        ALOGE("Invalid object %p\n", obj);
+    if (!dvmIsHeapAddress(obj)) {
+        ALOGE("Invalid object %p", obj);
         dvmAbort();
     }
 #endif
 #ifndef NDEBUG
     if (obj->clazz == NULL || ((u4) obj->clazz) <= 65536) {
         /* probable heap corruption */
-        ALOGE("Invalid object class %p (in %p)\n", obj->clazz, obj);
+        ALOGE("Invalid object class %p (in %p)", obj->clazz, obj);
         dvmAbort();
     }
 #endif
     return true;
 }
 
-/* File: cstubs/stubdefs.c */
-/* this is a standard (no debug support) interpreter */
-#define INTERP_TYPE INTERP_STD
-#define CHECK_DEBUG_AND_PROF() ((void)0)
-# define CHECK_TRACKED_REFS() ((void)0)
-#define CHECK_JIT_BOOL() (false)
-#define CHECK_JIT_VOID()
-#define ABORT_JIT_TSELECT() ((void)0)
-
+/* File: portable/stubdefs.cpp */
 /*
  * In the C mterp stubs, "goto" is a function call followed immediately
  * by a return.
  */
 
-#define GOTO_TARGET_DECL(_target, ...)                                      \
-    void dvmMterp_##_target(MterpGlue* glue, ## __VA_ARGS__);
+#define GOTO_TARGET_DECL(_target, ...)
 
-/* (void)xxx to quiet unused variable compiler warnings. */
-#define GOTO_TARGET(_target, ...)                                           \
-    void dvmMterp_##_target(MterpGlue* glue, ## __VA_ARGS__) {              \
-        u2 ref, vsrc1, vsrc2, vdst;                                         \
-        u2 inst = FETCH(0);                                                 \
-        const Method* methodToCall;                                         \
-        StackSaveArea* debugSaveArea;                                       \
-        (void)ref; (void)vsrc1; (void)vsrc2; (void)vdst; (void)inst;        \
-        (void)methodToCall; (void)debugSaveArea;
+#define GOTO_TARGET(_target, ...) _target:
 
-#define GOTO_TARGET_END }
-
-/*
- * Redefine what used to be local variable accesses into MterpGlue struct
- * references.  (These are undefined down in "footer.c".)
- */
-#define retval                  glue->retval
-#define pc                      glue->pc
-#define fp                      glue->fp
-#define curMethod               glue->method
-#define methodClassDex          glue->methodClassDex
-#define self                    glue->self
-#define debugTrackedRefStart    glue->debugTrackedRefStart
+#define GOTO_TARGET_END
 
 /* ugh */
-#define STUB_HACK(x) x
-
-
-/*
- * Opcode handler framing macros.  Here, each opcode is a separate function
- * that takes a "glue" argument and returns void.  We can't declare
- * these "static" because they may be called from an assembly stub.
- * (void)xxx to quiet unused variable compiler warnings.
- */
-#define HANDLE_OPCODE(_op)                                                  \
-    void dvmMterp_##_op(MterpGlue* glue) {                                  \
-        u2 ref, vsrc1, vsrc2, vdst;                                         \
-        u2 inst = FETCH(0);                                                 \
-        (void)ref; (void)vsrc1; (void)vsrc2; (void)vdst; (void)inst;
-
-#define OP_END }
+#define STUB_HACK(x)
+#define JIT_STUB_HACK(x)
 
 /*
- * Like the "portable" FINISH, but don't reload "inst", and return to caller
- * when done.
+ * InterpSave's pc and fp must be valid when breaking out to a
+ * "Reportxxx" routine.  Because the portable interpreter uses local
+ * variables for these, we must flush prior.  Stubs, however, use
+ * the interpSave vars directly, so this is a nop for stubs.
  */
-#define FINISH(_offset) {                                                   \
+#define PC_FP_TO_SELF()                                                    \
+    self->interpSave.pc = pc;                                              \
+    self->interpSave.curFrame = fp;
+#define PC_TO_SELF() self->interpSave.pc = pc;
+
+/*
+ * Instruction framing.  For a switch-oriented implementation this is
+ * case/break, for a threaded implementation it's a goto label and an
+ * instruction fetch/computed goto.
+ *
+ * Assumes the existence of "const u2* pc" and (for threaded operation)
+ * "u2 inst".
+ */
+# define H(_op)             &&op_##_op
+# define HANDLE_OPCODE(_op) op_##_op:
+# define FINISH(_offset) {                                                  \
         ADJUST_PC(_offset);                                                 \
-        CHECK_DEBUG_AND_PROF();                                             \
-        CHECK_TRACKED_REFS();                                               \
-        return;                                                             \
+        inst = FETCH(0);                                                    \
+        if (self->interpBreak.ctl.subMode) {                                \
+            dvmCheckBefore(pc, fp, self);                                   \
+        }                                                                   \
+        goto *handlerTable[INST_INST(inst)];                                \
+    }
+# define FINISH_BKPT(_opcode) {                                             \
+        goto *handlerTable[_opcode];                                        \
     }
 
+#define OP_END
 
 /*
- * The "goto label" statements turn into function calls followed by
- * return statements.  Some of the functions take arguments, which in the
- * portable interpreter are handled by assigning values to globals.
+ * The "goto" targets just turn into goto statements.  The "arguments" are
+ * passed through local variables.
  */
 
-#define GOTO_exceptionThrown()                                              \
-    do {                                                                    \
-        dvmMterp_exceptionThrown(glue);                                     \
-        return;                                                             \
-    } while(false)
+#define GOTO_exceptionThrown() goto exceptionThrown;
 
-#define GOTO_returnFromMethod()                                             \
-    do {                                                                    \
-        dvmMterp_returnFromMethod(glue);                                    \
-        return;                                                             \
-    } while(false)
+#define GOTO_returnFromMethod() goto returnFromMethod;
 
 #define GOTO_invoke(_target, _methodCallRange)                              \
     do {                                                                    \
-        dvmMterp_##_target(glue, _methodCallRange);                         \
-        return;                                                             \
+        methodCallRange = _methodCallRange;                                 \
+        goto _target;                                                       \
     } while(false)
 
-#define GOTO_invokeMethod(_methodCallRange, _methodToCall, _vsrc1, _vdst)   \
-    do {                                                                    \
-        dvmMterp_invokeMethod(glue, _methodCallRange, _methodToCall,        \
-            _vsrc1, _vdst);                                                 \
-        return;                                                             \
-    } while(false)
+/* for this, the "args" are already in the locals */
+#define GOTO_invokeMethod(_methodCallRange, _methodToCall, _vsrc1, _vdst) goto invokeMethod;
 
-/*
- * As a special case, "goto bail" turns into a longjmp.  Use "bail_switch"
- * if we need to switch to the other interpreter upon our return.
- */
-#define GOTO_bail()                                                         \
-    dvmMterpStdBail(glue, false);
-#define GOTO_bail_switch()                                                  \
-    dvmMterpStdBail(glue, true);
+#define GOTO_bail() goto bail;
 
 /*
  * Periodically check for thread suspension.
@@ -528,21 +452,14 @@ static inline bool checkForNullExportPC(Object* obj, u4* fp, const u2* pc)
  * While we're at it, see if a debugger has attached or the profiler has
  * started.  If so, switch to a different "goto" table.
  */
-#define PERIODIC_CHECKS(_entryPoint, _pcadj) {                              \
+#define PERIODIC_CHECKS(_pcadj) {                              \
         if (dvmCheckSuspendQuick(self)) {                                   \
             EXPORT_PC();  /* need for precise GC */                         \
             dvmCheckSuspendPending(self);                                   \
         }                                                                   \
-        if (NEED_INTERP_SWITCH(INTERP_TYPE)) {                              \
-            ADJUST_PC(_pcadj);                                              \
-            glue->entryPoint = _entryPoint;                                 \
-            LOGVV("threadid=%d: switch to STD ep=%d adj=%d\n",              \
-                self->threadId, (_entryPoint), (_pcadj));                   \
-            GOTO_bail_switch();                                             \
-        }                                                                   \
     }
 
-/* File: c/opcommon.c */
+/* File: c/opcommon.cpp */
 /* forward declarations of goto targets */
 GOTO_TARGET_DECL(filledNewArray, bool methodCallRange);
 GOTO_TARGET_DECL(invokeVirtual, bool methodCallRange);
@@ -634,7 +551,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             result = 1;                                                     \
         else                                                                \
             result = (_nanVal);                                             \
-        ILOGV("+ result=%d\n", result);                                     \
+        ILOGV("+ result=%d", result);                                       \
         SET_REGISTER(vdst, result);                                         \
     }                                                                       \
     FINISH(2);
@@ -649,7 +566,7 @@ GOTO_TARGET_DECL(exceptionThrown);
                 branchOffset);                                              \
             ILOGV("> branch taken");                                        \
             if (branchOffset < 0)                                           \
-                PERIODIC_CHECKS(kInterpEntryInstr, branchOffset);           \
+                PERIODIC_CHECKS(branchOffset);                              \
             FINISH(branchOffset);                                           \
         } else {                                                            \
             ILOGV("|if-%s v%d,v%d,-", (_opname), vsrc1, vsrc2);             \
@@ -664,7 +581,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             ILOGV("|if-%s v%d,+0x%04x", (_opname), vsrc1, branchOffset);    \
             ILOGV("> branch taken");                                        \
             if (branchOffset < 0)                                           \
-                PERIODIC_CHECKS(kInterpEntryInstr, branchOffset);           \
+                PERIODIC_CHECKS(branchOffset);                              \
             FINISH(branchOffset);                                           \
         } else {                                                            \
             ILOGV("|if-%s v%d,-", (_opname), vsrc1);                        \
@@ -694,8 +611,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             secondVal = GET_REGISTER(vsrc2);                                \
             if (secondVal == 0) {                                           \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
+                dvmThrowArithmeticException("divide by zero");              \
                 GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u4)firstVal == 0x80000000 && secondVal == -1) {            \
@@ -741,9 +657,8 @@ GOTO_TARGET_DECL(exceptionThrown);
             firstVal = GET_REGISTER(vsrc1);                                 \
             if ((s2) vsrc2 == 0) {                                          \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
-                GOTO_exceptionThrown();                                      \
+                dvmThrowArithmeticException("divide by zero");              \
+                GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u4)firstVal == 0x80000000 && ((s2) vsrc2) == -1) {         \
                 /* won't generate /lit16 instr for this; check anyway */    \
@@ -776,8 +691,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             firstVal = GET_REGISTER(vsrc1);                                 \
             if ((s1) vsrc2 == 0) {                                          \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
+                dvmThrowArithmeticException("divide by zero");              \
                 GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u4)firstVal == 0x80000000 && ((s1) vsrc2) == -1) {         \
@@ -822,8 +736,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             secondVal = GET_REGISTER(vsrc1);                                \
             if (secondVal == 0) {                                           \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
+                dvmThrowArithmeticException("divide by zero");              \
                 GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u4)firstVal == 0x80000000 && secondVal == -1) {            \
@@ -865,8 +778,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             secondVal = GET_REGISTER_WIDE(vsrc2);                           \
             if (secondVal == 0LL) {                                         \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
+                dvmThrowArithmeticException("divide by zero");              \
                 GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u8)firstVal == 0x8000000000000000ULL &&                    \
@@ -912,8 +824,7 @@ GOTO_TARGET_DECL(exceptionThrown);
             secondVal = GET_REGISTER_WIDE(vsrc1);                           \
             if (secondVal == 0LL) {                                         \
                 EXPORT_PC();                                                \
-                dvmThrowException("Ljava/lang/ArithmeticException;",        \
-                    "divide by zero");                                      \
+                dvmThrowArithmeticException("divide by zero");              \
                 GOTO_exceptionThrown();                                     \
             }                                                               \
             if ((u8)firstVal == 0x8000000000000000ULL &&                    \
@@ -1003,12 +914,13 @@ GOTO_TARGET_DECL(exceptionThrown);
         if (!checkForNull((Object*) arrayObj))                              \
             GOTO_exceptionThrown();                                         \
         if (GET_REGISTER(vsrc2) >= arrayObj->length) {                      \
-            dvmThrowAIOOBE(GET_REGISTER(vsrc2), arrayObj->length);          \
+            dvmThrowArrayIndexOutOfBoundsException(                         \
+                arrayObj->length, GET_REGISTER(vsrc2));                     \
             GOTO_exceptionThrown();                                         \
         }                                                                   \
         SET_REGISTER##_regsize(vdst,                                        \
-            ((_type*) arrayObj->contents)[GET_REGISTER(vsrc2)]);            \
-        ILOGV("+ AGET[%d]=0x%x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));  \
+            ((_type*)(void*)arrayObj->contents)[GET_REGISTER(vsrc2)]);      \
+        ILOGV("+ AGET[%d]=%#x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));   \
     }                                                                       \
     FINISH(2);
 
@@ -1027,11 +939,12 @@ GOTO_TARGET_DECL(exceptionThrown);
         if (!checkForNull((Object*) arrayObj))                              \
             GOTO_exceptionThrown();                                         \
         if (GET_REGISTER(vsrc2) >= arrayObj->length) {                      \
-            dvmThrowAIOOBE(GET_REGISTER(vsrc2), arrayObj->length);          \
+            dvmThrowArrayIndexOutOfBoundsException(                         \
+                arrayObj->length, GET_REGISTER(vsrc2));                     \
             GOTO_exceptionThrown();                                         \
         }                                                                   \
         ILOGV("+ APUT[%d]=0x%08x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));\
-        ((_type*) arrayObj->contents)[GET_REGISTER(vsrc2)] =                \
+        ((_type*)(void*)arrayObj->contents)[GET_REGISTER(vsrc2)] =          \
             GET_REGISTER##_regsize(vdst);                                   \
     }                                                                       \
     FINISH(2);
@@ -1074,9 +987,8 @@ GOTO_TARGET_DECL(exceptionThrown);
         }                                                                   \
         SET_REGISTER##_regsize(vdst,                                        \
             dvmGetField##_ftype(obj, ifield->byteOffset));                  \
-        ILOGV("+ IGET '%s'=0x%08llx", ifield->field.name,                   \
+        ILOGV("+ IGET '%s'=0x%08llx", ifield->name,                         \
             (u8) GET_REGISTER##_regsize(vdst));                             \
-        UPDATE_FIELD_GET(&ifield->field);                                   \
     }                                                                       \
     FINISH(2);
 
@@ -1119,9 +1031,8 @@ GOTO_TARGET_DECL(exceptionThrown);
         }                                                                   \
         dvmSetField##_ftype(obj, ifield->byteOffset,                        \
             GET_REGISTER##_regsize(vdst));                                  \
-        ILOGV("+ IPUT '%s'=0x%08llx", ifield->field.name,                   \
+        ILOGV("+ IPUT '%s'=0x%08llx", ifield->name,                         \
             (u8) GET_REGISTER##_regsize(vdst));                             \
-        UPDATE_FIELD_PUT(&ifield->field);                                   \
     }                                                                       \
     FINISH(2);
 
@@ -1145,9 +1056,12 @@ GOTO_TARGET_DECL(exceptionThrown);
 
 /*
  * The JIT needs dvmDexGetResolvedField() to return non-null.
- * Since we use the portable interpreter to build the trace, the extra
- * checks in HANDLE_SGET_X and HANDLE_SPUT_X are not needed for mterp.
+ * Because the portable interpreter is not involved with the JIT
+ * and trace building, we only need the extra check here when this
+ * code is massaged into a stub called from an assembly interpreter.
+ * This is controlled by the JIT_STUB_HACK maco.
  */
+
 #define HANDLE_SGET_X(_opcode, _opname, _ftype, _regsize)                   \
     HANDLE_OPCODE(_opcode /*vAA, field@BBBB*/)                              \
     {                                                                       \
@@ -1162,13 +1076,12 @@ GOTO_TARGET_DECL(exceptionThrown);
             if (sfield == NULL)                                             \
                 GOTO_exceptionThrown();                                     \
             if (dvmDexGetResolvedField(methodClassDex, ref) == NULL) {      \
-                ABORT_JIT_TSELECT();                                        \
+                JIT_STUB_HACK(dvmJitEndTraceSelect(self,pc));               \
             }                                                               \
         }                                                                   \
         SET_REGISTER##_regsize(vdst, dvmGetStaticField##_ftype(sfield));    \
         ILOGV("+ SGET '%s'=0x%08llx",                                       \
-            sfield->field.name, (u8)GET_REGISTER##_regsize(vdst));          \
-        UPDATE_FIELD_GET(&sfield->field);                                   \
+            sfield->name, (u8)GET_REGISTER##_regsize(vdst));                \
     }                                                                       \
     FINISH(2);
 
@@ -1186,55 +1099,1692 @@ GOTO_TARGET_DECL(exceptionThrown);
             if (sfield == NULL)                                             \
                 GOTO_exceptionThrown();                                     \
             if (dvmDexGetResolvedField(methodClassDex, ref) == NULL) {      \
-                ABORT_JIT_TSELECT();                                        \
+                JIT_STUB_HACK(dvmJitEndTraceSelect(self,pc));               \
             }                                                               \
         }                                                                   \
         dvmSetStaticField##_ftype(sfield, GET_REGISTER##_regsize(vdst));    \
         ILOGV("+ SPUT '%s'=0x%08llx",                                       \
-            sfield->field.name, (u8)GET_REGISTER##_regsize(vdst));          \
-        UPDATE_FIELD_PUT(&sfield->field);                                   \
+            sfield->name, (u8)GET_REGISTER##_regsize(vdst));                \
     }                                                                       \
     FINISH(2);
 
-/* File: c/OP_IGET_VOLATILE.c */
+/* File: portable/entry.cpp */
+/*
+ * Main interpreter loop.
+ *
+ * This was written with an ARM implementation in mind.
+ */
+void dvmInterpretPortable(Thread* self)
+{
+#if defined(EASY_GDB)
+    StackSaveArea* debugSaveArea = SAVEAREA_FROM_FP(self->interpSave.curFrame);
+#endif
+    DvmDex* methodClassDex;     // curMethod->clazz->pDvmDex
+    JValue retval;
+
+    /* core state */
+    const Method* curMethod;    // method we're interpreting
+    const u2* pc;               // program counter
+    u4* fp;                     // frame pointer
+    u2 inst;                    // current instruction
+    /* instruction decoding */
+    u4 ref;                     // 16 or 32-bit quantity fetched directly
+    u2 vsrc1, vsrc2, vdst;      // usually used for register indexes
+    /* method call setup */
+    const Method* methodToCall;
+    bool methodCallRange;
+
+    /* static computed goto table */
+    DEFINE_GOTO_TABLE(handlerTable);
+
+    /* copy state in */
+    curMethod = self->interpSave.method;
+    pc = self->interpSave.pc;
+    fp = self->interpSave.curFrame;
+    retval = self->interpSave.retval;   /* only need for kInterpEntryReturn? */
+
+    methodClassDex = curMethod->clazz->pDvmDex;
+
+    LOGVV("threadid=%d: %s.%s pc=%#x fp=%p",
+        self->threadId, curMethod->clazz->descriptor, curMethod->name,
+        pc - curMethod->insns, fp);
+
+    /*
+     * Handle any ongoing profiling and prep for debugging.
+     */
+    if (self->interpBreak.ctl.subMode != 0) {
+        TRACE_METHOD_ENTER(self, curMethod);
+        self->debugIsMethodEntry = true;   // Always true on startup
+    }
+    /*
+     * DEBUG: scramble this to ensure we're not relying on it.
+     */
+    methodToCall = (const Method*) -1;
+
+#if 0
+    if (self->debugIsMethodEntry) {
+        ILOGD("|-- Now interpreting %s.%s", curMethod->clazz->descriptor,
+                curMethod->name);
+        DUMP_REGS(curMethod, self->interpSave.curFrame, false);
+    }
+#endif
+
+    FINISH(0);                  /* fetch and execute first instruction */
+
+/*--- start of opcodes ---*/
+
+/* File: c/OP_NOP.cpp */
+HANDLE_OPCODE(OP_NOP)
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MOVE.cpp */
+HANDLE_OPCODE(OP_MOVE /*vA, vB*/)
+    vdst = INST_A(inst);
+    vsrc1 = INST_B(inst);
+    ILOGV("|move%s v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MOVE_FROM16.cpp */
+HANDLE_OPCODE(OP_MOVE_FROM16 /*vAA, vBBBB*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|move%s/from16 v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE_FROM16) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(2);
+OP_END
+
+/* File: c/OP_MOVE_16.cpp */
+HANDLE_OPCODE(OP_MOVE_16 /*vAAAA, vBBBB*/)
+    vdst = FETCH(1);
+    vsrc1 = FETCH(2);
+    ILOGV("|move%s/16 v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE_16) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(3);
+OP_END
+
+/* File: c/OP_MOVE_WIDE.cpp */
+HANDLE_OPCODE(OP_MOVE_WIDE /*vA, vB*/)
+    /* IMPORTANT: must correctly handle overlapping registers, e.g. both
+     * "move-wide v6, v7" and "move-wide v7, v6" */
+    vdst = INST_A(inst);
+    vsrc1 = INST_B(inst);
+    ILOGV("|move-wide v%d,v%d %s(v%d=0x%08llx)", vdst, vsrc1,
+        kSpacing+5, vdst, GET_REGISTER_WIDE(vsrc1));
+    SET_REGISTER_WIDE(vdst, GET_REGISTER_WIDE(vsrc1));
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MOVE_WIDE_FROM16.cpp */
+HANDLE_OPCODE(OP_MOVE_WIDE_FROM16 /*vAA, vBBBB*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|move-wide/from16 v%d,v%d  (v%d=0x%08llx)", vdst, vsrc1,
+        vdst, GET_REGISTER_WIDE(vsrc1));
+    SET_REGISTER_WIDE(vdst, GET_REGISTER_WIDE(vsrc1));
+    FINISH(2);
+OP_END
+
+/* File: c/OP_MOVE_WIDE_16.cpp */
+HANDLE_OPCODE(OP_MOVE_WIDE_16 /*vAAAA, vBBBB*/)
+    vdst = FETCH(1);
+    vsrc1 = FETCH(2);
+    ILOGV("|move-wide/16 v%d,v%d %s(v%d=0x%08llx)", vdst, vsrc1,
+        kSpacing+8, vdst, GET_REGISTER_WIDE(vsrc1));
+    SET_REGISTER_WIDE(vdst, GET_REGISTER_WIDE(vsrc1));
+    FINISH(3);
+OP_END
+
+/* File: c/OP_MOVE_OBJECT.cpp */
+/* File: c/OP_MOVE.cpp */
+HANDLE_OPCODE(OP_MOVE_OBJECT /*vA, vB*/)
+    vdst = INST_A(inst);
+    vsrc1 = INST_B(inst);
+    ILOGV("|move%s v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(1);
+OP_END
+
+
+/* File: c/OP_MOVE_OBJECT_FROM16.cpp */
+/* File: c/OP_MOVE_FROM16.cpp */
+HANDLE_OPCODE(OP_MOVE_OBJECT_FROM16 /*vAA, vBBBB*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|move%s/from16 v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE_FROM16) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(2);
+OP_END
+
+
+/* File: c/OP_MOVE_OBJECT_16.cpp */
+/* File: c/OP_MOVE_16.cpp */
+HANDLE_OPCODE(OP_MOVE_OBJECT_16 /*vAAAA, vBBBB*/)
+    vdst = FETCH(1);
+    vsrc1 = FETCH(2);
+    ILOGV("|move%s/16 v%d,v%d %s(v%d=0x%08x)",
+        (INST_INST(inst) == OP_MOVE_16) ? "" : "-object", vdst, vsrc1,
+        kSpacing, vdst, GET_REGISTER(vsrc1));
+    SET_REGISTER(vdst, GET_REGISTER(vsrc1));
+    FINISH(3);
+OP_END
+
+
+/* File: c/OP_MOVE_RESULT.cpp */
+HANDLE_OPCODE(OP_MOVE_RESULT /*vAA*/)
+    vdst = INST_AA(inst);
+    ILOGV("|move-result%s v%d %s(v%d=0x%08x)",
+         (INST_INST(inst) == OP_MOVE_RESULT) ? "" : "-object",
+         vdst, kSpacing+4, vdst,retval.i);
+    SET_REGISTER(vdst, retval.i);
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MOVE_RESULT_WIDE.cpp */
+HANDLE_OPCODE(OP_MOVE_RESULT_WIDE /*vAA*/)
+    vdst = INST_AA(inst);
+    ILOGV("|move-result-wide v%d %s(0x%08llx)", vdst, kSpacing, retval.j);
+    SET_REGISTER_WIDE(vdst, retval.j);
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MOVE_RESULT_OBJECT.cpp */
+/* File: c/OP_MOVE_RESULT.cpp */
+HANDLE_OPCODE(OP_MOVE_RESULT_OBJECT /*vAA*/)
+    vdst = INST_AA(inst);
+    ILOGV("|move-result%s v%d %s(v%d=0x%08x)",
+         (INST_INST(inst) == OP_MOVE_RESULT) ? "" : "-object",
+         vdst, kSpacing+4, vdst,retval.i);
+    SET_REGISTER(vdst, retval.i);
+    FINISH(1);
+OP_END
+
+
+/* File: c/OP_MOVE_EXCEPTION.cpp */
+HANDLE_OPCODE(OP_MOVE_EXCEPTION /*vAA*/)
+    vdst = INST_AA(inst);
+    ILOGV("|move-exception v%d", vdst);
+    assert(self->exception != NULL);
+    SET_REGISTER(vdst, (u4)self->exception);
+    dvmClearException(self);
+    FINISH(1);
+OP_END
+
+/* File: c/OP_RETURN_VOID.cpp */
+HANDLE_OPCODE(OP_RETURN_VOID /**/)
+    ILOGV("|return-void");
+#ifndef NDEBUG
+    retval.j = 0xababababULL;    // placate valgrind
+#endif
+    GOTO_returnFromMethod();
+OP_END
+
+/* File: c/OP_RETURN.cpp */
+HANDLE_OPCODE(OP_RETURN /*vAA*/)
+    vsrc1 = INST_AA(inst);
+    ILOGV("|return%s v%d",
+        (INST_INST(inst) == OP_RETURN) ? "" : "-object", vsrc1);
+    retval.i = GET_REGISTER(vsrc1);
+    GOTO_returnFromMethod();
+OP_END
+
+/* File: c/OP_RETURN_WIDE.cpp */
+HANDLE_OPCODE(OP_RETURN_WIDE /*vAA*/)
+    vsrc1 = INST_AA(inst);
+    ILOGV("|return-wide v%d", vsrc1);
+    retval.j = GET_REGISTER_WIDE(vsrc1);
+    GOTO_returnFromMethod();
+OP_END
+
+/* File: c/OP_RETURN_OBJECT.cpp */
+/* File: c/OP_RETURN.cpp */
+HANDLE_OPCODE(OP_RETURN_OBJECT /*vAA*/)
+    vsrc1 = INST_AA(inst);
+    ILOGV("|return%s v%d",
+        (INST_INST(inst) == OP_RETURN) ? "" : "-object", vsrc1);
+    retval.i = GET_REGISTER(vsrc1);
+    GOTO_returnFromMethod();
+OP_END
+
+
+/* File: c/OP_CONST_4.cpp */
+HANDLE_OPCODE(OP_CONST_4 /*vA, #+B*/)
+    {
+        s4 tmp;
+
+        vdst = INST_A(inst);
+        tmp = (s4) (INST_B(inst) << 28) >> 28;  // sign extend 4-bit value
+        ILOGV("|const/4 v%d,#0x%02x", vdst, (s4)tmp);
+        SET_REGISTER(vdst, tmp);
+    }
+    FINISH(1);
+OP_END
+
+/* File: c/OP_CONST_16.cpp */
+HANDLE_OPCODE(OP_CONST_16 /*vAA, #+BBBB*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|const/16 v%d,#0x%04x", vdst, (s2)vsrc1);
+    SET_REGISTER(vdst, (s2) vsrc1);
+    FINISH(2);
+OP_END
+
+/* File: c/OP_CONST.cpp */
+HANDLE_OPCODE(OP_CONST /*vAA, #+BBBBBBBB*/)
+    {
+        u4 tmp;
+
+        vdst = INST_AA(inst);
+        tmp = FETCH(1);
+        tmp |= (u4)FETCH(2) << 16;
+        ILOGV("|const v%d,#0x%08x", vdst, tmp);
+        SET_REGISTER(vdst, tmp);
+    }
+    FINISH(3);
+OP_END
+
+/* File: c/OP_CONST_HIGH16.cpp */
+HANDLE_OPCODE(OP_CONST_HIGH16 /*vAA, #+BBBB0000*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|const/high16 v%d,#0x%04x0000", vdst, vsrc1);
+    SET_REGISTER(vdst, vsrc1 << 16);
+    FINISH(2);
+OP_END
+
+/* File: c/OP_CONST_WIDE_16.cpp */
+HANDLE_OPCODE(OP_CONST_WIDE_16 /*vAA, #+BBBB*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|const-wide/16 v%d,#0x%04x", vdst, (s2)vsrc1);
+    SET_REGISTER_WIDE(vdst, (s2)vsrc1);
+    FINISH(2);
+OP_END
+
+/* File: c/OP_CONST_WIDE_32.cpp */
+HANDLE_OPCODE(OP_CONST_WIDE_32 /*vAA, #+BBBBBBBB*/)
+    {
+        u4 tmp;
+
+        vdst = INST_AA(inst);
+        tmp = FETCH(1);
+        tmp |= (u4)FETCH(2) << 16;
+        ILOGV("|const-wide/32 v%d,#0x%08x", vdst, tmp);
+        SET_REGISTER_WIDE(vdst, (s4) tmp);
+    }
+    FINISH(3);
+OP_END
+
+/* File: c/OP_CONST_WIDE.cpp */
+HANDLE_OPCODE(OP_CONST_WIDE /*vAA, #+BBBBBBBBBBBBBBBB*/)
+    {
+        u8 tmp;
+
+        vdst = INST_AA(inst);
+        tmp = FETCH(1);
+        tmp |= (u8)FETCH(2) << 16;
+        tmp |= (u8)FETCH(3) << 32;
+        tmp |= (u8)FETCH(4) << 48;
+        ILOGV("|const-wide v%d,#0x%08llx", vdst, tmp);
+        SET_REGISTER_WIDE(vdst, tmp);
+    }
+    FINISH(5);
+OP_END
+
+/* File: c/OP_CONST_WIDE_HIGH16.cpp */
+HANDLE_OPCODE(OP_CONST_WIDE_HIGH16 /*vAA, #+BBBB000000000000*/)
+    vdst = INST_AA(inst);
+    vsrc1 = FETCH(1);
+    ILOGV("|const-wide/high16 v%d,#0x%04x000000000000", vdst, vsrc1);
+    SET_REGISTER_WIDE(vdst, ((u8) vsrc1) << 48);
+    FINISH(2);
+OP_END
+
+/* File: c/OP_CONST_STRING.cpp */
+HANDLE_OPCODE(OP_CONST_STRING /*vAA, string@BBBB*/)
+    {
+        StringObject* strObj;
+
+        vdst = INST_AA(inst);
+        ref = FETCH(1);
+        ILOGV("|const-string v%d string@0x%04x", vdst, ref);
+        strObj = dvmDexGetResolvedString(methodClassDex, ref);
+        if (strObj == NULL) {
+            EXPORT_PC();
+            strObj = dvmResolveString(curMethod->clazz, ref);
+            if (strObj == NULL)
+                GOTO_exceptionThrown();
+        }
+        SET_REGISTER(vdst, (u4) strObj);
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_CONST_STRING_JUMBO.cpp */
+HANDLE_OPCODE(OP_CONST_STRING_JUMBO /*vAA, string@BBBBBBBB*/)
+    {
+        StringObject* strObj;
+        u4 tmp;
+
+        vdst = INST_AA(inst);
+        tmp = FETCH(1);
+        tmp |= (u4)FETCH(2) << 16;
+        ILOGV("|const-string/jumbo v%d string@0x%08x", vdst, tmp);
+        strObj = dvmDexGetResolvedString(methodClassDex, tmp);
+        if (strObj == NULL) {
+            EXPORT_PC();
+            strObj = dvmResolveString(curMethod->clazz, tmp);
+            if (strObj == NULL)
+                GOTO_exceptionThrown();
+        }
+        SET_REGISTER(vdst, (u4) strObj);
+    }
+    FINISH(3);
+OP_END
+
+/* File: c/OP_CONST_CLASS.cpp */
+HANDLE_OPCODE(OP_CONST_CLASS /*vAA, class@BBBB*/)
+    {
+        ClassObject* clazz;
+
+        vdst = INST_AA(inst);
+        ref = FETCH(1);
+        ILOGV("|const-class v%d class@0x%04x", vdst, ref);
+        clazz = dvmDexGetResolvedClass(methodClassDex, ref);
+        if (clazz == NULL) {
+            EXPORT_PC();
+            clazz = dvmResolveClass(curMethod->clazz, ref, true);
+            if (clazz == NULL)
+                GOTO_exceptionThrown();
+        }
+        SET_REGISTER(vdst, (u4) clazz);
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_MONITOR_ENTER.cpp */
+HANDLE_OPCODE(OP_MONITOR_ENTER /*vAA*/)
+    {
+        Object* obj;
+
+        vsrc1 = INST_AA(inst);
+        ILOGV("|monitor-enter v%d %s(0x%08x)",
+            vsrc1, kSpacing+6, GET_REGISTER(vsrc1));
+        obj = (Object*)GET_REGISTER(vsrc1);
+        if (!checkForNullExportPC(obj, fp, pc))
+            GOTO_exceptionThrown();
+        ILOGV("+ locking %p %s", obj, obj->clazz->descriptor);
+        EXPORT_PC();    /* need for precise GC */
+        dvmLockObject(self, obj);
+    }
+    FINISH(1);
+OP_END
+
+/* File: c/OP_MONITOR_EXIT.cpp */
+HANDLE_OPCODE(OP_MONITOR_EXIT /*vAA*/)
+    {
+        Object* obj;
+
+        EXPORT_PC();
+
+        vsrc1 = INST_AA(inst);
+        ILOGV("|monitor-exit v%d %s(0x%08x)",
+            vsrc1, kSpacing+5, GET_REGISTER(vsrc1));
+        obj = (Object*)GET_REGISTER(vsrc1);
+        if (!checkForNull(obj)) {
+            /*
+             * The exception needs to be processed at the *following*
+             * instruction, not the current instruction (see the Dalvik
+             * spec).  Because we're jumping to an exception handler,
+             * we're not actually at risk of skipping an instruction
+             * by doing so.
+             */
+            ADJUST_PC(1);           /* monitor-exit width is 1 */
+            GOTO_exceptionThrown();
+        }
+        ILOGV("+ unlocking %p %s", obj, obj->clazz->descriptor);
+        if (!dvmUnlockObject(self, obj)) {
+            assert(dvmCheckException(self));
+            ADJUST_PC(1);
+            GOTO_exceptionThrown();
+        }
+    }
+    FINISH(1);
+OP_END
+
+/* File: c/OP_CHECK_CAST.cpp */
+HANDLE_OPCODE(OP_CHECK_CAST /*vAA, class@BBBB*/)
+    {
+        ClassObject* clazz;
+        Object* obj;
+
+        EXPORT_PC();
+
+        vsrc1 = INST_AA(inst);
+        ref = FETCH(1);         /* class to check against */
+        ILOGV("|check-cast v%d,class@0x%04x", vsrc1, ref);
+
+        obj = (Object*)GET_REGISTER(vsrc1);
+        if (obj != NULL) {
+#if defined(WITH_EXTRA_OBJECT_VALIDATION)
+            if (!checkForNull(obj))
+                GOTO_exceptionThrown();
+#endif
+            clazz = dvmDexGetResolvedClass(methodClassDex, ref);
+            if (clazz == NULL) {
+                clazz = dvmResolveClass(curMethod->clazz, ref, false);
+                if (clazz == NULL)
+                    GOTO_exceptionThrown();
+            }
+            if (!dvmInstanceof(obj->clazz, clazz)) {
+                dvmThrowClassCastException(obj->clazz, clazz);
+                GOTO_exceptionThrown();
+            }
+        }
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_INSTANCE_OF.cpp */
+HANDLE_OPCODE(OP_INSTANCE_OF /*vA, vB, class@CCCC*/)
+    {
+        ClassObject* clazz;
+        Object* obj;
+
+        vdst = INST_A(inst);
+        vsrc1 = INST_B(inst);   /* object to check */
+        ref = FETCH(1);         /* class to check against */
+        ILOGV("|instance-of v%d,v%d,class@0x%04x", vdst, vsrc1, ref);
+
+        obj = (Object*)GET_REGISTER(vsrc1);
+        if (obj == NULL) {
+            SET_REGISTER(vdst, 0);
+        } else {
+#if defined(WITH_EXTRA_OBJECT_VALIDATION)
+            if (!checkForNullExportPC(obj, fp, pc))
+                GOTO_exceptionThrown();
+#endif
+            clazz = dvmDexGetResolvedClass(methodClassDex, ref);
+            if (clazz == NULL) {
+                EXPORT_PC();
+                clazz = dvmResolveClass(curMethod->clazz, ref, true);
+                if (clazz == NULL)
+                    GOTO_exceptionThrown();
+            }
+            SET_REGISTER(vdst, dvmInstanceof(obj->clazz, clazz));
+        }
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_ARRAY_LENGTH.cpp */
+HANDLE_OPCODE(OP_ARRAY_LENGTH /*vA, vB*/)
+    {
+        ArrayObject* arrayObj;
+
+        vdst = INST_A(inst);
+        vsrc1 = INST_B(inst);
+        arrayObj = (ArrayObject*) GET_REGISTER(vsrc1);
+        ILOGV("|array-length v%d,v%d  (%p)", vdst, vsrc1, arrayObj);
+        if (!checkForNullExportPC((Object*) arrayObj, fp, pc))
+            GOTO_exceptionThrown();
+        /* verifier guarantees this is an array reference */
+        SET_REGISTER(vdst, arrayObj->length);
+    }
+    FINISH(1);
+OP_END
+
+/* File: c/OP_NEW_INSTANCE.cpp */
+HANDLE_OPCODE(OP_NEW_INSTANCE /*vAA, class@BBBB*/)
+    {
+        ClassObject* clazz;
+        Object* newObj;
+
+        EXPORT_PC();
+
+        vdst = INST_AA(inst);
+        ref = FETCH(1);
+        ILOGV("|new-instance v%d,class@0x%04x", vdst, ref);
+        clazz = dvmDexGetResolvedClass(methodClassDex, ref);
+        if (clazz == NULL) {
+            clazz = dvmResolveClass(curMethod->clazz, ref, false);
+            if (clazz == NULL)
+                GOTO_exceptionThrown();
+        }
+
+        if (!dvmIsClassInitialized(clazz) && !dvmInitClass(clazz))
+            GOTO_exceptionThrown();
+
+#if defined(WITH_JIT)
+        /*
+         * The JIT needs dvmDexGetResolvedClass() to return non-null.
+         * Since we use the portable interpreter to build the trace, this extra
+         * check is not needed for mterp.
+         */
+        if ((self->interpBreak.ctl.subMode & kSubModeJitTraceBuild) &&
+            (!dvmDexGetResolvedClass(methodClassDex, ref))) {
+            /* Class initialization is still ongoing - end the trace */
+            dvmJitEndTraceSelect(self,pc);
+        }
+#endif
+
+        /*
+         * Verifier now tests for interface/abstract class.
+         */
+        //if (dvmIsInterfaceClass(clazz) || dvmIsAbstractClass(clazz)) {
+        //    dvmThrowExceptionWithClassMessage(gDvm.exInstantiationError,
+        //        clazz->descriptor);
+        //    GOTO_exceptionThrown();
+        //}
+        newObj = dvmAllocObject(clazz, ALLOC_DONT_TRACK);
+        if (newObj == NULL)
+            GOTO_exceptionThrown();
+        SET_REGISTER(vdst, (u4) newObj);
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_NEW_ARRAY.cpp */
+HANDLE_OPCODE(OP_NEW_ARRAY /*vA, vB, class@CCCC*/)
+    {
+        ClassObject* arrayClass;
+        ArrayObject* newArray;
+        s4 length;
+
+        EXPORT_PC();
+
+        vdst = INST_A(inst);
+        vsrc1 = INST_B(inst);       /* length reg */
+        ref = FETCH(1);
+        ILOGV("|new-array v%d,v%d,class@0x%04x  (%d elements)",
+            vdst, vsrc1, ref, (s4) GET_REGISTER(vsrc1));
+        length = (s4) GET_REGISTER(vsrc1);
+        if (length < 0) {
+            dvmThrowNegativeArraySizeException(length);
+            GOTO_exceptionThrown();
+        }
+        arrayClass = dvmDexGetResolvedClass(methodClassDex, ref);
+        if (arrayClass == NULL) {
+            arrayClass = dvmResolveClass(curMethod->clazz, ref, false);
+            if (arrayClass == NULL)
+                GOTO_exceptionThrown();
+        }
+        /* verifier guarantees this is an array class */
+        assert(dvmIsArrayClass(arrayClass));
+        assert(dvmIsClassInitialized(arrayClass));
+
+        newArray = dvmAllocArrayByClass(arrayClass, length, ALLOC_DONT_TRACK);
+        if (newArray == NULL)
+            GOTO_exceptionThrown();
+        SET_REGISTER(vdst, (u4) newArray);
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_FILLED_NEW_ARRAY.cpp */
+HANDLE_OPCODE(OP_FILLED_NEW_ARRAY /*vB, {vD, vE, vF, vG, vA}, class@CCCC*/)
+    GOTO_invoke(filledNewArray, false);
+OP_END
+
+/* File: c/OP_FILLED_NEW_ARRAY_RANGE.cpp */
+HANDLE_OPCODE(OP_FILLED_NEW_ARRAY_RANGE /*{vCCCC..v(CCCC+AA-1)}, class@BBBB*/)
+    GOTO_invoke(filledNewArray, true);
+OP_END
+
+/* File: c/OP_FILL_ARRAY_DATA.cpp */
+HANDLE_OPCODE(OP_FILL_ARRAY_DATA)   /*vAA, +BBBBBBBB*/
+    {
+        const u2* arrayData;
+        s4 offset;
+        ArrayObject* arrayObj;
+
+        EXPORT_PC();
+        vsrc1 = INST_AA(inst);
+        offset = FETCH(1) | (((s4) FETCH(2)) << 16);
+        ILOGV("|fill-array-data v%d +0x%04x", vsrc1, offset);
+        arrayData = pc + offset;       // offset in 16-bit units
+#ifndef NDEBUG
+        if (arrayData < curMethod->insns ||
+            arrayData >= curMethod->insns + dvmGetMethodInsnsSize(curMethod))
+        {
+            /* should have been caught in verifier */
+            dvmThrowInternalError("bad fill array data");
+            GOTO_exceptionThrown();
+        }
+#endif
+        arrayObj = (ArrayObject*) GET_REGISTER(vsrc1);
+        if (!dvmInterpHandleFillArrayData(arrayObj, arrayData)) {
+            GOTO_exceptionThrown();
+        }
+        FINISH(3);
+    }
+OP_END
+
+/* File: c/OP_THROW.cpp */
+HANDLE_OPCODE(OP_THROW /*vAA*/)
+    {
+        Object* obj;
+
+        /*
+         * We don't create an exception here, but the process of searching
+         * for a catch block can do class lookups and throw exceptions.
+         * We need to update the saved PC.
+         */
+        EXPORT_PC();
+
+        vsrc1 = INST_AA(inst);
+        ILOGV("|throw v%d  (%p)", vsrc1, (void*)GET_REGISTER(vsrc1));
+        obj = (Object*) GET_REGISTER(vsrc1);
+        if (!checkForNull(obj)) {
+            /* will throw a null pointer exception */
+            LOGVV("Bad exception");
+        } else {
+            /* use the requested exception */
+            dvmSetException(self, obj);
+        }
+        GOTO_exceptionThrown();
+    }
+OP_END
+
+/* File: c/OP_GOTO.cpp */
+HANDLE_OPCODE(OP_GOTO /*+AA*/)
+    vdst = INST_AA(inst);
+    if ((s1)vdst < 0)
+        ILOGV("|goto -0x%02x", -((s1)vdst));
+    else
+        ILOGV("|goto +0x%02x", ((s1)vdst));
+    ILOGV("> branch taken");
+    if ((s1)vdst < 0)
+        PERIODIC_CHECKS((s1)vdst);
+    FINISH((s1)vdst);
+OP_END
+
+/* File: c/OP_GOTO_16.cpp */
+HANDLE_OPCODE(OP_GOTO_16 /*+AAAA*/)
+    {
+        s4 offset = (s2) FETCH(1);          /* sign-extend next code unit */
+
+        if (offset < 0)
+            ILOGV("|goto/16 -0x%04x", -offset);
+        else
+            ILOGV("|goto/16 +0x%04x", offset);
+        ILOGV("> branch taken");
+        if (offset < 0)
+            PERIODIC_CHECKS(offset);
+        FINISH(offset);
+    }
+OP_END
+
+/* File: c/OP_GOTO_32.cpp */
+HANDLE_OPCODE(OP_GOTO_32 /*+AAAAAAAA*/)
+    {
+        s4 offset = FETCH(1);               /* low-order 16 bits */
+        offset |= ((s4) FETCH(2)) << 16;    /* high-order 16 bits */
+
+        if (offset < 0)
+            ILOGV("|goto/32 -0x%08x", -offset);
+        else
+            ILOGV("|goto/32 +0x%08x", offset);
+        ILOGV("> branch taken");
+        if (offset <= 0)    /* allowed to branch to self */
+            PERIODIC_CHECKS(offset);
+        FINISH(offset);
+    }
+OP_END
+
+/* File: c/OP_PACKED_SWITCH.cpp */
+HANDLE_OPCODE(OP_PACKED_SWITCH /*vAA, +BBBB*/)
+    {
+        const u2* switchData;
+        u4 testVal;
+        s4 offset;
+
+        vsrc1 = INST_AA(inst);
+        offset = FETCH(1) | (((s4) FETCH(2)) << 16);
+        ILOGV("|packed-switch v%d +0x%04x", vsrc1, offset);
+        switchData = pc + offset;       // offset in 16-bit units
+#ifndef NDEBUG
+        if (switchData < curMethod->insns ||
+            switchData >= curMethod->insns + dvmGetMethodInsnsSize(curMethod))
+        {
+            /* should have been caught in verifier */
+            EXPORT_PC();
+            dvmThrowInternalError("bad packed switch");
+            GOTO_exceptionThrown();
+        }
+#endif
+        testVal = GET_REGISTER(vsrc1);
+
+        offset = dvmInterpHandlePackedSwitch(switchData, testVal);
+        ILOGV("> branch taken (0x%04x)", offset);
+        if (offset <= 0)  /* uncommon */
+            PERIODIC_CHECKS(offset);
+        FINISH(offset);
+    }
+OP_END
+
+/* File: c/OP_SPARSE_SWITCH.cpp */
+HANDLE_OPCODE(OP_SPARSE_SWITCH /*vAA, +BBBB*/)
+    {
+        const u2* switchData;
+        u4 testVal;
+        s4 offset;
+
+        vsrc1 = INST_AA(inst);
+        offset = FETCH(1) | (((s4) FETCH(2)) << 16);
+        ILOGV("|sparse-switch v%d +0x%04x", vsrc1, offset);
+        switchData = pc + offset;       // offset in 16-bit units
+#ifndef NDEBUG
+        if (switchData < curMethod->insns ||
+            switchData >= curMethod->insns + dvmGetMethodInsnsSize(curMethod))
+        {
+            /* should have been caught in verifier */
+            EXPORT_PC();
+            dvmThrowInternalError("bad sparse switch");
+            GOTO_exceptionThrown();
+        }
+#endif
+        testVal = GET_REGISTER(vsrc1);
+
+        offset = dvmInterpHandleSparseSwitch(switchData, testVal);
+        ILOGV("> branch taken (0x%04x)", offset);
+        if (offset <= 0)  /* uncommon */
+            PERIODIC_CHECKS(offset);
+        FINISH(offset);
+    }
+OP_END
+
+/* File: c/OP_CMPL_FLOAT.cpp */
+HANDLE_OP_CMPX(OP_CMPL_FLOAT, "l-float", float, _FLOAT, -1)
+OP_END
+
+/* File: c/OP_CMPG_FLOAT.cpp */
+HANDLE_OP_CMPX(OP_CMPG_FLOAT, "g-float", float, _FLOAT, 1)
+OP_END
+
+/* File: c/OP_CMPL_DOUBLE.cpp */
+HANDLE_OP_CMPX(OP_CMPL_DOUBLE, "l-double", double, _DOUBLE, -1)
+OP_END
+
+/* File: c/OP_CMPG_DOUBLE.cpp */
+HANDLE_OP_CMPX(OP_CMPG_DOUBLE, "g-double", double, _DOUBLE, 1)
+OP_END
+
+/* File: c/OP_CMP_LONG.cpp */
+HANDLE_OP_CMPX(OP_CMP_LONG, "-long", s8, _WIDE, 0)
+OP_END
+
+/* File: c/OP_IF_EQ.cpp */
+HANDLE_OP_IF_XX(OP_IF_EQ, "eq", ==)
+OP_END
+
+/* File: c/OP_IF_NE.cpp */
+HANDLE_OP_IF_XX(OP_IF_NE, "ne", !=)
+OP_END
+
+/* File: c/OP_IF_LT.cpp */
+HANDLE_OP_IF_XX(OP_IF_LT, "lt", <)
+OP_END
+
+/* File: c/OP_IF_GE.cpp */
+HANDLE_OP_IF_XX(OP_IF_GE, "ge", >=)
+OP_END
+
+/* File: c/OP_IF_GT.cpp */
+HANDLE_OP_IF_XX(OP_IF_GT, "gt", >)
+OP_END
+
+/* File: c/OP_IF_LE.cpp */
+HANDLE_OP_IF_XX(OP_IF_LE, "le", <=)
+OP_END
+
+/* File: c/OP_IF_EQZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_EQZ, "eqz", ==)
+OP_END
+
+/* File: c/OP_IF_NEZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_NEZ, "nez", !=)
+OP_END
+
+/* File: c/OP_IF_LTZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_LTZ, "ltz", <)
+OP_END
+
+/* File: c/OP_IF_GEZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_GEZ, "gez", >=)
+OP_END
+
+/* File: c/OP_IF_GTZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_GTZ, "gtz", >)
+OP_END
+
+/* File: c/OP_IF_LEZ.cpp */
+HANDLE_OP_IF_XXZ(OP_IF_LEZ, "lez", <=)
+OP_END
+
+/* File: c/OP_UNUSED_3E.cpp */
+HANDLE_OPCODE(OP_UNUSED_3E)
+OP_END
+
+/* File: c/OP_UNUSED_3F.cpp */
+HANDLE_OPCODE(OP_UNUSED_3F)
+OP_END
+
+/* File: c/OP_UNUSED_40.cpp */
+HANDLE_OPCODE(OP_UNUSED_40)
+OP_END
+
+/* File: c/OP_UNUSED_41.cpp */
+HANDLE_OPCODE(OP_UNUSED_41)
+OP_END
+
+/* File: c/OP_UNUSED_42.cpp */
+HANDLE_OPCODE(OP_UNUSED_42)
+OP_END
+
+/* File: c/OP_UNUSED_43.cpp */
+HANDLE_OPCODE(OP_UNUSED_43)
+OP_END
+
+/* File: c/OP_AGET.cpp */
+HANDLE_OP_AGET(OP_AGET, "", u4, )
+OP_END
+
+/* File: c/OP_AGET_WIDE.cpp */
+HANDLE_OP_AGET(OP_AGET_WIDE, "-wide", s8, _WIDE)
+OP_END
+
+/* File: c/OP_AGET_OBJECT.cpp */
+HANDLE_OP_AGET(OP_AGET_OBJECT, "-object", u4, )
+OP_END
+
+/* File: c/OP_AGET_BOOLEAN.cpp */
+HANDLE_OP_AGET(OP_AGET_BOOLEAN, "-boolean", u1, )
+OP_END
+
+/* File: c/OP_AGET_BYTE.cpp */
+HANDLE_OP_AGET(OP_AGET_BYTE, "-byte", s1, )
+OP_END
+
+/* File: c/OP_AGET_CHAR.cpp */
+HANDLE_OP_AGET(OP_AGET_CHAR, "-char", u2, )
+OP_END
+
+/* File: c/OP_AGET_SHORT.cpp */
+HANDLE_OP_AGET(OP_AGET_SHORT, "-short", s2, )
+OP_END
+
+/* File: c/OP_APUT.cpp */
+HANDLE_OP_APUT(OP_APUT, "", u4, )
+OP_END
+
+/* File: c/OP_APUT_WIDE.cpp */
+HANDLE_OP_APUT(OP_APUT_WIDE, "-wide", s8, _WIDE)
+OP_END
+
+/* File: c/OP_APUT_OBJECT.cpp */
+HANDLE_OPCODE(OP_APUT_OBJECT /*vAA, vBB, vCC*/)
+    {
+        ArrayObject* arrayObj;
+        Object* obj;
+        u2 arrayInfo;
+        EXPORT_PC();
+        vdst = INST_AA(inst);       /* AA: source value */
+        arrayInfo = FETCH(1);
+        vsrc1 = arrayInfo & 0xff;   /* BB: array ptr */
+        vsrc2 = arrayInfo >> 8;     /* CC: index */
+        ILOGV("|aput%s v%d,v%d,v%d", "-object", vdst, vsrc1, vsrc2);
+        arrayObj = (ArrayObject*) GET_REGISTER(vsrc1);
+        if (!checkForNull((Object*) arrayObj))
+            GOTO_exceptionThrown();
+        if (GET_REGISTER(vsrc2) >= arrayObj->length) {
+            dvmThrowArrayIndexOutOfBoundsException(
+                arrayObj->length, GET_REGISTER(vsrc2));
+            GOTO_exceptionThrown();
+        }
+        obj = (Object*) GET_REGISTER(vdst);
+        if (obj != NULL) {
+            if (!checkForNull(obj))
+                GOTO_exceptionThrown();
+            if (!dvmCanPutArrayElement(obj->clazz, arrayObj->clazz)) {
+                ALOGV("Can't put a '%s'(%p) into array type='%s'(%p)",
+                    obj->clazz->descriptor, obj,
+                    arrayObj->clazz->descriptor, arrayObj);
+                dvmThrowArrayStoreExceptionIncompatibleElement(obj->clazz, arrayObj->clazz);
+                GOTO_exceptionThrown();
+            }
+        }
+        ILOGV("+ APUT[%d]=0x%08x", GET_REGISTER(vsrc2), GET_REGISTER(vdst));
+        dvmSetObjectArrayElement(arrayObj,
+                                 GET_REGISTER(vsrc2),
+                                 (Object *)GET_REGISTER(vdst));
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_APUT_BOOLEAN.cpp */
+HANDLE_OP_APUT(OP_APUT_BOOLEAN, "-boolean", u1, )
+OP_END
+
+/* File: c/OP_APUT_BYTE.cpp */
+HANDLE_OP_APUT(OP_APUT_BYTE, "-byte", s1, )
+OP_END
+
+/* File: c/OP_APUT_CHAR.cpp */
+HANDLE_OP_APUT(OP_APUT_CHAR, "-char", u2, )
+OP_END
+
+/* File: c/OP_APUT_SHORT.cpp */
+HANDLE_OP_APUT(OP_APUT_SHORT, "-short", s2, )
+OP_END
+
+/* File: c/OP_IGET.cpp */
+HANDLE_IGET_X(OP_IGET,                  "", Int, )
+OP_END
+
+/* File: c/OP_IGET_WIDE.cpp */
+HANDLE_IGET_X(OP_IGET_WIDE,             "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_IGET_OBJECT.cpp */
+HANDLE_IGET_X(OP_IGET_OBJECT,           "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_IGET_BOOLEAN.cpp */
+HANDLE_IGET_X(OP_IGET_BOOLEAN,          "", Int, )
+OP_END
+
+/* File: c/OP_IGET_BYTE.cpp */
+HANDLE_IGET_X(OP_IGET_BYTE,             "", Int, )
+OP_END
+
+/* File: c/OP_IGET_CHAR.cpp */
+HANDLE_IGET_X(OP_IGET_CHAR,             "", Int, )
+OP_END
+
+/* File: c/OP_IGET_SHORT.cpp */
+HANDLE_IGET_X(OP_IGET_SHORT,            "", Int, )
+OP_END
+
+/* File: c/OP_IPUT.cpp */
+HANDLE_IPUT_X(OP_IPUT,                  "", Int, )
+OP_END
+
+/* File: c/OP_IPUT_WIDE.cpp */
+HANDLE_IPUT_X(OP_IPUT_WIDE,             "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_IPUT_OBJECT.cpp */
+/*
+ * The VM spec says we should verify that the reference being stored into
+ * the field is assignment compatible.  In practice, many popular VMs don't
+ * do this because it slows down a very common operation.  It's not so bad
+ * for us, since "dexopt" quickens it whenever possible, but it's still an
+ * issue.
+ *
+ * To make this spec-complaint, we'd need to add a ClassObject pointer to
+ * the Field struct, resolve the field's type descriptor at link or class
+ * init time, and then verify the type here.
+ */
+HANDLE_IPUT_X(OP_IPUT_OBJECT,           "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_IPUT_BOOLEAN.cpp */
+HANDLE_IPUT_X(OP_IPUT_BOOLEAN,          "", Int, )
+OP_END
+
+/* File: c/OP_IPUT_BYTE.cpp */
+HANDLE_IPUT_X(OP_IPUT_BYTE,             "", Int, )
+OP_END
+
+/* File: c/OP_IPUT_CHAR.cpp */
+HANDLE_IPUT_X(OP_IPUT_CHAR,             "", Int, )
+OP_END
+
+/* File: c/OP_IPUT_SHORT.cpp */
+HANDLE_IPUT_X(OP_IPUT_SHORT,            "", Int, )
+OP_END
+
+/* File: c/OP_SGET.cpp */
+HANDLE_SGET_X(OP_SGET,                  "", Int, )
+OP_END
+
+/* File: c/OP_SGET_WIDE.cpp */
+HANDLE_SGET_X(OP_SGET_WIDE,             "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_SGET_OBJECT.cpp */
+HANDLE_SGET_X(OP_SGET_OBJECT,           "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_SGET_BOOLEAN.cpp */
+HANDLE_SGET_X(OP_SGET_BOOLEAN,          "", Int, )
+OP_END
+
+/* File: c/OP_SGET_BYTE.cpp */
+HANDLE_SGET_X(OP_SGET_BYTE,             "", Int, )
+OP_END
+
+/* File: c/OP_SGET_CHAR.cpp */
+HANDLE_SGET_X(OP_SGET_CHAR,             "", Int, )
+OP_END
+
+/* File: c/OP_SGET_SHORT.cpp */
+HANDLE_SGET_X(OP_SGET_SHORT,            "", Int, )
+OP_END
+
+/* File: c/OP_SPUT.cpp */
+HANDLE_SPUT_X(OP_SPUT,                  "", Int, )
+OP_END
+
+/* File: c/OP_SPUT_WIDE.cpp */
+HANDLE_SPUT_X(OP_SPUT_WIDE,             "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_SPUT_OBJECT.cpp */
+HANDLE_SPUT_X(OP_SPUT_OBJECT,           "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_SPUT_BOOLEAN.cpp */
+HANDLE_SPUT_X(OP_SPUT_BOOLEAN,          "", Int, )
+OP_END
+
+/* File: c/OP_SPUT_BYTE.cpp */
+HANDLE_SPUT_X(OP_SPUT_BYTE,             "", Int, )
+OP_END
+
+/* File: c/OP_SPUT_CHAR.cpp */
+HANDLE_SPUT_X(OP_SPUT_CHAR,             "", Int, )
+OP_END
+
+/* File: c/OP_SPUT_SHORT.cpp */
+HANDLE_SPUT_X(OP_SPUT_SHORT,            "", Int, )
+OP_END
+
+/* File: c/OP_INVOKE_VIRTUAL.cpp */
+HANDLE_OPCODE(OP_INVOKE_VIRTUAL /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeVirtual, false);
+OP_END
+
+/* File: c/OP_INVOKE_SUPER.cpp */
+HANDLE_OPCODE(OP_INVOKE_SUPER /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeSuper, false);
+OP_END
+
+/* File: c/OP_INVOKE_DIRECT.cpp */
+HANDLE_OPCODE(OP_INVOKE_DIRECT /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeDirect, false);
+OP_END
+
+/* File: c/OP_INVOKE_STATIC.cpp */
+HANDLE_OPCODE(OP_INVOKE_STATIC /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeStatic, false);
+OP_END
+
+/* File: c/OP_INVOKE_INTERFACE.cpp */
+HANDLE_OPCODE(OP_INVOKE_INTERFACE /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeInterface, false);
+OP_END
+
+/* File: c/OP_UNUSED_73.cpp */
+HANDLE_OPCODE(OP_UNUSED_73)
+OP_END
+
+/* File: c/OP_INVOKE_VIRTUAL_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_VIRTUAL_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeVirtual, true);
+OP_END
+
+/* File: c/OP_INVOKE_SUPER_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_SUPER_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeSuper, true);
+OP_END
+
+/* File: c/OP_INVOKE_DIRECT_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_DIRECT_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeDirect, true);
+OP_END
+
+/* File: c/OP_INVOKE_STATIC_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_STATIC_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeStatic, true);
+OP_END
+
+/* File: c/OP_INVOKE_INTERFACE_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_INTERFACE_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeInterface, true);
+OP_END
+
+/* File: c/OP_UNUSED_79.cpp */
+HANDLE_OPCODE(OP_UNUSED_79)
+OP_END
+
+/* File: c/OP_UNUSED_7A.cpp */
+HANDLE_OPCODE(OP_UNUSED_7A)
+OP_END
+
+/* File: c/OP_NEG_INT.cpp */
+HANDLE_UNOP(OP_NEG_INT, "neg-int", -, , )
+OP_END
+
+/* File: c/OP_NOT_INT.cpp */
+HANDLE_UNOP(OP_NOT_INT, "not-int", , ^ 0xffffffff, )
+OP_END
+
+/* File: c/OP_NEG_LONG.cpp */
+HANDLE_UNOP(OP_NEG_LONG, "neg-long", -, , _WIDE)
+OP_END
+
+/* File: c/OP_NOT_LONG.cpp */
+HANDLE_UNOP(OP_NOT_LONG, "not-long", , ^ 0xffffffffffffffffULL, _WIDE)
+OP_END
+
+/* File: c/OP_NEG_FLOAT.cpp */
+HANDLE_UNOP(OP_NEG_FLOAT, "neg-float", -, , _FLOAT)
+OP_END
+
+/* File: c/OP_NEG_DOUBLE.cpp */
+HANDLE_UNOP(OP_NEG_DOUBLE, "neg-double", -, , _DOUBLE)
+OP_END
+
+/* File: c/OP_INT_TO_LONG.cpp */
+HANDLE_NUMCONV(OP_INT_TO_LONG,          "int-to-long", _INT, _WIDE)
+OP_END
+
+/* File: c/OP_INT_TO_FLOAT.cpp */
+HANDLE_NUMCONV(OP_INT_TO_FLOAT,         "int-to-float", _INT, _FLOAT)
+OP_END
+
+/* File: c/OP_INT_TO_DOUBLE.cpp */
+HANDLE_NUMCONV(OP_INT_TO_DOUBLE,        "int-to-double", _INT, _DOUBLE)
+OP_END
+
+/* File: c/OP_LONG_TO_INT.cpp */
+HANDLE_NUMCONV(OP_LONG_TO_INT,          "long-to-int", _WIDE, _INT)
+OP_END
+
+/* File: c/OP_LONG_TO_FLOAT.cpp */
+HANDLE_NUMCONV(OP_LONG_TO_FLOAT,        "long-to-float", _WIDE, _FLOAT)
+OP_END
+
+/* File: c/OP_LONG_TO_DOUBLE.cpp */
+HANDLE_NUMCONV(OP_LONG_TO_DOUBLE,       "long-to-double", _WIDE, _DOUBLE)
+OP_END
+
+/* File: c/OP_FLOAT_TO_INT.cpp */
+HANDLE_FLOAT_TO_INT(OP_FLOAT_TO_INT,    "float-to-int",
+    float, _FLOAT, s4, _INT)
+OP_END
+
+/* File: c/OP_FLOAT_TO_LONG.cpp */
+HANDLE_FLOAT_TO_INT(OP_FLOAT_TO_LONG,   "float-to-long",
+    float, _FLOAT, s8, _WIDE)
+OP_END
+
+/* File: c/OP_FLOAT_TO_DOUBLE.cpp */
+HANDLE_NUMCONV(OP_FLOAT_TO_DOUBLE,      "float-to-double", _FLOAT, _DOUBLE)
+OP_END
+
+/* File: c/OP_DOUBLE_TO_INT.cpp */
+HANDLE_FLOAT_TO_INT(OP_DOUBLE_TO_INT,   "double-to-int",
+    double, _DOUBLE, s4, _INT)
+OP_END
+
+/* File: c/OP_DOUBLE_TO_LONG.cpp */
+HANDLE_FLOAT_TO_INT(OP_DOUBLE_TO_LONG,  "double-to-long",
+    double, _DOUBLE, s8, _WIDE)
+OP_END
+
+/* File: c/OP_DOUBLE_TO_FLOAT.cpp */
+HANDLE_NUMCONV(OP_DOUBLE_TO_FLOAT,      "double-to-float", _DOUBLE, _FLOAT)
+OP_END
+
+/* File: c/OP_INT_TO_BYTE.cpp */
+HANDLE_INT_TO_SMALL(OP_INT_TO_BYTE,     "byte", s1)
+OP_END
+
+/* File: c/OP_INT_TO_CHAR.cpp */
+HANDLE_INT_TO_SMALL(OP_INT_TO_CHAR,     "char", u2)
+OP_END
+
+/* File: c/OP_INT_TO_SHORT.cpp */
+HANDLE_INT_TO_SMALL(OP_INT_TO_SHORT,    "short", s2)    /* want sign bit */
+OP_END
+
+/* File: c/OP_ADD_INT.cpp */
+HANDLE_OP_X_INT(OP_ADD_INT, "add", +, 0)
+OP_END
+
+/* File: c/OP_SUB_INT.cpp */
+HANDLE_OP_X_INT(OP_SUB_INT, "sub", -, 0)
+OP_END
+
+/* File: c/OP_MUL_INT.cpp */
+HANDLE_OP_X_INT(OP_MUL_INT, "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_INT.cpp */
+HANDLE_OP_X_INT(OP_DIV_INT, "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_INT.cpp */
+HANDLE_OP_X_INT(OP_REM_INT, "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_INT.cpp */
+HANDLE_OP_X_INT(OP_AND_INT, "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_INT.cpp */
+HANDLE_OP_X_INT(OP_OR_INT,  "or",  |, 0)
+OP_END
+
+/* File: c/OP_XOR_INT.cpp */
+HANDLE_OP_X_INT(OP_XOR_INT, "xor", ^, 0)
+OP_END
+
+/* File: c/OP_SHL_INT.cpp */
+HANDLE_OP_SHX_INT(OP_SHL_INT, "shl", (s4), <<)
+OP_END
+
+/* File: c/OP_SHR_INT.cpp */
+HANDLE_OP_SHX_INT(OP_SHR_INT, "shr", (s4), >>)
+OP_END
+
+/* File: c/OP_USHR_INT.cpp */
+HANDLE_OP_SHX_INT(OP_USHR_INT, "ushr", (u4), >>)
+OP_END
+
+/* File: c/OP_ADD_LONG.cpp */
+HANDLE_OP_X_LONG(OP_ADD_LONG, "add", +, 0)
+OP_END
+
+/* File: c/OP_SUB_LONG.cpp */
+HANDLE_OP_X_LONG(OP_SUB_LONG, "sub", -, 0)
+OP_END
+
+/* File: c/OP_MUL_LONG.cpp */
+HANDLE_OP_X_LONG(OP_MUL_LONG, "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_LONG.cpp */
+HANDLE_OP_X_LONG(OP_DIV_LONG, "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_LONG.cpp */
+HANDLE_OP_X_LONG(OP_REM_LONG, "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_LONG.cpp */
+HANDLE_OP_X_LONG(OP_AND_LONG, "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_LONG.cpp */
+HANDLE_OP_X_LONG(OP_OR_LONG,  "or", |, 0)
+OP_END
+
+/* File: c/OP_XOR_LONG.cpp */
+HANDLE_OP_X_LONG(OP_XOR_LONG, "xor", ^, 0)
+OP_END
+
+/* File: c/OP_SHL_LONG.cpp */
+HANDLE_OP_SHX_LONG(OP_SHL_LONG, "shl", (s8), <<)
+OP_END
+
+/* File: c/OP_SHR_LONG.cpp */
+HANDLE_OP_SHX_LONG(OP_SHR_LONG, "shr", (s8), >>)
+OP_END
+
+/* File: c/OP_USHR_LONG.cpp */
+HANDLE_OP_SHX_LONG(OP_USHR_LONG, "ushr", (u8), >>)
+OP_END
+
+/* File: c/OP_ADD_FLOAT.cpp */
+HANDLE_OP_X_FLOAT(OP_ADD_FLOAT, "add", +)
+OP_END
+
+/* File: c/OP_SUB_FLOAT.cpp */
+HANDLE_OP_X_FLOAT(OP_SUB_FLOAT, "sub", -)
+OP_END
+
+/* File: c/OP_MUL_FLOAT.cpp */
+HANDLE_OP_X_FLOAT(OP_MUL_FLOAT, "mul", *)
+OP_END
+
+/* File: c/OP_DIV_FLOAT.cpp */
+HANDLE_OP_X_FLOAT(OP_DIV_FLOAT, "div", /)
+OP_END
+
+/* File: c/OP_REM_FLOAT.cpp */
+HANDLE_OPCODE(OP_REM_FLOAT /*vAA, vBB, vCC*/)
+    {
+        u2 srcRegs;
+        vdst = INST_AA(inst);
+        srcRegs = FETCH(1);
+        vsrc1 = srcRegs & 0xff;
+        vsrc2 = srcRegs >> 8;
+        ILOGV("|%s-float v%d,v%d,v%d", "mod", vdst, vsrc1, vsrc2);
+        SET_REGISTER_FLOAT(vdst,
+            fmodf(GET_REGISTER_FLOAT(vsrc1), GET_REGISTER_FLOAT(vsrc2)));
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_ADD_DOUBLE.cpp */
+HANDLE_OP_X_DOUBLE(OP_ADD_DOUBLE, "add", +)
+OP_END
+
+/* File: c/OP_SUB_DOUBLE.cpp */
+HANDLE_OP_X_DOUBLE(OP_SUB_DOUBLE, "sub", -)
+OP_END
+
+/* File: c/OP_MUL_DOUBLE.cpp */
+HANDLE_OP_X_DOUBLE(OP_MUL_DOUBLE, "mul", *)
+OP_END
+
+/* File: c/OP_DIV_DOUBLE.cpp */
+HANDLE_OP_X_DOUBLE(OP_DIV_DOUBLE, "div", /)
+OP_END
+
+/* File: c/OP_REM_DOUBLE.cpp */
+HANDLE_OPCODE(OP_REM_DOUBLE /*vAA, vBB, vCC*/)
+    {
+        u2 srcRegs;
+        vdst = INST_AA(inst);
+        srcRegs = FETCH(1);
+        vsrc1 = srcRegs & 0xff;
+        vsrc2 = srcRegs >> 8;
+        ILOGV("|%s-double v%d,v%d,v%d", "mod", vdst, vsrc1, vsrc2);
+        SET_REGISTER_DOUBLE(vdst,
+            fmod(GET_REGISTER_DOUBLE(vsrc1), GET_REGISTER_DOUBLE(vsrc2)));
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_ADD_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_ADD_INT_2ADDR, "add", +, 0)
+OP_END
+
+/* File: c/OP_SUB_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_SUB_INT_2ADDR, "sub", -, 0)
+OP_END
+
+/* File: c/OP_MUL_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_MUL_INT_2ADDR, "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_DIV_INT_2ADDR, "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_REM_INT_2ADDR, "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_AND_INT_2ADDR, "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_OR_INT_2ADDR,  "or", |, 0)
+OP_END
+
+/* File: c/OP_XOR_INT_2ADDR.cpp */
+HANDLE_OP_X_INT_2ADDR(OP_XOR_INT_2ADDR, "xor", ^, 0)
+OP_END
+
+/* File: c/OP_SHL_INT_2ADDR.cpp */
+HANDLE_OP_SHX_INT_2ADDR(OP_SHL_INT_2ADDR, "shl", (s4), <<)
+OP_END
+
+/* File: c/OP_SHR_INT_2ADDR.cpp */
+HANDLE_OP_SHX_INT_2ADDR(OP_SHR_INT_2ADDR, "shr", (s4), >>)
+OP_END
+
+/* File: c/OP_USHR_INT_2ADDR.cpp */
+HANDLE_OP_SHX_INT_2ADDR(OP_USHR_INT_2ADDR, "ushr", (u4), >>)
+OP_END
+
+/* File: c/OP_ADD_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_ADD_LONG_2ADDR, "add", +, 0)
+OP_END
+
+/* File: c/OP_SUB_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_SUB_LONG_2ADDR, "sub", -, 0)
+OP_END
+
+/* File: c/OP_MUL_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_MUL_LONG_2ADDR, "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_DIV_LONG_2ADDR, "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_REM_LONG_2ADDR, "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_AND_LONG_2ADDR, "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_OR_LONG_2ADDR,  "or", |, 0)
+OP_END
+
+/* File: c/OP_XOR_LONG_2ADDR.cpp */
+HANDLE_OP_X_LONG_2ADDR(OP_XOR_LONG_2ADDR, "xor", ^, 0)
+OP_END
+
+/* File: c/OP_SHL_LONG_2ADDR.cpp */
+HANDLE_OP_SHX_LONG_2ADDR(OP_SHL_LONG_2ADDR, "shl", (s8), <<)
+OP_END
+
+/* File: c/OP_SHR_LONG_2ADDR.cpp */
+HANDLE_OP_SHX_LONG_2ADDR(OP_SHR_LONG_2ADDR, "shr", (s8), >>)
+OP_END
+
+/* File: c/OP_USHR_LONG_2ADDR.cpp */
+HANDLE_OP_SHX_LONG_2ADDR(OP_USHR_LONG_2ADDR, "ushr", (u8), >>)
+OP_END
+
+/* File: c/OP_ADD_FLOAT_2ADDR.cpp */
+HANDLE_OP_X_FLOAT_2ADDR(OP_ADD_FLOAT_2ADDR, "add", +)
+OP_END
+
+/* File: c/OP_SUB_FLOAT_2ADDR.cpp */
+HANDLE_OP_X_FLOAT_2ADDR(OP_SUB_FLOAT_2ADDR, "sub", -)
+OP_END
+
+/* File: c/OP_MUL_FLOAT_2ADDR.cpp */
+HANDLE_OP_X_FLOAT_2ADDR(OP_MUL_FLOAT_2ADDR, "mul", *)
+OP_END
+
+/* File: c/OP_DIV_FLOAT_2ADDR.cpp */
+HANDLE_OP_X_FLOAT_2ADDR(OP_DIV_FLOAT_2ADDR, "div", /)
+OP_END
+
+/* File: c/OP_REM_FLOAT_2ADDR.cpp */
+HANDLE_OPCODE(OP_REM_FLOAT_2ADDR /*vA, vB*/)
+    vdst = INST_A(inst);
+    vsrc1 = INST_B(inst);
+    ILOGV("|%s-float-2addr v%d,v%d", "mod", vdst, vsrc1);
+    SET_REGISTER_FLOAT(vdst,
+        fmodf(GET_REGISTER_FLOAT(vdst), GET_REGISTER_FLOAT(vsrc1)));
+    FINISH(1);
+OP_END
+
+/* File: c/OP_ADD_DOUBLE_2ADDR.cpp */
+HANDLE_OP_X_DOUBLE_2ADDR(OP_ADD_DOUBLE_2ADDR, "add", +)
+OP_END
+
+/* File: c/OP_SUB_DOUBLE_2ADDR.cpp */
+HANDLE_OP_X_DOUBLE_2ADDR(OP_SUB_DOUBLE_2ADDR, "sub", -)
+OP_END
+
+/* File: c/OP_MUL_DOUBLE_2ADDR.cpp */
+HANDLE_OP_X_DOUBLE_2ADDR(OP_MUL_DOUBLE_2ADDR, "mul", *)
+OP_END
+
+/* File: c/OP_DIV_DOUBLE_2ADDR.cpp */
+HANDLE_OP_X_DOUBLE_2ADDR(OP_DIV_DOUBLE_2ADDR, "div", /)
+OP_END
+
+/* File: c/OP_REM_DOUBLE_2ADDR.cpp */
+HANDLE_OPCODE(OP_REM_DOUBLE_2ADDR /*vA, vB*/)
+    vdst = INST_A(inst);
+    vsrc1 = INST_B(inst);
+    ILOGV("|%s-double-2addr v%d,v%d", "mod", vdst, vsrc1);
+    SET_REGISTER_DOUBLE(vdst,
+        fmod(GET_REGISTER_DOUBLE(vdst), GET_REGISTER_DOUBLE(vsrc1)));
+    FINISH(1);
+OP_END
+
+/* File: c/OP_ADD_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_ADD_INT_LIT16, "add", +, 0)
+OP_END
+
+/* File: c/OP_RSUB_INT.cpp */
+HANDLE_OPCODE(OP_RSUB_INT /*vA, vB, #+CCCC*/)
+    {
+        vdst = INST_A(inst);
+        vsrc1 = INST_B(inst);
+        vsrc2 = FETCH(1);
+        ILOGV("|rsub-int v%d,v%d,#+0x%04x", vdst, vsrc1, vsrc2);
+        SET_REGISTER(vdst, (s2) vsrc2 - (s4) GET_REGISTER(vsrc1));
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_MUL_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_MUL_INT_LIT16, "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_DIV_INT_LIT16, "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_REM_INT_LIT16, "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_AND_INT_LIT16, "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_OR_INT_LIT16,  "or",  |, 0)
+OP_END
+
+/* File: c/OP_XOR_INT_LIT16.cpp */
+HANDLE_OP_X_INT_LIT16(OP_XOR_INT_LIT16, "xor", ^, 0)
+OP_END
+
+/* File: c/OP_ADD_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_ADD_INT_LIT8,   "add", +, 0)
+OP_END
+
+/* File: c/OP_RSUB_INT_LIT8.cpp */
+HANDLE_OPCODE(OP_RSUB_INT_LIT8 /*vAA, vBB, #+CC*/)
+    {
+        u2 litInfo;
+        vdst = INST_AA(inst);
+        litInfo = FETCH(1);
+        vsrc1 = litInfo & 0xff;
+        vsrc2 = litInfo >> 8;
+        ILOGV("|%s-int/lit8 v%d,v%d,#+0x%02x", "rsub", vdst, vsrc1, vsrc2);
+        SET_REGISTER(vdst, (s1) vsrc2 - (s4) GET_REGISTER(vsrc1));
+    }
+    FINISH(2);
+OP_END
+
+/* File: c/OP_MUL_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_MUL_INT_LIT8,   "mul", *, 0)
+OP_END
+
+/* File: c/OP_DIV_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_DIV_INT_LIT8,   "div", /, 1)
+OP_END
+
+/* File: c/OP_REM_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_REM_INT_LIT8,   "rem", %, 2)
+OP_END
+
+/* File: c/OP_AND_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_AND_INT_LIT8,   "and", &, 0)
+OP_END
+
+/* File: c/OP_OR_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_OR_INT_LIT8,    "or",  |, 0)
+OP_END
+
+/* File: c/OP_XOR_INT_LIT8.cpp */
+HANDLE_OP_X_INT_LIT8(OP_XOR_INT_LIT8,   "xor", ^, 0)
+OP_END
+
+/* File: c/OP_SHL_INT_LIT8.cpp */
+HANDLE_OP_SHX_INT_LIT8(OP_SHL_INT_LIT8,   "shl", (s4), <<)
+OP_END
+
+/* File: c/OP_SHR_INT_LIT8.cpp */
+HANDLE_OP_SHX_INT_LIT8(OP_SHR_INT_LIT8,   "shr", (s4), >>)
+OP_END
+
+/* File: c/OP_USHR_INT_LIT8.cpp */
+HANDLE_OP_SHX_INT_LIT8(OP_USHR_INT_LIT8,  "ushr", (u4), >>)
+OP_END
+
+/* File: c/OP_IGET_VOLATILE.cpp */
 HANDLE_IGET_X(OP_IGET_VOLATILE,         "-volatile", IntVolatile, )
 OP_END
 
-/* File: c/OP_IPUT_VOLATILE.c */
+/* File: c/OP_IPUT_VOLATILE.cpp */
 HANDLE_IPUT_X(OP_IPUT_VOLATILE,         "-volatile", IntVolatile, )
 OP_END
 
-/* File: c/OP_SGET_VOLATILE.c */
+/* File: c/OP_SGET_VOLATILE.cpp */
 HANDLE_SGET_X(OP_SGET_VOLATILE,         "-volatile", IntVolatile, )
 OP_END
 
-/* File: c/OP_SPUT_VOLATILE.c */
+/* File: c/OP_SPUT_VOLATILE.cpp */
 HANDLE_SPUT_X(OP_SPUT_VOLATILE,         "-volatile", IntVolatile, )
 OP_END
 
-/* File: c/OP_IGET_OBJECT_VOLATILE.c */
+/* File: c/OP_IGET_OBJECT_VOLATILE.cpp */
 HANDLE_IGET_X(OP_IGET_OBJECT_VOLATILE,  "-object-volatile", ObjectVolatile, _AS_OBJECT)
 OP_END
 
-/* File: c/OP_IGET_WIDE_VOLATILE.c */
+/* File: c/OP_IGET_WIDE_VOLATILE.cpp */
 HANDLE_IGET_X(OP_IGET_WIDE_VOLATILE,    "-wide-volatile", LongVolatile, _WIDE)
 OP_END
 
-/* File: c/OP_IPUT_WIDE_VOLATILE.c */
+/* File: c/OP_IPUT_WIDE_VOLATILE.cpp */
 HANDLE_IPUT_X(OP_IPUT_WIDE_VOLATILE,    "-wide-volatile", LongVolatile, _WIDE)
 OP_END
 
-/* File: c/OP_SGET_WIDE_VOLATILE.c */
+/* File: c/OP_SGET_WIDE_VOLATILE.cpp */
 HANDLE_SGET_X(OP_SGET_WIDE_VOLATILE,    "-wide-volatile", LongVolatile, _WIDE)
 OP_END
 
-/* File: c/OP_SPUT_WIDE_VOLATILE.c */
+/* File: c/OP_SPUT_WIDE_VOLATILE.cpp */
 HANDLE_SPUT_X(OP_SPUT_WIDE_VOLATILE,    "-wide-volatile", LongVolatile, _WIDE)
 OP_END
 
-/* File: c/OP_BREAKPOINT.c */
+/* File: c/OP_BREAKPOINT.cpp */
 HANDLE_OPCODE(OP_BREAKPOINT)
-#if (INTERP_TYPE == INTERP_DBG)
     {
         /*
          * Restart this instruction with the original opcode.  We do
@@ -1251,19 +2801,85 @@ HANDLE_OPCODE(OP_BREAKPOINT)
          * time we get here, the breakpoint has already been handled and
          * the thread resumed.
          */
-        u1 originalOpCode = dvmGetOriginalOpCode(pc);
-        ALOGV("+++ break 0x%02x (0x%04x -> 0x%04x)\n", originalOpCode, inst,
-            INST_REPLACE_OP(inst, originalOpCode));
-        inst = INST_REPLACE_OP(inst, originalOpCode);
-        FINISH_BKPT(originalOpCode);
+        u1 originalOpcode = dvmGetOriginalOpcode(pc);
+        ALOGV("+++ break 0x%02x (0x%04x -> 0x%04x)", originalOpcode, inst,
+            INST_REPLACE_OP(inst, originalOpcode));
+        inst = INST_REPLACE_OP(inst, originalOpcode);
+        FINISH_BKPT(originalOpcode);
     }
-#else
-    ALOGE("Breakpoint hit in non-debug interpreter\n");
-    dvmAbort();
-#endif
 OP_END
 
-/* File: c/OP_EXECUTE_INLINE_RANGE.c */
+/* File: c/OP_THROW_VERIFICATION_ERROR.cpp */
+HANDLE_OPCODE(OP_THROW_VERIFICATION_ERROR)
+    EXPORT_PC();
+    vsrc1 = INST_AA(inst);
+    ref = FETCH(1);             /* class/field/method ref */
+    dvmThrowVerificationError(curMethod, vsrc1, ref);
+    GOTO_exceptionThrown();
+OP_END
+
+/* File: c/OP_EXECUTE_INLINE.cpp */
+HANDLE_OPCODE(OP_EXECUTE_INLINE /*vB, {vD, vE, vF, vG}, inline@CCCC*/)
+    {
+        /*
+         * This has the same form as other method calls, but we ignore
+         * the 5th argument (vA).  This is chiefly because the first four
+         * arguments to a function on ARM are in registers.
+         *
+         * We only set the arguments that are actually used, leaving
+         * the rest uninitialized.  We're assuming that, if the method
+         * needs them, they'll be specified in the call.
+         *
+         * However, this annoys gcc when optimizations are enabled,
+         * causing a "may be used uninitialized" warning.  Quieting
+         * the warnings incurs a slight penalty (5%: 373ns vs. 393ns
+         * on empty method).  Note that valgrind is perfectly happy
+         * either way as the uninitialiezd values are never actually
+         * used.
+         */
+        u4 arg0, arg1, arg2, arg3;
+        arg0 = arg1 = arg2 = arg3 = 0;
+
+        EXPORT_PC();
+
+        vsrc1 = INST_B(inst);       /* #of args */
+        ref = FETCH(1);             /* inline call "ref" */
+        vdst = FETCH(2);            /* 0-4 register indices */
+        ILOGV("|execute-inline args=%d @%d {regs=0x%04x}",
+            vsrc1, ref, vdst);
+
+        assert((vdst >> 16) == 0);  // 16-bit type -or- high 16 bits clear
+        assert(vsrc1 <= 4);
+
+        switch (vsrc1) {
+        case 4:
+            arg3 = GET_REGISTER(vdst >> 12);
+            /* fall through */
+        case 3:
+            arg2 = GET_REGISTER((vdst & 0x0f00) >> 8);
+            /* fall through */
+        case 2:
+            arg1 = GET_REGISTER((vdst & 0x00f0) >> 4);
+            /* fall through */
+        case 1:
+            arg0 = GET_REGISTER(vdst & 0x0f);
+            /* fall through */
+        default:        // case 0
+            ;
+        }
+
+        if (self->interpBreak.ctl.subMode & kSubModeDebugProfile) {
+            if (!dvmPerformInlineOp4Dbg(arg0, arg1, arg2, arg3, &retval, ref))
+                GOTO_exceptionThrown();
+        } else {
+            if (!dvmPerformInlineOp4Std(arg0, arg1, arg2, arg3, &retval, ref))
+                GOTO_exceptionThrown();
+        }
+    }
+    FINISH(3);
+OP_END
+
+/* File: c/OP_EXECUTE_INLINE_RANGE.cpp */
 HANDLE_OPCODE(OP_EXECUTE_INLINE_RANGE /*{vCCCC..v(CCCC+AA-1)}, inline@BBBB*/)
     {
         u4 arg0, arg1, arg2, arg3;
@@ -1297,17 +2913,49 @@ HANDLE_OPCODE(OP_EXECUTE_INLINE_RANGE /*{vCCCC..v(CCCC+AA-1)}, inline@BBBB*/)
             ;
         }
 
-#if INTERP_TYPE == INTERP_DBG
-        if (!dvmPerformInlineOp4Dbg(arg0, arg1, arg2, arg3, &retval, ref))
-            GOTO_exceptionThrown();
-#else
-        if (!dvmPerformInlineOp4Std(arg0, arg1, arg2, arg3, &retval, ref))
-            GOTO_exceptionThrown();
-#endif
+        if (self->interpBreak.ctl.subMode & kSubModeDebugProfile) {
+            if (!dvmPerformInlineOp4Dbg(arg0, arg1, arg2, arg3, &retval, ref))
+                GOTO_exceptionThrown();
+        } else {
+            if (!dvmPerformInlineOp4Std(arg0, arg1, arg2, arg3, &retval, ref))
+                GOTO_exceptionThrown();
+        }
     }
     FINISH(3);
+OP_END
 
-/* File: c/OP_RETURN_VOID_BARRIER.c */
+/* File: c/OP_INVOKE_OBJECT_INIT_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_OBJECT_INIT_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    {
+        Object* obj;
+
+        vsrc1 = FETCH(2);               /* reg number of "this" pointer */
+        obj = GET_REGISTER_AS_OBJECT(vsrc1);
+
+        if (!checkForNullExportPC(obj, fp, pc))
+            GOTO_exceptionThrown();
+
+        /*
+         * The object should be marked "finalizable" when Object.<init>
+         * completes normally.  We're going to assume it does complete
+         * (by virtue of being nothing but a return-void) and set it now.
+         */
+        if (IS_CLASS_FLAG_SET(obj->clazz, CLASS_ISFINALIZABLE)) {
+            EXPORT_PC();
+            dvmSetFinalizable(obj);
+            if (dvmGetException(self))
+                GOTO_exceptionThrown();
+        }
+
+        if (self->interpBreak.ctl.subMode & kSubModeDebuggerActive) {
+            /* behave like OP_INVOKE_DIRECT_RANGE */
+            GOTO_invoke(invokeDirect, true);
+        }
+        FINISH(3);
+    }
+OP_END
+
+/* File: c/OP_RETURN_VOID_BARRIER.cpp */
 HANDLE_OPCODE(OP_RETURN_VOID_BARRIER /**/)
     ILOGV("|return-void");
 #ifndef NDEBUG
@@ -1317,19 +2965,73 @@ HANDLE_OPCODE(OP_RETURN_VOID_BARRIER /**/)
     GOTO_returnFromMethod();
 OP_END
 
-/* File: c/OP_IPUT_OBJECT_VOLATILE.c */
+/* File: c/OP_IGET_QUICK.cpp */
+HANDLE_IGET_X_QUICK(OP_IGET_QUICK,          "", Int, )
+OP_END
+
+/* File: c/OP_IGET_WIDE_QUICK.cpp */
+HANDLE_IGET_X_QUICK(OP_IGET_WIDE_QUICK,     "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_IGET_OBJECT_QUICK.cpp */
+HANDLE_IGET_X_QUICK(OP_IGET_OBJECT_QUICK,   "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_IPUT_QUICK.cpp */
+HANDLE_IPUT_X_QUICK(OP_IPUT_QUICK,          "", Int, )
+OP_END
+
+/* File: c/OP_IPUT_WIDE_QUICK.cpp */
+HANDLE_IPUT_X_QUICK(OP_IPUT_WIDE_QUICK,     "-wide", Long, _WIDE)
+OP_END
+
+/* File: c/OP_IPUT_OBJECT_QUICK.cpp */
+HANDLE_IPUT_X_QUICK(OP_IPUT_OBJECT_QUICK,   "-object", Object, _AS_OBJECT)
+OP_END
+
+/* File: c/OP_INVOKE_VIRTUAL_QUICK.cpp */
+HANDLE_OPCODE(OP_INVOKE_VIRTUAL_QUICK /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeVirtualQuick, false);
+OP_END
+
+/* File: c/OP_INVOKE_VIRTUAL_QUICK_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_VIRTUAL_QUICK_RANGE/*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeVirtualQuick, true);
+OP_END
+
+/* File: c/OP_INVOKE_SUPER_QUICK.cpp */
+HANDLE_OPCODE(OP_INVOKE_SUPER_QUICK /*vB, {vD, vE, vF, vG, vA}, meth@CCCC*/)
+    GOTO_invoke(invokeSuperQuick, false);
+OP_END
+
+/* File: c/OP_INVOKE_SUPER_QUICK_RANGE.cpp */
+HANDLE_OPCODE(OP_INVOKE_SUPER_QUICK_RANGE /*{vCCCC..v(CCCC+AA-1)}, meth@BBBB*/)
+    GOTO_invoke(invokeSuperQuick, true);
+OP_END
+
+/* File: c/OP_IPUT_OBJECT_VOLATILE.cpp */
 HANDLE_IPUT_X(OP_IPUT_OBJECT_VOLATILE,  "-object-volatile", ObjectVolatile, _AS_OBJECT)
 OP_END
 
-/* File: c/OP_SGET_OBJECT_VOLATILE.c */
+/* File: c/OP_SGET_OBJECT_VOLATILE.cpp */
 HANDLE_SGET_X(OP_SGET_OBJECT_VOLATILE,  "-object-volatile", ObjectVolatile, _AS_OBJECT)
 OP_END
 
-/* File: c/OP_SPUT_OBJECT_VOLATILE.c */
+/* File: c/OP_SPUT_OBJECT_VOLATILE.cpp */
 HANDLE_SPUT_X(OP_SPUT_OBJECT_VOLATILE,  "-object-volatile", ObjectVolatile, _AS_OBJECT)
 OP_END
 
-/* File: c/gotoTargets.c */
+/* File: c/OP_UNUSED_FF.cpp */
+HANDLE_OPCODE(OP_UNUSED_FF)
+    /*
+     * In portable interp, most unused opcodes will fall through to here.
+     */
+    ALOGE("unknown opcode 0x%02x\n", INST_INST(inst));
+    dvmAbort();
+    FINISH(1);
+OP_END
+
+/* File: c/gotoTargets.cpp */
 /*
  * C footer.  This has some common code shared by the various targets.
  */
@@ -1340,7 +3042,7 @@ OP_END
  * next instruction.  Here, these are subroutines that return to the caller.
  */
 
-GOTO_TARGET(filledNewArray, bool methodCallRange)
+GOTO_TARGET(filledNewArray, bool methodCallRange, bool)
     {
         ClassObject* arrayClass;
         ArrayObject* newArray;
@@ -1363,7 +3065,7 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
             arg5 = INST_A(inst);
             vsrc1 = INST_B(inst);   /* #of elements */
             ILOGV("|filled-new-array args=%d @0x%04x {regs=0x%04x %x}",
-                vsrc1, ref, vdst, arg5);
+               vsrc1, ref, vdst, arg5);
         }
 
         /*
@@ -1377,7 +3079,7 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
         }
         /*
         if (!dvmIsArrayClass(arrayClass)) {
-            dvmThrowException("Ljava/lang/RuntimeError;",
+            dvmThrowRuntimeException(
                 "filled-new-array needs array class");
             GOTO_exceptionThrown();
         }
@@ -1389,17 +3091,16 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
         /*
          * Create an array of the specified type.
          */
-        LOGVV("+++ filled-new-array type is '%s'\n", arrayClass->descriptor);
+        LOGVV("+++ filled-new-array type is '%s'", arrayClass->descriptor);
         typeCh = arrayClass->descriptor[1];
         if (typeCh == 'D' || typeCh == 'J') {
             /* category 2 primitives not allowed */
-            dvmThrowException("Ljava/lang/RuntimeError;",
-                "bad filled array req");
+            dvmThrowRuntimeException("bad filled array req");
             GOTO_exceptionThrown();
         } else if (typeCh != 'L' && typeCh != '[' && typeCh != 'I') {
             /* TODO: requires multiple "fill in" loops with different widths */
-            ALOGE("non-int primitives not implemented\n");
-            dvmThrowException("Ljava/lang/InternalError;",
+            ALOGE("non-int primitives not implemented");
+            dvmThrowInternalError(
                 "filled-new-array not implemented for anything but 'int'");
             GOTO_exceptionThrown();
         }
@@ -1411,7 +3112,7 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
         /*
          * Fill in the elements.  It's legal for vsrc1 to be zero.
          */
-        contents = (u4*) newArray->contents;
+        contents = (u4*)(void*)newArray->contents;
         if (methodCallRange) {
             for (i = 0; i < vsrc1; i++)
                 contents[i] = GET_REGISTER(vdst+i);
@@ -1430,13 +3131,13 @@ GOTO_TARGET(filledNewArray, bool methodCallRange)
             dvmWriteBarrierArray(newArray, 0, newArray->length);
         }
 
-        retval.l = newArray;
+        retval.l = (Object*)newArray;
     }
     FINISH(3);
 GOTO_TARGET_END
 
 
-GOTO_TARGET(invokeVirtual, bool methodCallRange)
+GOTO_TARGET(invokeVirtual, bool methodCallRange, bool)
     {
         Method* baseMethod;
         Object* thisPtr;
@@ -1474,7 +3175,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
         if (baseMethod == NULL) {
             baseMethod = dvmResolveMethod(curMethod->clazz, ref,METHOD_VIRTUAL);
             if (baseMethod == NULL) {
-                ILOGV("+ unknown method or access denied\n");
+                ILOGV("+ unknown method or access denied");
                 GOTO_exceptionThrown();
             }
         }
@@ -1486,8 +3187,9 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
         assert(baseMethod->methodIndex < thisPtr->clazz->vtableCount);
         methodToCall = thisPtr->clazz->vtable[baseMethod->methodIndex];
 
-#if defined(WITH_JIT) && (INTERP_TYPE == INTERP_DBG)
-        callsiteClass = thisPtr->clazz;
+#if defined(WITH_JIT) && defined(MTERP_STUB)
+        self->methodToCall = methodToCall;
+        self->callsiteClass = thisPtr->clazz;
 #endif
 
 #if 0
@@ -1501,8 +3203,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
              * Works fine unless Sub stops providing an implementation of
              * the method.
              */
-            dvmThrowException("Ljava/lang/AbstractMethodError;",
-                "abstract method not implemented");
+            dvmThrowAbstractMethodError("abstract method not implemented");
             GOTO_exceptionThrown();
         }
 #else
@@ -1510,7 +3211,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
             methodToCall->nativeFunc != NULL);
 #endif
 
-        LOGVV("+++ base=%s.%s virtual[%d]=%s.%s\n",
+        LOGVV("+++ base=%s.%s virtual[%d]=%s.%s",
             baseMethod->clazz->descriptor, baseMethod->name,
             (u4) baseMethod->methodIndex,
             methodToCall->clazz->descriptor, methodToCall->name);
@@ -1518,7 +3219,7 @@ GOTO_TARGET(invokeVirtual, bool methodCallRange)
 
 #if 0
         if (vsrc1 != methodToCall->insSize) {
-            ALOGW("WRONG METHOD: base=%s.%s virtual[%d]=%s.%s\n",
+            ALOGW("WRONG METHOD: base=%s.%s virtual[%d]=%s.%s",
                 baseMethod->clazz->descriptor, baseMethod->name,
                 (u4) baseMethod->methodIndex,
                 methodToCall->clazz->descriptor, methodToCall->name);
@@ -1552,6 +3253,7 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
                 vsrc1 >> 4, ref, vdst, vsrc1 & 0x0f);
             thisReg = vdst & 0x0f;
         }
+
         /* impossible in well-formed code, but we must check nevertheless */
         if (!checkForNull((Object*) GET_REGISTER(thisReg)))
             GOTO_exceptionThrown();
@@ -1567,7 +3269,7 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
         if (baseMethod == NULL) {
             baseMethod = dvmResolveMethod(curMethod->clazz, ref,METHOD_VIRTUAL);
             if (baseMethod == NULL) {
-                ILOGV("+ unknown method or access denied\n");
+                ILOGV("+ unknown method or access denied");
                 GOTO_exceptionThrown();
             }
         }
@@ -1586,22 +3288,21 @@ GOTO_TARGET(invokeSuper, bool methodCallRange)
              * Method does not exist in the superclass.  Could happen if
              * superclass gets updated.
              */
-            dvmThrowException("Ljava/lang/NoSuchMethodError;",
-                baseMethod->name);
+            dvmThrowNoSuchMethodError(baseMethod->name);
             GOTO_exceptionThrown();
         }
         methodToCall = curMethod->clazz->super->vtable[baseMethod->methodIndex];
+
 #if 0
         if (dvmIsAbstractMethod(methodToCall)) {
-            dvmThrowException("Ljava/lang/AbstractMethodError;",
-                "abstract method not implemented");
+            dvmThrowAbstractMethodError("abstract method not implemented");
             GOTO_exceptionThrown();
         }
 #else
         assert(!dvmIsAbstractMethod(methodToCall) ||
             methodToCall->nativeFunc != NULL);
 #endif
-        LOGVV("+++ base=%s.%s super-virtual=%s.%s\n",
+        LOGVV("+++ base=%s.%s super-virtual=%s.%s",
             baseMethod->clazz->descriptor, baseMethod->name,
             methodToCall->clazz->descriptor, methodToCall->name);
         assert(methodToCall != NULL);
@@ -1636,14 +3337,11 @@ GOTO_TARGET(invokeInterface, bool methodCallRange)
                 vsrc1 >> 4, ref, vdst, vsrc1 & 0x0f);
             thisPtr = (Object*) GET_REGISTER(vdst & 0x0f);
         }
+
         if (!checkForNull(thisPtr))
             GOTO_exceptionThrown();
 
         thisClass = thisPtr->clazz;
-
-#if defined(WITH_JIT) && (INTERP_TYPE == INTERP_DBG)
-        callsiteClass = thisClass;
-#endif
 
         /*
          * Given a class and a method index, find the Method* with the
@@ -1651,6 +3349,10 @@ GOTO_TARGET(invokeInterface, bool methodCallRange)
          */
         methodToCall = dvmFindInterfaceMethodInCache(thisClass, ref, curMethod,
                         methodClassDex);
+#if defined(WITH_JIT) && defined(MTERP_STUB)
+        self->callsiteClass = thisClass;
+        self->methodToCall = methodToCall;
+#endif
         if (methodToCall == NULL) {
             assert(dvmCheckException(self));
             GOTO_exceptionThrown();
@@ -1664,11 +3366,11 @@ GOTO_TARGET(invokeDirect, bool methodCallRange)
     {
         u2 thisReg;
 
+        EXPORT_PC();
+
         vsrc1 = INST_AA(inst);      /* AA (count) or BA (count + arg 5) */
         ref = FETCH(1);             /* method ref */
         vdst = FETCH(2);            /* 4 regs -or- first reg */
-
-        EXPORT_PC();
 
         if (methodCallRange) {
             ILOGV("|invoke-direct-range args=%d @0x%04x {regs=v%d-v%d}",
@@ -1679,6 +3381,7 @@ GOTO_TARGET(invokeDirect, bool methodCallRange)
                 vsrc1 >> 4, ref, vdst, vsrc1 & 0x0f);
             thisReg = vdst & 0x0f;
         }
+
         if (!checkForNull((Object*) GET_REGISTER(thisReg)))
             GOTO_exceptionThrown();
 
@@ -1687,7 +3390,7 @@ GOTO_TARGET(invokeDirect, bool methodCallRange)
             methodToCall = dvmResolveMethod(curMethod->clazz, ref,
                             METHOD_DIRECT);
             if (methodToCall == NULL) {
-                ILOGV("+ unknown direct method\n");     // should be impossible
+                ILOGV("+ unknown direct method");     // should be impossible
                 GOTO_exceptionThrown();
             }
         }
@@ -1696,11 +3399,11 @@ GOTO_TARGET(invokeDirect, bool methodCallRange)
 GOTO_TARGET_END
 
 GOTO_TARGET(invokeStatic, bool methodCallRange)
+    EXPORT_PC();
+
     vsrc1 = INST_AA(inst);      /* AA (count) or BA (count + arg 5) */
     ref = FETCH(1);             /* method ref */
     vdst = FETCH(2);            /* 4 regs -or- first reg */
-
-    EXPORT_PC();
 
     if (methodCallRange)
         ILOGV("|invoke-static-range args=%d @0x%04x {regs=v%d-v%d}",
@@ -1713,19 +3416,22 @@ GOTO_TARGET(invokeStatic, bool methodCallRange)
     if (methodToCall == NULL) {
         methodToCall = dvmResolveMethod(curMethod->clazz, ref, METHOD_STATIC);
         if (methodToCall == NULL) {
-            ILOGV("+ unknown method\n");
+            ILOGV("+ unknown method");
             GOTO_exceptionThrown();
         }
 
+#if defined(WITH_JIT) && defined(MTERP_STUB)
         /*
          * The JIT needs dvmDexGetResolvedMethod() to return non-null.
-         * Since we use the portable interpreter to build the trace, this extra
-         * check is not needed for mterp.
+         * Include the check if this code is being used as a stub
+         * called from the assembly interpreter.
          */
-        if (dvmDexGetResolvedMethod(methodClassDex, ref) == NULL) {
+        if ((self->interpBreak.ctl.subMode & kSubModeJitTraceBuild) &&
+            (dvmDexGetResolvedMethod(methodClassDex, ref) == NULL)) {
             /* Class initialization is still ongoing */
-            ABORT_JIT_TSELECT();
+            dvmJitEndTraceSelect(self,pc);
         }
+#endif
     }
     GOTO_invokeMethod(methodCallRange, methodToCall, vsrc1, vdst);
 GOTO_TARGET_END
@@ -1759,21 +3465,21 @@ GOTO_TARGET(invokeVirtualQuick, bool methodCallRange)
         if (!checkForNull(thisPtr))
             GOTO_exceptionThrown();
 
-#if defined(WITH_JIT) && (INTERP_TYPE == INTERP_DBG)
-        callsiteClass = thisPtr->clazz;
-#endif
 
         /*
          * Combine the object we found with the vtable offset in the
          * method.
          */
-        assert(ref < thisPtr->clazz->vtableCount);
+        assert(ref < (unsigned int) thisPtr->clazz->vtableCount);
         methodToCall = thisPtr->clazz->vtable[ref];
+#if defined(WITH_JIT) && defined(MTERP_STUB)
+        self->callsiteClass = thisPtr->clazz;
+        self->methodToCall = methodToCall;
+#endif
 
 #if 0
         if (dvmIsAbstractMethod(methodToCall)) {
-            dvmThrowException("Ljava/lang/AbstractMethodError;",
-                "abstract method not implemented");
+            dvmThrowAbstractMethodError("abstract method not implemented");
             GOTO_exceptionThrown();
         }
 #else
@@ -1781,7 +3487,7 @@ GOTO_TARGET(invokeVirtualQuick, bool methodCallRange)
             methodToCall->nativeFunc != NULL);
 #endif
 
-        LOGVV("+++ virtual[%d]=%s.%s\n",
+        LOGVV("+++ virtual[%d]=%s.%s",
             ref, methodToCall->clazz->descriptor, methodToCall->name);
         assert(methodToCall != NULL);
 
@@ -1814,11 +3520,11 @@ GOTO_TARGET(invokeSuperQuick, bool methodCallRange)
 
 #if 0   /* impossible in optimized + verified code */
         if (ref >= curMethod->clazz->super->vtableCount) {
-            dvmThrowException("Ljava/lang/NoSuchMethodError;", NULL);
+            dvmThrowNoSuchMethodError(NULL);
             GOTO_exceptionThrown();
         }
 #else
-        assert(ref < curMethod->clazz->super->vtableCount);
+        assert(ref < (unsigned int) curMethod->clazz->super->vtableCount);
 #endif
 
         /*
@@ -1834,18 +3540,16 @@ GOTO_TARGET(invokeSuperQuick, bool methodCallRange)
 
 #if 0
         if (dvmIsAbstractMethod(methodToCall)) {
-            dvmThrowException("Ljava/lang/AbstractMethodError;",
-                "abstract method not implemented");
+            dvmThrowAbstractMethodError("abstract method not implemented");
             GOTO_exceptionThrown();
         }
 #else
         assert(!dvmIsAbstractMethod(methodToCall) ||
             methodToCall->nativeFunc != NULL);
 #endif
-        LOGVV("+++ super-virtual[%d]=%s.%s\n",
+        LOGVV("+++ super-virtual[%d]=%s.%s",
             ref, methodToCall->clazz->descriptor, methodToCall->name);
         assert(methodToCall != NULL);
-
         GOTO_invokeMethod(methodCallRange, methodToCall, vsrc1, vdst);
     }
 GOTO_TARGET_END
@@ -1866,7 +3570,7 @@ GOTO_TARGET(returnFromMethod)
          * Since this is now an interpreter switch point, we must do it before
          * we do anything at all.
          */
-        PERIODIC_CHECKS(kInterpEntryReturn, 0);
+        PERIODIC_CHECKS(0);
 
         ILOGV("> retval=0x%llx (leaving %s.%s %s)",
             retval.j, curMethod->clazz->descriptor, curMethod->name,
@@ -1878,26 +3582,27 @@ GOTO_TARGET(returnFromMethod)
 #ifdef EASY_GDB
         debugSaveArea = saveArea;
 #endif
-#if (INTERP_TYPE == INTERP_DBG)
-        TRACE_METHOD_EXIT(self, curMethod);
-#endif
 
         /* back up to previous frame and see if we hit a break */
-        fp = saveArea->prevFrame;
+        fp = (u4*)saveArea->prevFrame;
         assert(fp != NULL);
+
+        /* Handle any special subMode requirements */
+        if (self->interpBreak.ctl.subMode != 0) {
+            PC_FP_TO_SELF();
+            dvmReportReturn(self);
+        }
+
         if (dvmIsBreakFrame(fp)) {
             /* bail without popping the method frame from stack */
-            LOGVV("+++ returned into break frame\n");
-#if defined(WITH_JIT)
-            /* Let the Jit know the return is terminating normally */
-            CHECK_JIT_VOID();
-#endif
+            LOGVV("+++ returned into break frame");
             GOTO_bail();
         }
 
         /* update thread FP, and reset local variables */
-        self->curFrame = fp;
+        self->interpSave.curFrame = fp;
         curMethod = SAVEAREA_FROM_FP(fp)->method;
+        self->interpSave.method = curMethod;
         //methodClass = curMethod->clazz;
         methodClassDex = curMethod->clazz->pDvmDex;
         pc = saveArea->savedPc;
@@ -1911,7 +3616,7 @@ GOTO_TARGET(returnFromMethod)
         {
             FINISH(3);
         } else {
-            //ALOGE("Unknown invoke instr %02x at %d\n",
+            //ALOGE("Unknown invoke instr %02x at %d",
             //    invokeInstr, (int) (pc - curMethod->insns));
             assert(false);
         }
@@ -1930,16 +3635,8 @@ GOTO_TARGET(exceptionThrown)
         Object* exception;
         int catchRelPc;
 
-        /*
-         * Since this is now an interpreter switch point, we must do it before
-         * we do anything at all.
-         */
-        PERIODIC_CHECKS(kInterpEntryThrow, 0);
+        PERIODIC_CHECKS(0);
 
-#if defined(WITH_JIT)
-        // Something threw during trace selection - abort the current trace
-        ABORT_JIT_TSELECT();
-#endif
         /*
          * We save off the exception and clear the exception status.  While
          * processing the exception we might need to load some Throwable
@@ -1951,13 +3648,12 @@ GOTO_TARGET(exceptionThrown)
         dvmAddTrackedAlloc(exception, self);
         dvmClearException(self);
 
-        ALOGV("Handling exception %s at %s:%d\n",
+        ALOGV("Handling exception %s at %s:%d",
             exception->clazz->descriptor, curMethod->name,
             dvmLineNumFromPC(curMethod, pc - curMethod->insns));
 
-#if (INTERP_TYPE == INTERP_DBG)
         /*
-         * Tell the debugger about it.
+         * Report the exception throw to any "subMode" watchers.
          *
          * TODO: if the exception was thrown by interpreted code, control
          * fell through native, and then back to us, we will report the
@@ -1970,14 +3666,10 @@ GOTO_TARGET(exceptionThrown)
          * here, and have the JNI exception code do the reporting to the
          * debugger.
          */
-        if (gDvm.debuggerActive) {
-            void* catchFrame;
-            catchRelPc = dvmFindCatchBlock(self, pc - curMethod->insns,
-                        exception, true, &catchFrame);
-            dvmDbgPostException(fp, pc - curMethod->insns, catchFrame,
-                catchRelPc, exception);
+        if (self->interpBreak.ctl.subMode != 0) {
+            PC_FP_TO_SELF();
+            dvmReportExceptionThrow(self, exception);
         }
-#endif
 
         /*
          * We need to unroll to the catch block or the nearest "break"
@@ -1995,7 +3687,7 @@ GOTO_TARGET(exceptionThrown)
          * the "catch" blocks.
          */
         catchRelPc = dvmFindCatchBlock(self, pc - curMethod->insns,
-                    exception, false, (void*)&fp);
+                    exception, false, (void**)(void*)&fp);
 
         /*
          * Restore the stack bounds after an overflow.  This isn't going to
@@ -2024,7 +3716,7 @@ GOTO_TARGET(exceptionThrown)
         if (catchRelPc < 0) {
             /* falling through to JNI code or off the bottom of the stack */
 #if DVM_SHOW_EXCEPTION >= 2
-            ALOGD("Exception %s from %s:%d not caught locally\n",
+            ALOGD("Exception %s from %s:%d not caught locally",
                 exception->clazz->descriptor, dvmGetMethodSourceFile(curMethod),
                 dvmLineNumFromPC(curMethod, pc - curMethod->insns));
 #endif
@@ -2036,7 +3728,7 @@ GOTO_TARGET(exceptionThrown)
 #if DVM_SHOW_EXCEPTION >= 3
         {
             const Method* catchMethod = SAVEAREA_FROM_FP(fp)->method;
-            ALOGD("Exception %s thrown from %s:%d to %s:%d\n",
+            ALOGD("Exception %s thrown from %s:%d to %s:%d",
                 exception->clazz->descriptor, dvmGetMethodSourceFile(curMethod),
                 dvmLineNumFromPC(curMethod, pc - curMethod->insns),
                 dvmGetMethodSourceFile(catchMethod),
@@ -2045,11 +3737,12 @@ GOTO_TARGET(exceptionThrown)
 #endif
 
         /*
-         * Adjust local variables to match self->curFrame and the
+         * Adjust local variables to match self->interpSave.curFrame and the
          * updated PC.
          */
-        //fp = (u4*) self->curFrame;
+        //fp = (u4*) self->interpSave.curFrame;
         curMethod = SAVEAREA_FROM_FP(fp)->method;
+        self->interpSave.method = curMethod;
         //methodClass = curMethod->clazz;
         methodClassDex = curMethod->clazz->pDvmDex;
         pc = curMethod->insns + catchRelPc;
@@ -2185,7 +3878,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
             bottom = (u1*) newSaveArea - methodToCall->outsSize * sizeof(u4);
             if (bottom < self->interpStackEnd) {
                 /* stack overflow */
-                ALOGV("Stack overflow on method call (start=%p end=%p newBot=%p(%d) size=%d '%s')\n",
+                ALOGV("Stack overflow on method call (start=%p end=%p newBot=%p(%d) size=%d '%s')",
                     self->interpStackStart, self->interpStackEnd, bottom,
                     (u1*) fp - bottom, self->interpStackSize,
                     methodToCall->name);
@@ -2193,7 +3886,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
                 assert(dvmCheckException(self));
                 GOTO_exceptionThrown();
             }
-            //ALOGD("+++ fp=%p newFp=%p newSave=%p bottom=%p\n",
+            //ALOGD("+++ fp=%p newFp=%p newSave=%p bottom=%p",
             //    fp, newFp, newSaveArea, bottom);
         }
 
@@ -2215,10 +3908,20 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
 #endif
         newSaveArea->prevFrame = fp;
         newSaveArea->savedPc = pc;
-#if defined(WITH_JIT)
+#if defined(WITH_JIT) && defined(MTERP_STUB)
         newSaveArea->returnAddr = 0;
 #endif
         newSaveArea->method = methodToCall;
+
+        if (self->interpBreak.ctl.subMode != 0) {
+            /*
+             * We mark ENTER here for both native and non-native
+             * calls.  For native calls, we'll mark EXIT on return.
+             * For non-native calls, EXIT is marked in the RETURN op.
+             */
+            PC_TO_SELF();
+            dvmReportInvoke(self, methodToCall);
+        }
 
         if (!dvmIsNativeMethod(methodToCall)) {
             /*
@@ -2226,50 +3929,33 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
              * frame pointer and other local state, and continue.
              */
             curMethod = methodToCall;
+            self->interpSave.method = curMethod;
             methodClassDex = curMethod->clazz->pDvmDex;
             pc = methodToCall->insns;
-            fp = self->curFrame = newFp;
+            fp = newFp;
+            self->interpSave.curFrame = fp;
 #ifdef EASY_GDB
             debugSaveArea = SAVEAREA_FROM_FP(newFp);
 #endif
-#if INTERP_TYPE == INTERP_DBG
-            debugIsMethodEntry = true;              // profiling, debugging
-#endif
+            self->debugIsMethodEntry = true;        // profiling, debugging
             ILOGD("> pc <-- %s.%s %s", curMethod->clazz->descriptor,
                 curMethod->name, curMethod->shorty);
             DUMP_REGS(curMethod, fp, true);         // show input args
             FINISH(0);                              // jump to method start
         } else {
             /* set this up for JNI locals, even if not a JNI native */
-#ifdef USE_INDIRECT_REF
             newSaveArea->xtra.localRefCookie = self->jniLocalRefTable.segmentState.all;
-#else
-            newSaveArea->xtra.localRefCookie = self->jniLocalRefTable.nextEntry;
-#endif
 
-            self->curFrame = newFp;
+            self->interpSave.curFrame = newFp;
 
             DUMP_REGS(methodToCall, newFp, true);   // show input args
 
-#if (INTERP_TYPE == INTERP_DBG)
-            if (gDvm.debuggerActive) {
-                dvmDbgPostLocationEvent(methodToCall, -1,
-                    dvmGetThisPtr(curMethod, fp), DBG_METHOD_ENTRY);
-            }
-#endif
-#if (INTERP_TYPE == INTERP_DBG)
-            TRACE_METHOD_ENTER(self, methodToCall);
-#endif
-
-            {
-                ILOGD("> native <-- %s.%s %s", methodToCall->clazz->descriptor,
-                        methodToCall->name, methodToCall->shorty);
+            if (self->interpBreak.ctl.subMode != 0) {
+                dvmReportPreNativeInvoke(methodToCall, self, newSaveArea->prevFrame);
             }
 
-#if defined(WITH_JIT)
-            /* Allow the Jit to end any pending trace building */
-            CHECK_JIT_VOID();
-#endif
+            ILOGD("> native <-- %s.%s %s", methodToCall->clazz->descriptor,
+                  methodToCall->name, methodToCall->shorty);
 
             /*
              * Jump through native call bridge.  Because we leave no
@@ -2278,19 +3964,14 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
              */
             (*methodToCall->nativeFunc)(newFp, &retval, methodToCall, self);
 
-#if (INTERP_TYPE == INTERP_DBG)
-            if (gDvm.debuggerActive) {
-                dvmDbgPostLocationEvent(methodToCall, -1,
-                    dvmGetThisPtr(curMethod, fp), DBG_METHOD_EXIT);
+            if (self->interpBreak.ctl.subMode != 0) {
+                dvmReportPostNativeInvoke(methodToCall, self, newSaveArea->prevFrame);
             }
-#endif
-#if (INTERP_TYPE == INTERP_DBG)
-            TRACE_METHOD_EXIT(self, methodToCall);
-#endif
 
             /* pop frame off */
             dvmPopJniLocals(self, newSaveArea);
-            self->curFrame = fp;
+            self->interpSave.curFrame = newSaveArea->prevFrame;
+            fp = newSaveArea->prevFrame;
 
             /*
              * If the native code threw an exception, or interpreted code
@@ -2298,7 +3979,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
              * it, jump to our local exception handling.
              */
             if (dvmCheckException(self)) {
-                ALOGV("Exception thrown by/below native code\n");
+                ALOGV("Exception thrown by/below native code");
                 GOTO_exceptionThrown();
             }
 
@@ -2314,7 +3995,7 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
             {
                 FINISH(3);
             } else {
-                //ALOGE("Unknown invoke instr %02x at %d\n",
+                //ALOGE("Unknown invoke instr %02x at %d",
                 //    invokeInstr, (int) (pc - curMethod->insns));
                 assert(false);
             }
@@ -2323,14 +4004,12 @@ GOTO_TARGET(invokeMethod, bool methodCallRange, const Method* _methodToCall,
     assert(false);      // should not get here
 GOTO_TARGET_END
 
-/* File: cstubs/enddefs.c */
+/* File: portable/enddefs.cpp */
+/*--- end of opcodes ---*/
 
-/* undefine "magic" name remapping */
-#undef retval
-#undef pc
-#undef fp
-#undef curMethod
-#undef methodClassDex
-#undef self
-#undef debugTrackedRefStart
+bail:
+    ILOGD("|-- Leaving interpreter loop");      // note "curMethod" may be NULL
+
+    self->interpSave.retval = retval;
+}
 
