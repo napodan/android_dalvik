@@ -228,7 +228,6 @@ struct DvmGlobals {
     ClassObject* classOrgApacheHarmonyLangAnnotationAnnotationMember;
     ClassObject* classOrgApacheHarmonyLangAnnotationAnnotationMemberArray;
     ClassObject* classOrgApacheHarmonyNioInternalDirectBuffer;
-    jclass      jclassOrgApacheHarmonyNioInternalDirectBuffer;
 
     /* synthetic classes for arrays of primitives */
     ClassObject* classArrayBoolean;
@@ -333,7 +332,6 @@ struct DvmGlobals {
     int         offJavaNioBuffer_capacity;
     int         offJavaNioBuffer_effectiveDirectAddress;
     int         offOrgApacheHarmonyLuniPlatformPlatformAddress_osaddr;
-    int         voffOrgApacheHarmonyLuniPlatformPlatformAddress_toLong;
 
     /*
      * VM-synthesized primitive classes, for arrays.
