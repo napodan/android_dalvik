@@ -205,7 +205,7 @@ static size_t getAllocLimit(const HeapSource *hs)
     if (isSoftLimited(hs)) {
         return hs->softLimit;
     } else {
-        return mspace_max_allowed_footprint(hs2heap(hs)->msp);
+        return mspace_footprint_limit(hs2heap(hs)->msp);
     }
 }
 
@@ -262,7 +262,7 @@ static void countAllocation(Heap *heap, const void *ptr, bool isObj)
 {
     assert(heap->bytesAllocated < mspace_footprint(heap->msp));
 
-    heap->bytesAllocated += mspace_usable_size(heap->msp, ptr) +
+    heap->bytesAllocated += mspace_usable_size(ptr) +
             HEAP_SOURCE_CHUNK_OVERHEAD;
     if (isObj) {
     heap->objectsAllocated++;
@@ -275,7 +275,7 @@ static void countAllocation(Heap *heap, const void *ptr, bool isObj)
 
 static void countFree(Heap *heap, const void *ptr, size_t *numBytes)
 {
-    size_t delta = mspace_usable_size(heap->msp, ptr) + HEAP_SOURCE_CHUNK_OVERHEAD;
+    size_t delta = mspace_usable_size(ptr) + HEAP_SOURCE_CHUNK_OVERHEAD;
     assert(delta > 0);
     if (delta < heap->bytesAllocated) {
         heap->bytesAllocated -= delta;
@@ -312,7 +312,7 @@ static mspace createMspace(void* base, size_t startSize, size_t absoluteMaxSize)
         /* Don't let the heap grow past the starting size without
          * our intervention.
          */
-        mspace_set_max_allowed_footprint(msp, startSize);
+        mspace_set_footprint_limit(msp, startSize);
     } else {
         /* There's no guarantee that errno has meaning when the call
          * fails, but it often does.
@@ -375,7 +375,7 @@ static bool addNewHeap(HeapSource *hs, mspace msp, size_t mspAbsoluteMaxSize)
      */
     if (hs->numHeaps > 0) {
         mspace msp = hs->heaps[0].msp;
-        mspace_set_max_allowed_footprint(msp, mspace_footprint(msp));
+        mspace_set_footprint_limit(msp, mspace_footprint(msp));
     }
 
     /* Put the new heap in the list, at heaps[0].
@@ -622,7 +622,7 @@ size_t dvmHeapSourceGetValue(HeapSourceValueSpec spec, size_t perHeapStats[],
             value = mspace_footprint(heap->msp);
             break;
         case HS_ALLOWED_FOOTPRINT:
-            value = mspace_max_allowed_footprint(heap->msp);
+            value = mspace_footprint_limit(heap->msp);
             break;
         case HS_BYTES_ALLOCATED:
             value = heap->bytesAllocated;
@@ -803,13 +803,13 @@ static void* heapAllocAndGrow(HeapSource *hs, Heap *heap, size_t n)
     if (max > hs->externalBytesAllocated) {
         max -= hs->externalBytesAllocated;
 
-        mspace_set_max_allowed_footprint(heap->msp, max);
+        mspace_set_footprint_limit(heap->msp, max);
         ptr = dvmHeapSourceAlloc(n);
 
         /* Shrink back down as small as possible.  Our caller may
          * readjust max_allowed to a more appropriate value.
          */
-        mspace_set_max_allowed_footprint(heap->msp,
+        mspace_set_footprint_limit(heap->msp,
                 mspace_footprint(heap->msp));
     } else {
         ptr = NULL;
@@ -1010,7 +1010,7 @@ size_t dvmHeapSourceChunkSize(const void *ptr)
 
     Heap* heap = ptr2heap(gHs, ptr);
     if (heap != NULL) {
-        return mspace_usable_size(heap->msp, ptr);
+        return mspace_usable_size(ptr);
     }
     return 0;
 }
@@ -1077,13 +1077,13 @@ static void setSoftLimit(HeapSource *hs, size_t softLimit)
     if (softLimit < currentHeapSize) {
         /* Don't let the heap grow any more, and impose a soft limit.
          */
-        mspace_set_max_allowed_footprint(msp, currentHeapSize);
+        mspace_set_footprint_limit(msp, currentHeapSize);
         hs->softLimit = softLimit;
     } else {
         /* Let the heap grow to the requested max, and remove any
          * soft limit, if set.
          */
-        mspace_set_max_allowed_footprint(msp, softLimit);
+        mspace_set_footprint_limit(msp, softLimit);
         hs->softLimit = SIZE_MAX;
     }
 }
@@ -1101,7 +1101,7 @@ static void setIdealFootprint(size_t max)
     HeapSource oldHs = *hs;
     mspace msp = hs->heaps[0].msp;
     size_t oldAllowedFootprint =
-            mspace_max_allowed_footprint(msp);
+            mspace_footprint_limit(msp);
 #endif
 
     HS_BOILERPLATE();
@@ -1133,8 +1133,8 @@ static void setIdealFootprint(size_t max)
             "ext %zd\n",
             oldHs.idealSize, hs->idealSize, hs->idealSize - oldHs.idealSize,
             oldHs.softLimit, hs->softLimit, hs->softLimit - oldHs.softLimit,
-            oldAllowedFootprint, mspace_max_allowed_footprint(msp),
-            mspace_max_allowed_footprint(msp) - oldAllowedFootprint,
+            oldAllowedFootprint, mspace_footprint_limit(msp),
+            mspace_footprint_limit(msp) - oldAllowedFootprint,
             hs->externalBytesAllocated);
 
 }
@@ -1319,7 +1319,7 @@ void dvmHeapSourceGrowForUtilization()
     } else {
         heap->concurrentStartBytes = freeBytes - CONCURRENT_START;
     }
-    newHeapMax = mspace_max_allowed_footprint(heap->msp);
+    newHeapMax = mspace_footprint_limit(heap->msp);
     if (isSoftLimited(hs)) {
         LOGD_HEAP("GC old usage %zd.%zd%%; now "
                 "%zd.%03zdMB used / %zd.%03zdMB soft max "
@@ -1456,7 +1456,7 @@ static bool externalBytesAvailable(const HeapSource *hs, size_t numBytes)
      * a small softLimit but a large heap footprint.
      */
     heap = hs2heap(hs);
-    currentHeapSize = mspace_max_allowed_footprint(heap->msp);
+    currentHeapSize = mspace_footprint_limit(heap->msp);
     newHeapSize = currentHeapSize + hs->externalBytesAllocated + numBytes;
     if (newHeapSize <= heap->absoluteMaxSize) {
         return true;
